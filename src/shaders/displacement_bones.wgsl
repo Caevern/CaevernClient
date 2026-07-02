@@ -29,7 +29,7 @@ struct Output {
 
 @vertex
 fn vs_main(
-    @location(0) pos: vec4<f32>, @location(1) normal: vec4<f32>, 
+    @location(0) pos: vec4<f32>, @location(1) normal: vec4<f32>,
     @location(2) color: vec4<f32>, @location(3) uv: vec4<f32>,
     @location(4) bone_index: vec4<f32>, @location(5) bone_weight: vec4<f32>
     ) -> Output {
@@ -48,7 +48,7 @@ fn vs_main(
         + bone_weight.z * bones.matrices[u32(bone_index.z)]
         + bone_weight.w * bones.matrices[u32(bone_index.w)];
     let skinned_pos = skin_mat * displaced_pos;
-    
+
     let m_position:vec4<f32> = model.model_mat * skinned_pos;
     output.position = uniforms.view_project_mat * m_position;
     output.v_position = m_position;

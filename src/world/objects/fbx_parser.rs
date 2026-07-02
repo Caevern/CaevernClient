@@ -514,9 +514,9 @@ fn get_transform(node: &Node) -> Option<Transform> {
                             }
 
                             match prop_name {
-                                "Lcl Translation" => translation = (nums[0] / 100.0, nums[1] / 100.0, nums[2] / 100.0),
+                                "Lcl Translation" => translation = (nums[0], nums[1], nums[2]),
                                 "Lcl Rotation" => rotation = (nums[0], nums[1], nums[2]),
-                                "Lcl Scaling" => scaling = (nums[0] / 100.0, nums[1] / 100.0, nums[2] / 100.0),
+                                "Lcl Scaling" => scaling = (nums[0], nums[1], nums[2]),
                                 _ => {}
                             }
                         }

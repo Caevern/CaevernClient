@@ -6,16 +6,16 @@
     "objects": [
         {
             "is_static": true, "reference": "models/base.fbx",
-            "texture": "textures/brick.jpg", "transform": {"position": [0, 1.5, 0], "scale": [1.0, 0.5, 1.0]}
+            "texture": "textures/brick.jpg", "transform": {"position": [0, 1.5, 0], "scale": [0.01, 0.005, 0.01]}
         },
         {
             "is_static": true, "reference": "models/table.fbx",
-            "transform": {"position": [0, 2, 0], "scale": [1.0, 1.0, 2.0]},
+            "transform": {"position": [0, 2, 0], "scale": [0.01, 0.01, 0.02]},
             "texture": "textures/table.png"
         },
         {
             "is_static": false, "reference": "models/fallback.fbx",
-            "transform": {"position": [4, 1.9, 0], "scale": [0.017, 0.017, 0.017]},
+            "transform": {"position": [4, 1.9, 0], "scale": [0.01, 0.01, 0.01]},
             "materials": [
                 {"name": "BodyMaterial", "texture": "textures/CG_Body_Base_color.png"},
                 {"name": "HairsMaterial", "texture": "textures/CG_Hairs_Base_color.png"},
