@@ -553,7 +553,9 @@ impl Renderer {
             } else if self.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
                 let skeleton = self.world.get_object(i).get_skeleton();
                 self.bones[i][skeleton["neck"]].0.rotation.y = self.player.camera.rotation.y + 1.57079633;
-                //self.bones[i][skeleton["head"]].rotation.y = self.player.camera.rotation.y + 1.57079633;
+                //self.bones[i][skeleton["head"]].0.scale.x = 0.0;
+                //self.bones[i][skeleton["head"]].0.scale.y = 0.0;
+                //self.bones[i][skeleton["head"]].0.scale.z = 0.0;
                 self.update_bones(i);
             }
         }

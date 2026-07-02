@@ -1,0 +1,17 @@
+{
+    "name": "fallback",
+    "id": 0,
+    "creator": "theCaely",
+
+    "reference": "models/fallback.fbx",
+    "transform": {"position": [0, 0, 0], "scale": [0.017, 0.017, 0.017]},
+    "materials": [
+        {"name": "BodyMaterial", "texture": "textures/CG_Body_Base_color.png"},
+        {"name": "HairsMaterial", "texture": "textures/CG_Hairs_Base_color.png"},
+        {"name": "DressMaterial", "texture": "textures/CG_Dress_Base_color.png"}
+    ],
+    "skeleton": [
+        {"body_part": "neck", "bone_name": "neck.xModel"},
+        {"body_part": "head", "bone_name": "head.xModel"}
+    ]
+}
