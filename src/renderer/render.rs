@@ -1,6 +1,7 @@
 use cgmath::*;
 use winit::window::Window;
 use std::iter;
+use std::sync::Arc;
 use wgpu::BindGroup;
 use rust_embed::RustEmbed;
 use std::collections::HashMap;
@@ -31,8 +32,8 @@ pub enum ShaderType {
 #[folder = "assets/"]
 pub struct Assets;
 
-pub struct Renderer {
-    pub init: transforms::InitWgpu,
+pub struct Renderer<'window> {
+    pub init: transforms::InitWgpu<'window>,
     project_mat: Matrix4<f32>,
 
     pipeline_displacement: wgpu::RenderPipeline,
@@ -58,17 +59,16 @@ pub struct Renderer {
 
     // the client position and rotation
     player: Player,
-    //camera_position: (f32, f32, f32),
-    //camera_rotation: (f32, f32, f32),
-    //camera_acceleration_walking: (f32, f32, f32),
 
     world: World,
     current_camera: usize,
 
     // networking
-    job_tx: Sender<LocalUserUpdate>
+    job_tx: Sender<LocalUserUpdate>,
+
+    pending_resize: Option<winit::dpi::PhysicalSize<u32>>
 }
-impl Renderer {
+impl<'window> Renderer<'window> {
     fn create_buffer_displacement(
         init: &transforms::InitWgpu, 
         uniform_bind_group_layout: &wgpu::BindGroupLayout, 
@@ -171,7 +171,7 @@ impl Renderer {
         return (uniform_bind_group, vertex_buffer)
     }
 
-    pub async fn new(window: &Window, job_tx: Sender<LocalUserUpdate>) -> Self {
+    pub async fn new(window: &Arc<Window>, job_tx: Sender<LocalUserUpdate>) -> Self {
         let init =  transforms::InitWgpu::init_wgpu(window).await;
 
         let camera_position: (f32, f32, f32) = (-10.0, 4.0, 0.0);
@@ -277,6 +277,7 @@ impl Renderer {
                 module: &shader_displacement,
                 entry_point: "vs_main",
                 buffers: &[Vertex::desc()],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader_displacement,
@@ -297,6 +298,7 @@ impl Renderer {
                     }),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             }),
             primitive: wgpu::PrimitiveState{
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -327,6 +329,7 @@ impl Renderer {
                 module: &shader_displacement_bones,
                 entry_point: "vs_main",
                 buffers: &[Vertex::desc()],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader_displacement_bones,
@@ -347,6 +350,7 @@ impl Renderer {
                     }),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
+                compilation_options: wgpu::PipelineCompilationOptions::default(),
             }),
             primitive: wgpu::PrimitiveState{
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -439,26 +443,25 @@ impl Renderer {
             font_maps,
 
             player: Player::new(),
-            //camera_position,
-            //camera_rotation,
-            //camera_acceleration_walking: (0.0, 0.0, 0.0),
 
             world: World::new(),
             current_camera: 0,
 
-            job_tx
+            job_tx,
+
+            pending_resize: None
         }
     }
+
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         if new_size.width > 0 && new_size.height > 0 {
             self.init.instance.poll_all(true);
             self.init.size = new_size;
-            self.init.config.width = new_size.width;
-            self.init.config.height = new_size.height;
-            self.init.surface.configure(&self.init.device, &self.init.config);
+            self.pending_resize = Some(new_size);
             self.project_mat = transforms::create_projection(new_size.width as f32 / new_size.height as f32);
         }
     }
+
     pub fn update(&mut self, _dt: std::time::Duration, keys: [bool; 6], mouse: [f32; 2], menu_tablet_state: usize) {
         let current_time = std::time::Instant::now();
         let mut frame_time = current_time.duration_since(self.previous_frame_time).as_secs_f32() * 20.0;
@@ -580,6 +583,12 @@ impl Renderer {
                 self.init.queue.write_buffer(&self.fragment_uniform_buffer, 16, bytemuck::cast_slice(eye_position));
                 self.init.queue.write_buffer(&self.model_uniform_buffers[grabbable_object_index], 0, bytemuck::cast_slice(model_ref));
                 self.init.queue.write_buffer(&self.model_uniform_buffers[grabbable_object_index], 64, bytemuck::cast_slice(normal_ref));
+            }
+
+            if let Some(size) = self.pending_resize.take() {
+                self.init.config.width = size.width;
+                self.init.config.height = size.height;
+                self.init.surface.configure(&self.init.device, &self.init.config);
             }
 
             let _ = self.job_tx.send(LocalUserUpdate::SendUserPosition(
@@ -904,18 +913,20 @@ impl Renderer {
                             b: 0.314,
                             a: 1.0,
                         }),
-                        store: true,
+                        store: wgpu::StoreOp::Store,
                     },
-                })], 
+                })],
                 //depth_stencil_attachment: None,
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &depth_view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
-                        store: false,
+                        store: wgpu::StoreOp::Discard,
                     }),
                     stencil_ops: None,
                 }),
+                occlusion_query_set: None,
+                timestamp_writes: None,
             });
 
             let mut current_shader = ShaderType::Displacement;

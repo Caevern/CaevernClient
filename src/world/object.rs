@@ -98,7 +98,6 @@ impl Object {
         let mut bones_converted: Vec<(Transform, Transform, i64)> = new_bone_vec(bones.len());
         for bone in bones {
             if bone.1.0 > bones_converted.len() { continue; }
-            //println!("{} : {}", bone.1.0, bone.1.2);
             bones_converted[bone.1.0] = (
                 Transform { position: position, rotation: rotation, scale: scale },
                 Transform { position: bone.1.1.position, rotation: bone.1.1.rotation, scale: bone.1.1.scale },

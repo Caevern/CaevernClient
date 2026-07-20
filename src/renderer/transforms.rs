@@ -1,5 +1,5 @@
 #![allow(dead_code)]
-use std::f32::consts::PI;
+use std::{f32::consts::PI, sync::Arc};
 use winit::window::Window;
 use cgmath::*;
 
@@ -11,25 +11,21 @@ pub const OPENGL_TO_WGPU_MATRIX: Matrix4<f32> = Matrix4::new(
     0.0, 0.0, 0.5, 0.0,
     0.0, 0.0, 0.5, 1.0,
 );
-pub struct InitWgpu {
+pub struct InitWgpu<'window> {
     pub instance: wgpu::Instance,
-    pub surface: wgpu::Surface,
+    pub surface: wgpu::Surface<'window>,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
     pub config: wgpu::SurfaceConfiguration,
     pub size: winit::dpi::PhysicalSize<u32>,
 }
 
-impl InitWgpu {
-    pub async fn init_wgpu(window: &Window) -> Self {
+impl<'window> InitWgpu<'window> {
+    pub async fn init_wgpu(window: &Arc<Window>) -> Self {
         let size = window.inner_size();
+        let instance = wgpu::Instance::default();
 
-        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::all(),
-            dx12_shader_compiler: Default::default(),
-        });
-
-        let surface = unsafe { instance.create_surface(window) }.unwrap();
+        let surface = instance.create_surface(Arc::clone(&window)).unwrap();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),
@@ -43,10 +39,10 @@ impl InitWgpu {
             .request_device(
                 &wgpu::DeviceDescriptor {
                     label: None,
-                    features: wgpu::Features::empty(),
-                    limits: wgpu::Limits::default(),
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
                 },
-                None, // Trace path
+                None,
             )
             .await
             .unwrap();
@@ -61,10 +57,11 @@ impl InitWgpu {
             present_mode: wgpu::PresentMode::Fifo,
             alpha_mode:surface_caps.alpha_modes[0],
             view_formats: vec![],
+            desired_maximum_frame_latency: 2,
         };
         surface.configure(&device, &config);
      
-        Self{
+        Self {
             instance,
             surface,
             device,

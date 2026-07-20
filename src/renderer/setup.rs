@@ -1,205 +1,32 @@
-use winit::{event::*, event_loop::{ControlFlow, EventLoop}};
-use std::sync::mpsc;
-use crate::{
-    network::users::{LocalUserUpdate, start_user_handler}, renderer::render::Renderer, world::world::World, xr::xr_manager::XRManager
-};
+use winit::event_loop::EventLoop;
 
-// this will call the render class
+use crate::renderer::game_window::GameWindow;
+use crate::world::world::World;
+
 pub fn start_engine(world: World) {
     env_logger::init();
-    let event_loop = EventLoop::new();
-    let window = winit::window::WindowBuilder::new().build(&event_loop).unwrap();
-    window.set_title("Caevern");
+    let event_loop = EventLoop::new().unwrap();
 
-    let (job_tx, job_rx) = mpsc::channel::<LocalUserUpdate>();
-    //let (result_tx, result_rx) = mpsc::channel::<UsersUpdate>();
+    let mut game_window = GameWindow {
+        window: None,
+        renderer: None,
 
-    let mut renderer = pollster::block_on(Renderer::new(&window, job_tx));
-    let render_start_time = std::time::Instant::now();
+        window_size: (0, 0),
 
-    let mut mouse_locked = false;
+        title: "Caevern".to_string(),
+        icon: None,
 
-    let mut keys = [false; 6]; // keys: W A S D
-    let mut mouse: [f32; 2] = [0.0; 2]; // mouse movement x and y
+        render_start_time: std::time::Instant::now(),
+        keys: [false; 6],
+        mouse_movement: [0.0; 2],
 
-    let mut use_confined = false;
+        mouse_locked: false,
+        use_confined: false,
+        xr_enabled: false,
+        menu_tablet_state: 0,
 
-    let mut menu_tablet_state = 0;
+        home_world: world
+    };
 
-    // TODO: change xr_enabled to an actual option
-    let xr_enabled = true;
-
-    if xr_enabled {
-        if let Ok(xr) = XRManager::new() {
-            println!("STARTED XRManager!!!")
-        } else {
-            println!("Initializing XRManager has failed :C")
-        }
-    }
-
-    start_user_handler(job_rx);
-
-    renderer.set_world(world);
-
-    event_loop.run(move |event, _, control_flow| {
-        mouse[0] -= mouse[0] * 0.1;
-        mouse[1] -= mouse[1] * 0.1;
-        match event {
-            Event::DeviceEvent { event: DeviceEvent::MouseMotion { delta }, .. } => {
-                if mouse_locked && !use_confined {
-                    mouse[0] -= delta.0 as f32;
-                    mouse[1] -= delta.1 as f32;
-                }
-            }
-            Event::WindowEvent {
-                ref event,
-                window_id,
-            } if window_id == window.id() => {
-                match event {
-                    WindowEvent::Focused(focused) => {
-                        if !focused {
-                            mouse_locked = false;
-                            if let Err(err) = window.set_cursor_grab(winit::window::CursorGrabMode::None) {
-                                eprintln!("Failed to unlock the cursor: {:?}", err);
-                            }
-                            window.set_cursor_visible(true);
-                        }
-                    }
-                    WindowEvent::CloseRequested {} => *control_flow = ControlFlow::Exit,
-                    WindowEvent::Resized(physical_size) => {
-                        renderer.resize(*physical_size);
-                    }
-                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                        renderer.resize(**new_inner_size);
-                    }
-                    WindowEvent::CursorMoved { position, .. } => {
-                        if !use_confined { return; }
-                        if mouse_locked {
-                            let window_size = window.inner_size();
-                            let center_x = window_size.width as f64 / 2.0;
-                            let center_y = window_size.height as f64 / 2.0;
-                            mouse[0] += (center_x - position.x) as f32;
-                            mouse[1] += (center_y - position.y) as f32;
-                            window.set_cursor_position(winit::dpi::PhysicalPosition::new(center_x, center_y)).expect("Failed to set cursor position");
-                        } else {
-                            mouse[0] = 0.0;
-                            mouse[1] = 0.0;
-                        }
-                    }
-                    WindowEvent::KeyboardInput {
-                        input: KeyboardInput {
-                                state: key_state,
-                                virtual_keycode: Some(keycode),
-                                ..
-                            },
-                        ..
-                    } => {
-                        match key_state {
-                            ElementState::Pressed => {
-                                match &keycode {
-                                    &VirtualKeyCode::W => { keys[0] = true }
-                                    &VirtualKeyCode::A => { keys[1] = true }
-                                    &VirtualKeyCode::S => { keys[2] = true }
-                                    &VirtualKeyCode::D => { keys[3] = true }
-                                    &VirtualKeyCode::Space => { keys[4] = true }
-                                    &VirtualKeyCode::Escape | &VirtualKeyCode::LWin | &VirtualKeyCode::RWin => {
-                                        if menu_tablet_state == 0 {
-                                            menu_tablet_state = 2;
-                                            mouse_locked = false;
-                                            if let Err(err) = window.set_cursor_grab(winit::window::CursorGrabMode::None) {
-                                                eprintln!("Failed to unlock the cursor: {:?}", err);
-                                            }
-                                            window.set_cursor_visible(true);
-                                        } else if menu_tablet_state == 1 {
-                                            menu_tablet_state = 3;
-                                            mouse_locked = true;
-                                            if !use_confined {
-                                                if let Err(err) = window.set_cursor_grab(winit::window::CursorGrabMode::Locked) {
-                                                    eprintln!("Failed to lock the cursor, switching to confined: {:?}", err);
-                                                    use_confined = true;
-                                                }
-                                            } else {
-                                                if let Err(err) = window.set_cursor_grab(winit::window::CursorGrabMode::Confined) {
-                                                    eprintln!("Failed to confine the cursor, switching to locked: {:?}", err);
-                                                }
-                                                let window_size = window.inner_size();
-                                                let center_x = window_size.width as f64 / 2.0;
-                                                let center_y = window_size.height as f64 / 2.0;
-                                                window.set_cursor_position(winit::dpi::PhysicalPosition::new(center_x, center_y)).expect("Failed to set cursor position");
-                                            }
-                                            window.set_cursor_visible(false);
-                                        }
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            ElementState::Released => {
-                                match &keycode {
-                                    &VirtualKeyCode::W => { keys[0] = false }
-                                    &VirtualKeyCode::A => { keys[1] = false }
-                                    &VirtualKeyCode::S => { keys[2] = false }
-                                    &VirtualKeyCode::D => { keys[3] = false }
-                                    &VirtualKeyCode::Space => { keys[4] = false }
-                                    _ => {}
-                                }
-                            }
-                        }
-                    }
-                    WindowEvent::MouseInput { state, button, .. } => {
-                        match state {
-                            ElementState::Pressed => {
-                                match button {
-                                    MouseButton::Left => {
-                                        mouse_locked = true;
-                                        if !use_confined {
-                                            if let Err(err) = window.set_cursor_grab(winit::window::CursorGrabMode::Locked) {
-                                                eprintln!("Failed to lock the cursor, switching to confined: {:?}", err);
-                                                use_confined = true;
-                                            }
-                                        } else {
-                                            if let Err(err) = window.set_cursor_grab(winit::window::CursorGrabMode::Confined) {
-                                                eprintln!("Failed to confine the cursor, switching to locked: {:?}", err);
-                                            }
-                                            let window_size = window.inner_size();
-                                            let center_x = window_size.width as f64 / 2.0;
-                                            let center_y = window_size.height as f64 / 2.0;
-                                            window.set_cursor_position(winit::dpi::PhysicalPosition::new(center_x, center_y)).expect("Failed to set cursor position");
-                                        }
-                                        window.set_cursor_visible(false);
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            ElementState::Released => {
-                                return
-                            }
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            Event::RedrawRequested(_) => {
-                let now = std::time::Instant::now();
-                let dt = now - render_start_time;
-
-                renderer.update(dt, keys, mouse, menu_tablet_state);
-                if menu_tablet_state == 2 {
-                    menu_tablet_state = 1;
-                } else if menu_tablet_state == 3 {
-                    menu_tablet_state = 0;
-                }
-
-                match renderer.render() {
-                    Ok(_) => {}
-                    Err(wgpu::SurfaceError::Lost) => renderer.resize(renderer.init.size),
-                    Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
-                    Err(e) => eprintln!("{:?}", e),
-                }
-            }
-            Event::MainEventsCleared => {
-                window.request_redraw();
-            }
-            _ => {}
-        }
-    });
+    event_loop.run_app(&mut game_window).unwrap();
 }

@@ -4,6 +4,7 @@ use cgmath::Vector3;
 
 use crate::{renderer::{transform::Transform, vertex::create_vertices_skinned}, world::{material::Material, object::{Object, ObjectType}, objects::fbx_parser::parse, scene::load_scene}};
 
+#[derive(Clone)]
 pub struct World {
     pub objects: Vec<Object>,
     pub textures: HashSet<String>,
