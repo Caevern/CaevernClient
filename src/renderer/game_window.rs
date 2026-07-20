@@ -133,11 +133,33 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                             PhysicalKey::Code(KeyCode::KeyD) => { self.keys[3] = true; }
                             PhysicalKey::Code(KeyCode::Space) => { self.keys[4] = true; }
                             PhysicalKey::Code(KeyCode::Escape) | PhysicalKey::Code(KeyCode::SuperLeft) | PhysicalKey::Code(KeyCode::SuperRight) => {
-                                self.mouse_locked = false;
-                                if let Err(err) = self.window.as_ref().unwrap().set_cursor_grab(winit::window::CursorGrabMode::None) {
-                                    eprintln!("Failed to unlock the cursor: {:?}", err);
+                                if self.menu_tablet_state == 0 {
+                                    self.menu_tablet_state = 2;
+                                    self.mouse_locked = false;
+                                    if let Err(err) = self.window.as_ref().unwrap().set_cursor_grab(winit::window::CursorGrabMode::None) {
+                                        eprintln!("Failed to unlock the cursor: {:?}", err);
+                                    }
+                                    self.window.as_ref().unwrap().set_cursor_visible(true);
+                                } else if self.menu_tablet_state == 1 {
+                                    self.menu_tablet_state = 3;
+                                    self.mouse_locked = true;
+                                    if !self.use_confined {
+                                        if let Err(err) = self.window.as_ref().unwrap().set_cursor_grab(winit::window::CursorGrabMode::Locked) {
+                                            eprintln!("Failed to lock the cursor, switching to confined: {:?}", err);
+                                            self.use_confined = true;
+                                        }
+                                    } else {
+                                        if let Err(err) = self.window.as_ref().unwrap().set_cursor_grab(winit::window::CursorGrabMode::Confined) {
+                                            eprintln!("Failed to confine the cursor, switching to locked: {:?}", err);
+                                        }
+                                        let window_size = self.window.as_ref().unwrap().inner_size();
+                                        let center_x = window_size.width as f64 / 2.0;
+                                        let center_y = window_size.height as f64 / 2.0;
+                                        self.window.as_ref().unwrap().set_cursor_position(winit::dpi::PhysicalPosition::new(center_x, center_y))
+                                            .expect("Failed to set cursor position");
+                                    }
+                                    self.window.as_ref().unwrap().set_cursor_visible(false);
                                 }
-                                self.window.as_ref().unwrap().set_cursor_visible(true);
                             }
                             _ => {}
                         }
@@ -167,6 +189,12 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     self.mouse_movement,
                     self.menu_tablet_state
                 );
+
+                if self.menu_tablet_state == 2 {
+                    self.menu_tablet_state = 1;
+                } else if self.menu_tablet_state == 3 {
+                    self.menu_tablet_state = 0;
+                }
 
                 self.mouse_movement = [0.0, 0.0];
 

@@ -699,7 +699,7 @@ impl<'window> Renderer<'window> {
                         current_parent_bone.1.rotation.into(),
                         current_parent_bone.1.scale.into(),
                     );
-                    println!("B: {:?}", current_parent_bone.1.position);
+                    //println!("B: {:?}", current_parent_bone.1.position);
                     bind_global = parent_bind * bind_global;
 
                     let parent_matrix = create_transforms(
