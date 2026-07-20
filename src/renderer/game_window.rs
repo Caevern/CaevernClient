@@ -53,7 +53,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         let (job_tx, job_rx) = mpsc::channel::<LocalUserUpdate>();
 
         // TODO: change xr_enabled to an actual option
-        self.xr_enabled = true;
+        self.xr_enabled = false;
 
         if self.xr_enabled {
             if let Ok(xr) = XRManager::new() {
