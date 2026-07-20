@@ -9,7 +9,6 @@ Custom engine? Of course! :D
 - 512MB Storage
 - 256MB Ram
 - 1 CPU core
-- GPU (Optional)
 
 # Todo List Client:
 - [x] Basic Rendering
