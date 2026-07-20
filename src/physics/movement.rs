@@ -47,7 +47,7 @@ pub fn get_camera_movement(
         walking_force.z -= frame_time * right[2] * player.walking_speed;
     }
     if keys[4] && player.is_grounded {
-        player.add_force(0.0, frame_time * player.jump_force, 0.0);
+        player.add_force(0.0, player.jump_force, 0.0);
         player.is_grounded = false;
     }
     walking_force

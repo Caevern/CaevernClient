@@ -14,11 +14,11 @@ pub fn apply_gravity(player: &mut Player, frame_time: f32) {
         if player.forces.y < 0.0 {
             player.forces.y = 0.0;
         } else {
-            player.camera.position.y += player.forces.y;
+            player.camera.position.y += player.forces.y * frame_time;
         }
         return;
     }
 
     player.forces.y -= 0.1 * frame_time;
-    player.camera.position.y += player.forces.y;
+    player.camera.position.y += player.forces.y * frame_time;
 }
