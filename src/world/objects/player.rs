@@ -20,7 +20,7 @@ impl Player {
 
             is_grounded: true,
             walking_speed: 0.25,
-            jump_force: 0.6
+            jump_force: 0.3
         }
     }
 
