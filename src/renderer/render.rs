@@ -1,6 +1,5 @@
 use cgmath::*;
 use winit::window::Window;
-use std::iter;
 use std::sync::Arc;
 use wgpu::BindGroup;
 use rust_embed::RustEmbed;
@@ -35,6 +34,10 @@ pub struct Assets;
 pub struct Renderer<'window> {
     pub init: transforms::InitWgpu<'window>,
     project_mat: Matrix4<f32>,
+
+    // TODO: Use a depth texture buffer instead of a new one per frame
+    //depth_texture: wgpu::Texture,
+    //depth_view: wgpu::TextureView,
 
     pipeline_displacement: wgpu::RenderPipeline,
     pipeline_displacement_bones: wgpu::RenderPipeline,
@@ -78,14 +81,14 @@ impl<'window> Renderer<'window> {
         texture: &wgpu::Texture, texture_size: wgpu::Extent3d, rgba: &Vec<u8>, width: u32, height: u32, vertex_num: usize,
     ) -> (BindGroup, wgpu::Buffer) {
         init.queue.write_texture(
-            wgpu::ImageCopyTexture {
+            wgpu::TexelCopyTextureInfo {
                 texture: &texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
             &rgba,
-            wgpu::ImageDataLayout {
+            wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(4 * width),
                 rows_per_image: Some(height),
@@ -94,14 +97,14 @@ impl<'window> Renderer<'window> {
         );
 
         init.queue.write_texture(
-            wgpu::ImageCopyTexture {
+            wgpu::TexelCopyTextureInfo {
                 texture: &displacement_texture,
                 mip_level: 0,
                 origin: wgpu::Origin3d::ZERO,
                 aspect: wgpu::TextureAspect::All,
             },
             &displacement_rgba,
-            wgpu::ImageDataLayout {
+            wgpu::TexelCopyBufferLayout {
                 offset: 0,
                 bytes_per_row: Some(4 * displacement_width),
                 rows_per_image: Some(displacement_height),
@@ -117,7 +120,7 @@ impl<'window> Renderer<'window> {
             address_mode_w: wgpu::AddressMode::ClampToEdge,
             mag_filter: wgpu::FilterMode::Nearest,
             min_filter: wgpu::FilterMode::Nearest,
-            mipmap_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::MipmapFilterMode::Nearest,
             ..Default::default()
         });
 
@@ -261,8 +264,8 @@ impl<'window> Renderer<'window> {
 
         let pipeline_layout = init.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &[&uniform_bind_group_layout],
-            push_constant_ranges: &[],
+            bind_group_layouts: &[Some(&uniform_bind_group_layout)],
+            immediate_size: 0
         });
 
         let shader_displacement = init.device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -275,13 +278,13 @@ impl<'window> Renderer<'window> {
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader_displacement,
-                entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
+                entry_point: Some("vs_main"),
+                buffers: &[Some(Vertex::desc())],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader_displacement,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: init.config.format,
                     blend: Some(wgpu::BlendState {
@@ -308,13 +311,14 @@ impl<'window> Renderer<'window> {
             //depth_stencil: None,
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth24Plus,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::LessEqual,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::LessEqual),
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),
             multisample: wgpu::MultisampleState::default(),
-            multiview: None
+            multiview_mask: None,
+            cache: None
         });
 
         let shader_displacement_bones = init.device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -327,13 +331,13 @@ impl<'window> Renderer<'window> {
             layout: Some(&pipeline_layout),
             vertex: wgpu::VertexState {
                 module: &shader_displacement_bones,
-                entry_point: "vs_main",
-                buffers: &[Vertex::desc()],
+                entry_point: Some("vs_main"),
+                buffers: &[Some(Vertex::desc())],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader_displacement_bones,
-                entry_point: "fs_main",
+                entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: init.config.format,
                     blend: Some(wgpu::BlendState {
@@ -360,13 +364,14 @@ impl<'window> Renderer<'window> {
             //depth_stencil: None,
             depth_stencil: Some(wgpu::DepthStencilState {
                 format: wgpu::TextureFormat::Depth24Plus,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::LessEqual,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::LessEqual),
                 stencil: wgpu::StencilState::default(),
                 bias: wgpu::DepthBiasState::default(),
             }),
             multisample: wgpu::MultisampleState::default(),
-            multiview: None
+            multiview_mask: None,
+            cache: None,
         });
 
         let vertex_uniform_buffer: wgpu::Buffer = init.device.create_buffer(&wgpu::BufferDescriptor{
@@ -420,6 +425,8 @@ impl<'window> Renderer<'window> {
         Self {
             init,
             project_mat,
+            //depth_texture: wgpu::Texture,
+            //depth_view: wgpu::TextureView,
 
             pipeline_displacement,
             pipeline_displacement_bones,
@@ -871,9 +878,25 @@ impl<'window> Renderer<'window> {
         }
     }
 
-    pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        //let output = self.init.surface.get_current_frame()?.output;
-        let output = self.init.surface.get_current_texture()?;
+    pub fn render(&mut self) -> Result<(), ()> {
+        let output = match self.init.surface.get_current_texture() {
+            wgpu::CurrentSurfaceTexture::Success(frame) => frame,
+            wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
+
+            wgpu::CurrentSurfaceTexture::Outdated => {
+                self.init.surface.configure(&self.init.device, &self.init.config);
+                return Ok(());
+            }
+
+            wgpu::CurrentSurfaceTexture::Lost => {
+                return Ok(());
+            }
+
+            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded | wgpu::CurrentSurfaceTexture::Validation => {
+                return Ok(());
+            }
+        };
+
         let view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
@@ -915,6 +938,7 @@ impl<'window> Renderer<'window> {
                         }),
                         store: wgpu::StoreOp::Store,
                     },
+                    depth_slice: None,
                 })],
                 //depth_stencil_attachment: None,
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
@@ -927,6 +951,7 @@ impl<'window> Renderer<'window> {
                 }),
                 occlusion_query_set: None,
                 timestamp_writes: None,
+                multiview_mask: None,
             });
 
             let mut current_shader = ShaderType::Displacement;
@@ -948,15 +973,15 @@ impl<'window> Renderer<'window> {
                 }
 
                 for i in 0..self.vertex_buffers[mesh].len() {
-                    render_pass.set_vertex_buffer(0, self.vertex_buffers[mesh][i].slice(..));           
+                    render_pass.set_vertex_buffer(0, self.vertex_buffers[mesh][i].slice(..));
                     render_pass.set_bind_group(0, &self.uniform_bind_groups[mesh][i], &[]);
                     render_pass.draw(0..self.num_vertices[mesh][i], 0..1);
                 }
             }
         }
 
-        self.init.queue.submit(iter::once(encoder.finish()));
-        output.present();
+        self.init.queue.submit(Some(encoder.finish()));
+        self.init.queue.present(output);
 
         Ok(())
     }

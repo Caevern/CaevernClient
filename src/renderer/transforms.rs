@@ -31,6 +31,7 @@ impl<'window> InitWgpu<'window> {
                 power_preference: wgpu::PowerPreference::default(),
                 compatible_surface: Some(&surface),
                 force_fallback_adapter:false,
+                apply_limit_buckets: true
             })
             .await
             .expect("No GPU adapter found that can present to this surface!");
@@ -41,8 +42,10 @@ impl<'window> InitWgpu<'window> {
                     label: None,
                     required_features: wgpu::Features::empty(),
                     required_limits: wgpu::Limits::default(),
-                },
-                None,
+                    experimental_features: wgpu::ExperimentalFeatures::disabled(),
+                    memory_hints: wgpu::MemoryHints::Performance,
+                    trace: wgpu::Trace::Off
+                }
             )
             .await
             .unwrap();
@@ -58,9 +61,10 @@ impl<'window> InitWgpu<'window> {
             alpha_mode:surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
+            color_space: wgpu::SurfaceColorSpace::Srgb
         };
         surface.configure(&device, &config);
-     
+
         Self {
             instance,
             surface,

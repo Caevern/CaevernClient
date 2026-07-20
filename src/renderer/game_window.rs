@@ -174,15 +174,6 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     Ok(_) => {
                         self.window.as_ref().unwrap().request_redraw();
                     }
-                    Err(wgpu::SurfaceError::Lost) => {
-                        println!("Lost window");
-                        renderer.resize(renderer.init.size);
-                        self.window_size = (
-                            renderer.init.size.width,
-                            renderer.init.size.height,
-                        );
-                    }
-                    Err(wgpu::SurfaceError::OutOfMemory) => event_loop.exit(),
                     Err(e) => eprintln!("{:?}", e),
                 }
             }
