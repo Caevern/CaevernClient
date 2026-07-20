@@ -96,14 +96,14 @@ impl Object {
         position: Vector3<f32>, rotation: Vector3<f32>, scale: Vector3<f32>
     ) {
         let mut bones_converted: Vec<(Transform, Transform, i64)> = new_bone_vec(bones.len());
-        for bone in bones {
+        /*for bone in bones {
             if bone.1.0 > bones_converted.len() { continue; }
             bones_converted[bone.1.0] = (
                 Transform { position: position, rotation: rotation, scale: scale },
                 Transform { position: bone.1.1.position, rotation: bone.1.1.rotation, scale: bone.1.1.scale },
                 bone.1.3
             );
-        }
+        }*/
         self.bones = bones_converted;
     }
     pub fn set_skeleton(&mut self, skeleton: HashMap<String, usize>) {
