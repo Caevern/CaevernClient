@@ -912,6 +912,10 @@ impl<'window> Renderer<'window> {
             self.model_uniform_buffers.push(model_uniform_buffer);
         }
 
+        for object in self.world.objects.iter_mut() {
+            object.clear_vertices();
+        }
+
         if self.world.get_cameras().len() > self.current_camera {
             let object_position = self.world.get_camera(self.current_camera).get_position();
             self.player.camera.position.x = object_position.x as f32;
