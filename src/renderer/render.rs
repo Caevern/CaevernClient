@@ -1,6 +1,6 @@
 use cgmath::*;
 use winit::window::Window;
-use std::{print, println};
+use std::println;
 use std::sync::Arc;
 use wgpu::BindGroup;
 use rust_embed::RustEmbed;
@@ -51,6 +51,7 @@ pub struct Renderer<'window> {
     num_vertices: Vec<Vec<u32>>,
     bone_buffers: Vec<wgpu::Buffer>,
     bones: Vec<Vec<(transform::Transform, transform::Transform, i64)>>,
+    final_marices: Vec<Vec<[[f32; 4]; 4]>>,
     shader_type: Vec<ShaderType>,
 
     uniform_bind_group_layout: wgpu::BindGroupLayout,
@@ -418,7 +419,6 @@ impl<'window> Renderer<'window> {
         let uniform_bind_groups = Vec::new();
         let num_vertices = Vec::new();
         let bone_buffers = Vec::new();
-        let bones = Vec::new();
         let shader_type = Vec::new();
 
         let previous_frame_time = std::time::Instant::now();
@@ -439,7 +439,8 @@ impl<'window> Renderer<'window> {
             uniform_bind_groups,
             num_vertices,
             bone_buffers,
-            bones,
+            bones: Vec::new(),
+            final_marices: Vec::new(),
             shader_type,
 
             uniform_bind_group_layout,
@@ -699,12 +700,18 @@ impl<'window> Renderer<'window> {
     // TODO: Only update the bone affected
     pub fn update_bones(&mut self, object_index: usize) {
         //let skeleton = self.world.get_object(object_index).get_skeleton();
-        let mut bones: Vec<[[f32; 4]; 4]> = Vec::new();
 
         // TODO: Get rid of default pivot, this isn't dynamic yet cause fbx is making me go crazy
         let default_pivot = 120.0;
+        let bind_global = create_transforms(
+            [0.0, default_pivot, 0.0],
+            [0.0, 0.0, 0.0],
+            [1.0, 1.0, 1.0],
+        );
+        let inverse_bind = bind_global.invert().expect("BIND DOESN'T EXIST");
 
-        for (_bone_index, bone) in self.bones[object_index].iter().enumerate() {
+        // TODO: Change to bone updating based on hiarchy
+        for (bone_index, bone) in self.bones[object_index].iter().enumerate() {
             //let mut global_matrix = create_transforms(
             //    bone.0.position.into(), bone.0.rotation.into(), bone.0.scale.into()
             //);
@@ -716,35 +723,7 @@ impl<'window> Renderer<'window> {
             //    bone.1.rotation.into(),
             //    bone.1.scale.into(),
             //);
-            let bind_global = create_transforms(
-                [0.0, default_pivot, 0.0],
-                [0.0, 0.0, 0.0],
-                [1.0, 1.0, 1.0],
-            );
-            /*let mut bind_position = [0.0; 3];
-            if bone.2 != -1 {
-                let mut current_parent = bone.2;
-                for _ in 0..self.bones[object_index].len() {
-                    if current_parent == -1 {
-                        break;
-                    }
-                    let current_parent_bone = self.bones[object_index][current_parent as usize];
 
-                    bind_position[0] += current_parent_bone.1.position.x;
-                    bind_position[1] += current_parent_bone.1.position.y;
-                    bind_position[2] += current_parent_bone.1.position.z;
-
-                    current_parent = current_parent_bone.2;
-                }
-            }*/
-            /*if bone_index == skeleton["head"] {
-                println!("head: {:?}", bind_position);
-            }
-            if bone_index == skeleton["neck"] {
-                println!("neck: {:?}", bind_position);
-            }*/
-
-            // TODO: Fix bone hiarchy when local works at least
             if bone.2 != -1 {
                 let mut current_parent = bone.2;
                 for _ in 0..self.bones[object_index].len() {
@@ -771,11 +750,11 @@ impl<'window> Renderer<'window> {
                 }
             }
 
-            let inverse_bind = bind_global.invert().expect("BIND DOESN'T EXIST");
+            //let inverse_bind = bind_global.invert().expect("BIND DOESN'T EXIST");
             let final_matrix = global_matrix * inverse_bind;
-            bones.push(final_matrix.into());
+            self.final_marices[object_index][bone_index] = final_matrix.into();
         }
-        self.init.queue.write_buffer(&self.bone_buffers[object_index], 0, bytemuck::cast_slice(&bones));
+        self.init.queue.write_buffer(&self.bone_buffers[object_index], 0, bytemuck::cast_slice(&self.final_marices[object_index]));
     }
 
     pub fn set_world(&mut self, world: World) {
@@ -798,6 +777,12 @@ impl<'window> Renderer<'window> {
             self.num_vertices.push(Vec::new());
 
             let bone_transforms = object.1.get_bones();
+            self.final_marices.push(Vec::new());
+            for _ in 0..bone_transforms.len() {
+                self.final_marices[object.0].push(
+                    [[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0]]
+                );
+            }
             self.bones.push(bone_transforms.clone());
 
             for bone in bone_transforms {
