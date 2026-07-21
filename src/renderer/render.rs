@@ -1,5 +1,6 @@
 use cgmath::*;
 use winit::window::Window;
+use std::{print, println};
 use std::sync::Arc;
 use wgpu::BindGroup;
 use rust_embed::RustEmbed;
@@ -563,9 +564,30 @@ impl<'window> Renderer<'window> {
                 self.init.queue.write_buffer(&self.model_uniform_buffers[i], 64, bytemuck::cast_slice(normal_ref));
             } else if self.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
                 let skeleton = self.world.get_object(i).get_skeleton();
-                //self.bones[i][skeleton["head"]].0.rotation.x = self.player.camera.rotation.x;
-                self.bones[i][skeleton["head"]].0.rotation.y = self.player.camera.rotation.y + 1.57079633;
+                self.bones[i][skeleton["head"]].0.rotation.x = -self.player.camera.rotation.x;
+                //self.bones[i][skeleton["head"]].0.scale = [0.0, 0.0, 0.0].into();
+                self.bones[i][skeleton["root"]].0.rotation.y = self.player.camera.rotation.y + 1.57079633;
                 self.update_bones(i);
+
+                let object = self.world.get_object(i);
+                let position = [
+                    object.get_position().x + self.player.camera.position.x,
+                    object.get_position().y,
+                    object.get_position().z - self.player.camera.position.z
+                ];
+
+                let model_mat = transforms::create_transforms(
+                    position,
+                    object.get_rotation().into(),
+                    object.get_scale().into()
+                );
+                let normal_mat = (model_mat.invert().unwrap()).transpose();
+
+                let model_ref:&[f32; 16] = model_mat.as_ref();
+                let normal_ref:&[f32; 16] = normal_mat.as_ref();
+
+                self.init.queue.write_buffer(&self.model_uniform_buffers[i], 0, bytemuck::cast_slice(model_ref));
+                self.init.queue.write_buffer(&self.model_uniform_buffers[i], 64, bytemuck::cast_slice(normal_ref));
             }
         }
 
@@ -674,18 +696,32 @@ impl<'window> Renderer<'window> {
         self.frame += 1;
     }
 
+    // TODO: Only update the bone affected
     pub fn update_bones(&mut self, object_index: usize) {
+        //let skeleton = self.world.get_object(object_index).get_skeleton();
         let mut bones: Vec<[[f32; 4]; 4]> = Vec::new();
-        for bone in self.bones[object_index].iter() {
-            let mut global_matrix = create_transforms(
-                bone.0.position.into(), bone.0.rotation.into(), bone.0.scale.into()
-            );
-            let mut bind_global = create_transforms(
-                bone.1.position.into(),
-                bone.1.rotation.into(),
-                bone.1.scale.into(),
-            );
 
+        // TODO: Get rid of default pivot, this isn't dynamic yet cause fbx is making me go crazy
+        let default_pivot = 120.0;
+
+        for (_bone_index, bone) in self.bones[object_index].iter().enumerate() {
+            //let mut global_matrix = create_transforms(
+            //    bone.0.position.into(), bone.0.rotation.into(), bone.0.scale.into()
+            //);
+            let mut global_matrix = create_transforms(
+                [bone.0.position.x, default_pivot, bone.0.rotation.z], bone.0.rotation.into(), bone.0.scale.into()
+            );
+            //let mut bind_global = create_transforms(
+            //    bone.1.position.into(),
+            //    bone.1.rotation.into(),
+            //    bone.1.scale.into(),
+            //);
+            let bind_global = create_transforms(
+                [0.0, default_pivot, 0.0],
+                [0.0, 0.0, 0.0],
+                [1.0, 1.0, 1.0],
+            );
+            /*let mut bind_position = [0.0; 3];
             if bone.2 != -1 {
                 let mut current_parent = bone.2;
                 for _ in 0..self.bones[object_index].len() {
@@ -694,13 +730,35 @@ impl<'window> Renderer<'window> {
                     }
                     let current_parent_bone = self.bones[object_index][current_parent as usize];
 
-                    let parent_bind = create_transforms(
+                    bind_position[0] += current_parent_bone.1.position.x;
+                    bind_position[1] += current_parent_bone.1.position.y;
+                    bind_position[2] += current_parent_bone.1.position.z;
+
+                    current_parent = current_parent_bone.2;
+                }
+            }*/
+            /*if bone_index == skeleton["head"] {
+                println!("head: {:?}", bind_position);
+            }
+            if bone_index == skeleton["neck"] {
+                println!("neck: {:?}", bind_position);
+            }*/
+
+            // TODO: Fix bone hiarchy when local works at least
+            if bone.2 != -1 {
+                let mut current_parent = bone.2;
+                for _ in 0..self.bones[object_index].len() {
+                    if current_parent == -1 {
+                        break;
+                    }
+                    let current_parent_bone = self.bones[object_index][current_parent as usize];
+
+                    /*let parent_bind = create_transforms(
                         current_parent_bone.1.position.into(),
                         current_parent_bone.1.rotation.into(),
                         current_parent_bone.1.scale.into(),
                     );
-                    //println!("B: {:?}", current_parent_bone.1.position);
-                    bind_global = parent_bind * bind_global;
+                    bind_global = parent_bind * bind_global;*/
 
                     let parent_matrix = create_transforms(
                         current_parent_bone.0.position.into(),

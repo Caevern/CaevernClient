@@ -20,7 +20,7 @@
         },
         {
             "is_static": false, "reference": "models/fallback.fbx",
-            "transform": {"position": [4, 1.9, 0], "scale": [0.017, 0.017, 0.017]},
+            "transform": {"position": [0, 1.9, 0], "scale": [0.017, 0.017, 0.017]},
             "materials": [
                 {"name": "BodyMaterial", "texture": "textures/CG_Body_Base_color.png"},
                 {"name": "HairsMaterial", "texture": "textures/CG_Hairs_Base_color.png"},
@@ -28,7 +28,8 @@
             ],
             "skeleton": [
                 {"body_part": "neck", "bone_name": "neck.xModel"},
-                {"body_part": "head", "bone_name": "head.xModel"}
+                {"body_part": "head", "bone_name": "head.xModel"},
+                {"body_part": "root", "bone_name": "root.xModel"}
             ]
         }
     ]

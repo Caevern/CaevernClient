@@ -38,6 +38,9 @@ Custom engine? Of course! :D
 - [ ] Entity culling
 - [ ] Chunked entity culling for static elements
 - [ ] Camera (Taking pictures)
+- [ ] Voice Chat
+- [x] Player Avatar
+- [ ] Render other players
 
 # Todo List Server:
 - [x] Player location data
