@@ -75,10 +75,10 @@ pub struct Renderer<'window> {
 }
 impl<'window> Renderer<'window> {
     fn create_buffer_displacement(
-        init: &transforms::InitWgpu, 
-        uniform_bind_group_layout: &wgpu::BindGroupLayout, 
+        init: &transforms::InitWgpu,
+        uniform_bind_group_layout: &wgpu::BindGroupLayout,
         vertex_uniform_buffer: &wgpu::Buffer, fragment_uniform_buffer: &wgpu::Buffer, model_uniform_buffer: &wgpu::Buffer, bones_buffer: &wgpu::Buffer,
-        displacement_texture: &wgpu::Texture, displacement_texture_size: wgpu::Extent3d, 
+        displacement_texture: &wgpu::Texture, displacement_texture_size: wgpu::Extent3d,
         displacement_rgba: &Vec<u8>, displacement_width: u32, displacement_height: u32,
         texture: &wgpu::Texture, texture_size: wgpu::Extent3d, rgba: &Vec<u8>, width: u32, height: u32, vertex_num: usize,
     ) -> (BindGroup, wgpu::Buffer) {
@@ -183,7 +183,7 @@ impl<'window> Renderer<'window> {
         let camera_rotation: (f32, f32, f32) = (0.0, 0.0, 0.0);
 
         let (_, project_mat, _) = transforms::create_view_projection(
-            camera_position.into(), camera_rotation.into(), cgmath::Vector3::unit_y(), 
+            camera_position.into(), camera_rotation.into(), cgmath::Vector3::unit_y(),
             init.config.width as f32 / init.config.height as f32);
 
         let uniform_bind_group_layout: wgpu::BindGroupLayout = init.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor{
@@ -391,7 +391,7 @@ impl<'window> Renderer<'window> {
         });
 
         let model_mat = transforms::create_transforms(
-            [0.0, 0.0, 0.0], 
+            [0.0, 0.0, 0.0],
             [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]
         );
         let normal_mat = (model_mat.invert().unwrap()).transpose();
@@ -602,7 +602,7 @@ impl<'window> Renderer<'window> {
                 let y_rotation = self.world.get_objects()[grabbable_object_index].get_rotation().y;
                 self.world.objects[grabbable_object_index].set_rotation_y(y_rotation + 0.1);
                 let model_mat = transforms::create_transforms(
-                    [0.0, 0.0, 0.0], 
+                    [0.0, 0.0, 0.0],
                     [0.0, y_rotation + 0.1, 0.0], [1.0, 1.0, 1.0]
                 );
                 let normal_mat = (model_mat.invert().unwrap()).transpose();
@@ -904,7 +904,7 @@ impl<'window> Renderer<'window> {
 
                 self.num_vertices[object.0].push(vertices.len() as u32);
                 self.init.queue.write_buffer(
-                    &self.vertex_buffers[object.0][self.vertex_buffers[object.0].len() - 1], 0, 
+                    &self.vertex_buffers[object.0][self.vertex_buffers[object.0].len() - 1], 0,
                     bytemuck::cast_slice(vertices)
                 );
             }
