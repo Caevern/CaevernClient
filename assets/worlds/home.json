@@ -20,7 +20,7 @@
         },
         {
             "is_static": false, "reference": "models/fallback.fbx",
-            "transform": {"position": [0, 1.9, 0], "scale": [0.017, 0.017, 0.017]},
+            "transform": {"position": [0, -2.1, 0], "scale": [0.017, 0.017, 0.017]},
             "materials": [
                 {"name": "BodyMaterial", "texture": "textures/CG_Body_Base_color.png"},
                 {"name": "HairsMaterial", "texture": "textures/CG_Hairs_Base_color.png"},

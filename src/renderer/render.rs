@@ -566,15 +566,15 @@ impl<'window> Renderer<'window> {
             } else if self.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
                 let skeleton = self.world.get_object(i).get_skeleton();
                 self.bones[i][skeleton["head"]].0.rotation.x = -self.player.camera.rotation.x;
-                //self.bones[i][skeleton["head"]].0.scale = [0.0, 0.0, 0.0].into();
-                self.bones[i][skeleton["root"]].0.rotation.y = self.player.camera.rotation.y + 1.57079633;
+                self.bones[i][skeleton["neck"]].0.scale = [0.0, 0.0, 0.0].into();
+                self.bones[i][skeleton["root"]].0.rotation.y = -self.player.camera.rotation.y + 1.57079633;
                 self.update_bones(i);
 
                 let object = self.world.get_object(i);
                 let position = [
-                    object.get_position().x + self.player.camera.position.x,
-                    object.get_position().y,
-                    object.get_position().z - self.player.camera.position.z
+                    object.get_position().x + self.player.camera.position.x - self.player.camera.rotation.y.cos() * 0.1,
+                    object.get_position().y + self.player.camera.position.y,
+                    object.get_position().z + self.player.camera.position.z - self.player.camera.rotation.y.sin() * 0.1
                 ];
 
                 let model_mat = transforms::create_transforms(
