@@ -63,11 +63,12 @@ pub fn start_user_handler(job_rx: Receiver<LocalUserUpdate>) {
                             let player_amount = (data.len() - 1) / 28;
                             for i in 0..player_amount {
                                 let player_id = u32::from_be_bytes([
-                                    data[i + 1], data[i + 2], data[i + 3], data[i + 4]
+                                    data[(i * 28) + 1], data[(i * 28) + 2], data[(i * 28) + 3], data[(i * 28) + 4]
                                 ]);
                                 if player_id == user_id { continue; }
                                 println!("player: {}", player_id);
                             }
+                            let _ = socket.send(Message::Binary(vec![2].into()));
                         }
                         0 => {}
                         _ => { println!("Unknown Command ({})", data[0]); }
