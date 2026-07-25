@@ -37,9 +37,6 @@ pub struct Renderer<'window> {
     pub init: transforms::InitWgpu<'window>,
     project_mat: Matrix4<f32>,
 
-    // TODO: Use a depth texture buffer instead of a new one per frame
-    //depth_texture: wgpu::Texture,
-    //depth_view: wgpu::TextureView,
     pipeline_displacement: wgpu::RenderPipeline,
     pipeline_displacement_bones: wgpu::RenderPipeline,
 
@@ -477,8 +474,7 @@ impl<'window> Renderer<'window> {
         Self {
             init,
             project_mat,
-            //depth_texture: wgpu::Texture,
-            //depth_view: wgpu::TextureView,
+
             pipeline_displacement,
             pipeline_displacement_bones,
 
