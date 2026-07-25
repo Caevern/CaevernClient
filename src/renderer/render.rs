@@ -657,9 +657,8 @@ impl<'window> Renderer<'window> {
             } else if self.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
                 let skeleton = self.world.get_object(i).get_skeleton();
                 self.bones[i][skeleton["head"]].0.rotation.x = -self.player.camera.rotation.x;
+                // TODO: make the local character this dissabled by default.
                 self.bones[i][skeleton["neck"]].0.scale = [0.0, 0.0, 0.0].into();
-                self.bones[i][skeleton["root"]].0.rotation.y =
-                    -self.player.camera.rotation.y + 1.57079633;
                 self.update_bones(i);
 
                 let object = self.world.get_object(i);
@@ -670,12 +669,14 @@ impl<'window> Renderer<'window> {
                     object.get_position().z + self.player.camera.position.z
                         - self.player.camera.rotation.y.sin() * 0.1,
                 ];
+                let rotation = [
+                    object.get_rotation().x,
+                    object.get_rotation().y - self.player.camera.rotation.y + 1.57079633,
+                    object.get_rotation().z,
+                ];
 
-                let model_mat = transforms::create_transforms(
-                    position,
-                    object.get_rotation().into(),
-                    object.get_scale().into(),
-                );
+                let model_mat =
+                    transforms::create_transforms(position, rotation, object.get_scale().into());
                 let normal_mat = (model_mat.invert().unwrap()).transpose();
 
                 let model_ref: &[f32; 16] = model_mat.as_ref();
