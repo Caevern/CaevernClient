@@ -1,31 +1,32 @@
 use cgmath::*;
-use winit::window::Window;
-use std::println;
-use std::sync::Arc;
-use wgpu::BindGroup;
 use rust_embed::RustEmbed;
 use std::collections::HashMap;
+use std::println;
+use std::sync::Arc;
 use std::sync::mpsc::Sender;
+use wgpu::BindGroup;
+use winit::window::Window;
 
+use crate::ALLOCATOR;
 use crate::interract::raycast::raycast_grab;
+use crate::network::users::LocalUserUpdate;
 use crate::physics::gravity::apply_gravity;
 use crate::physics::movement::{get_camera_movement, get_camera_rotation};
 use crate::renderer::texture_object::TextureObject;
 use crate::renderer::transform::Transform;
 use crate::renderer::transforms::create_transforms;
-use crate::renderer::{transform, transforms, vertex};
 use crate::renderer::vertex::Vertex;
+use crate::renderer::{transform, transforms, vertex};
 use crate::setup::fonts::{load_font_atlas, load_font_uvs};
 use crate::world::object::ObjectType;
 use crate::world::objects::player::Player;
 use crate::world::objects::text;
 use crate::world::world::World;
-use crate::network::users::{LocalUserUpdate};
-use crate::ALLOCATOR;
 
 #[derive(PartialEq)]
 pub enum ShaderType {
-    Displacement, DisplacementBones
+    Displacement,
+    DisplacementBones,
 }
 
 #[derive(RustEmbed)]
@@ -39,7 +40,6 @@ pub struct Renderer<'window> {
     // TODO: Use a depth texture buffer instead of a new one per frame
     //depth_texture: wgpu::Texture,
     //depth_view: wgpu::TextureView,
-
     pipeline_displacement: wgpu::RenderPipeline,
     pipeline_displacement_bones: wgpu::RenderPipeline,
 
@@ -71,16 +71,27 @@ pub struct Renderer<'window> {
     // networking
     job_tx: Sender<LocalUserUpdate>,
 
-    pending_resize: Option<winit::dpi::PhysicalSize<u32>>
+    pending_resize: Option<winit::dpi::PhysicalSize<u32>>,
 }
 impl<'window> Renderer<'window> {
     fn create_buffer_displacement(
         init: &transforms::InitWgpu,
         uniform_bind_group_layout: &wgpu::BindGroupLayout,
-        vertex_uniform_buffer: &wgpu::Buffer, fragment_uniform_buffer: &wgpu::Buffer, model_uniform_buffer: &wgpu::Buffer, bones_buffer: &wgpu::Buffer,
-        displacement_texture: &wgpu::Texture, displacement_texture_size: wgpu::Extent3d,
-        displacement_rgba: &Vec<u8>, displacement_width: u32, displacement_height: u32,
-        texture: &wgpu::Texture, texture_size: wgpu::Extent3d, rgba: &Vec<u8>, width: u32, height: u32, vertex_num: usize,
+        vertex_uniform_buffer: &wgpu::Buffer,
+        fragment_uniform_buffer: &wgpu::Buffer,
+        model_uniform_buffer: &wgpu::Buffer,
+        bones_buffer: &wgpu::Buffer,
+        displacement_texture: &wgpu::Texture,
+        displacement_texture_size: wgpu::Extent3d,
+        displacement_rgba: &Vec<u8>,
+        displacement_width: u32,
+        displacement_height: u32,
+        texture: &wgpu::Texture,
+        texture_size: wgpu::Extent3d,
+        rgba: &Vec<u8>,
+        width: u32,
+        height: u32,
+        vertex_num: usize,
     ) -> (BindGroup, wgpu::Buffer) {
         init.queue.write_texture(
             wgpu::TexelCopyTextureInfo {
@@ -115,7 +126,8 @@ impl<'window> Renderer<'window> {
         );
 
         let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-        let displacement_texture_view = displacement_texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let displacement_texture_view =
+            displacement_texture.create_view(&wgpu::TextureViewDescriptor::default());
         let sampler = init.device.create_sampler(&wgpu::SamplerDescriptor {
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
@@ -126,7 +138,7 @@ impl<'window> Renderer<'window> {
             ..Default::default()
         });
 
-        let uniform_bind_group = init.device.create_bind_group(&wgpu::BindGroupDescriptor{
+        let uniform_bind_group = init.device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &uniform_bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -170,250 +182,289 @@ impl<'window> Renderer<'window> {
             label: Some("Vertex Buffer"),
             size: max_buffer_size as u64,
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false
+            mapped_at_creation: false,
         });
 
-        return (uniform_bind_group, vertex_buffer)
+        return (uniform_bind_group, vertex_buffer);
     }
 
     pub async fn new(window: &Arc<Window>, job_tx: Sender<LocalUserUpdate>) -> Self {
-        let init =  transforms::InitWgpu::init_wgpu(window).await;
+        let init = transforms::InitWgpu::init_wgpu(window).await;
 
         let camera_position: (f32, f32, f32) = (-10.0, 4.0, 0.0);
         let camera_rotation: (f32, f32, f32) = (0.0, 0.0, 0.0);
 
         let (_, project_mat, _) = transforms::create_view_projection(
-            camera_position.into(), camera_rotation.into(), cgmath::Vector3::unit_y(),
-            init.config.width as f32 / init.config.height as f32);
+            camera_position.into(),
+            camera_rotation.into(),
+            cgmath::Vector3::unit_y(),
+            init.config.width as f32 / init.config.height as f32,
+        );
 
-        let uniform_bind_group_layout: wgpu::BindGroupLayout = init.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor{
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 3,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 4,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Texture {
-                        multisampled: false,
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 5,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 6,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 7,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: true },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-            ],
-            label: Some("Uniform Bind Group Layout"),
-        });
-
-        let pipeline_layout = init.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Render Pipeline Layout"),
-            bind_group_layouts: &[Some(&uniform_bind_group_layout)],
-            immediate_size: 0
-        });
-
-        let shader_displacement = init.device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/displacement.wgsl").into()),
-        });
-
-        let pipeline_displacement = init.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader_displacement,
-                entry_point: Some("vs_main"),
-                buffers: &[Some(Vertex::desc())],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader_displacement,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: init.config.format,
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent {
-                            src_factor: wgpu::BlendFactor::SrcAlpha,
-                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                            operation: wgpu::BlendOperation::Add,
+        let uniform_bind_group_layout: wgpu::BindGroupLayout = init
+            .device
+            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
                         },
-                        alpha: wgpu::BlendComponent {
-                            src_factor: wgpu::BlendFactor::One,
-                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                            operation: wgpu::BlendOperation::Add,
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
                         },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 4,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Texture {
+                            multisampled: false,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 5,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 6,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 7,
+                        visibility: wgpu::ShaderStages::VERTEX,
+                        ty: wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Storage { read_only: true },
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        count: None,
+                    },
+                ],
+                label: Some("Uniform Bind Group Layout"),
+            });
+
+        let pipeline_layout = init
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[Some(&uniform_bind_group_layout)],
+                immediate_size: 0,
+            });
+
+        let shader_displacement = init
+            .device
+            .create_shader_module(wgpu::ShaderModuleDescriptor {
+                label: Some("Shader"),
+                source: wgpu::ShaderSource::Wgsl(
+                    include_str!("../shaders/displacement.wgsl").into(),
+                ),
+            });
+
+        let pipeline_displacement =
+            init.device
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("Render Pipeline"),
+                    layout: Some(&pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &shader_displacement,
+                        entry_point: Some("vs_main"),
+                        buffers: &[Some(Vertex::desc())],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &shader_displacement,
+                        entry_point: Some("fs_main"),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: init.config.format,
+                            blend: Some(wgpu::BlendState {
+                                color: wgpu::BlendComponent {
+                                    src_factor: wgpu::BlendFactor::SrcAlpha,
+                                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                    operation: wgpu::BlendOperation::Add,
+                                },
+                                alpha: wgpu::BlendComponent {
+                                    src_factor: wgpu::BlendFactor::One,
+                                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                    operation: wgpu::BlendOperation::Add,
+                                },
+                            }),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
                     }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            }),
-            primitive: wgpu::PrimitiveState{
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                cull_mode: Some(wgpu::Face::Back),
-                ..Default::default()
-            },
-            //depth_stencil: None,
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth24Plus,
-                depth_write_enabled: Some(true),
-                depth_compare: Some(wgpu::CompareFunction::LessEqual),
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None
-        });
-
-        let shader_displacement_bones = init.device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("Shader"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("../shaders/displacement_bones.wgsl").into()),
-        });
-
-        let pipeline_displacement_bones = init.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: &shader_displacement_bones,
-                entry_point: Some("vs_main"),
-                buffers: &[Some(Vertex::desc())],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: &shader_displacement_bones,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: init.config.format,
-                    blend: Some(wgpu::BlendState {
-                        color: wgpu::BlendComponent {
-                            src_factor: wgpu::BlendFactor::SrcAlpha,
-                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                            operation: wgpu::BlendOperation::Add,
-                        },
-                        alpha: wgpu::BlendComponent {
-                            src_factor: wgpu::BlendFactor::One,
-                            dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
-                            operation: wgpu::BlendOperation::Add,
-                        },
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::TriangleList,
+                        cull_mode: Some(wgpu::Face::Back),
+                        ..Default::default()
+                    },
+                    //depth_stencil: None,
+                    depth_stencil: Some(wgpu::DepthStencilState {
+                        format: wgpu::TextureFormat::Depth24Plus,
+                        depth_write_enabled: Some(true),
+                        depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                        stencil: wgpu::StencilState::default(),
+                        bias: wgpu::DepthBiasState::default(),
                     }),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            }),
-            primitive: wgpu::PrimitiveState{
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                cull_mode: Some(wgpu::Face::Back),
-                ..Default::default()
-            },
-            //depth_stencil: None,
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: wgpu::TextureFormat::Depth24Plus,
-                depth_write_enabled: Some(true),
-                depth_compare: Some(wgpu::CompareFunction::LessEqual),
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
-            }),
-            multisample: wgpu::MultisampleState::default(),
-            multiview_mask: None,
-            cache: None,
-        });
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview_mask: None,
+                    cache: None,
+                });
 
-        let vertex_uniform_buffer: wgpu::Buffer = init.device.create_buffer(&wgpu::BufferDescriptor{
-            label: Some("Vertex Uniform Buffer"),
-            size: 192,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let shader_displacement_bones =
+            init.device
+                .create_shader_module(wgpu::ShaderModuleDescriptor {
+                    label: Some("Shader"),
+                    source: wgpu::ShaderSource::Wgsl(
+                        include_str!("../shaders/displacement_bones.wgsl").into(),
+                    ),
+                });
 
-        let fragment_uniform_buffer = init.device.create_buffer(&wgpu::BufferDescriptor{
+        let pipeline_displacement_bones =
+            init.device
+                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                    label: Some("Render Pipeline"),
+                    layout: Some(&pipeline_layout),
+                    vertex: wgpu::VertexState {
+                        module: &shader_displacement_bones,
+                        entry_point: Some("vs_main"),
+                        buffers: &[Some(Vertex::desc())],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    },
+                    fragment: Some(wgpu::FragmentState {
+                        module: &shader_displacement_bones,
+                        entry_point: Some("fs_main"),
+                        targets: &[Some(wgpu::ColorTargetState {
+                            format: init.config.format,
+                            blend: Some(wgpu::BlendState {
+                                color: wgpu::BlendComponent {
+                                    src_factor: wgpu::BlendFactor::SrcAlpha,
+                                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                    operation: wgpu::BlendOperation::Add,
+                                },
+                                alpha: wgpu::BlendComponent {
+                                    src_factor: wgpu::BlendFactor::One,
+                                    dst_factor: wgpu::BlendFactor::OneMinusSrcAlpha,
+                                    operation: wgpu::BlendOperation::Add,
+                                },
+                            }),
+                            write_mask: wgpu::ColorWrites::ALL,
+                        })],
+                        compilation_options: wgpu::PipelineCompilationOptions::default(),
+                    }),
+                    primitive: wgpu::PrimitiveState {
+                        topology: wgpu::PrimitiveTopology::TriangleList,
+                        cull_mode: Some(wgpu::Face::Back),
+                        ..Default::default()
+                    },
+                    //depth_stencil: None,
+                    depth_stencil: Some(wgpu::DepthStencilState {
+                        format: wgpu::TextureFormat::Depth24Plus,
+                        depth_write_enabled: Some(true),
+                        depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                        stencil: wgpu::StencilState::default(),
+                        bias: wgpu::DepthBiasState::default(),
+                    }),
+                    multisample: wgpu::MultisampleState::default(),
+                    multiview_mask: None,
+                    cache: None,
+                });
+
+        let vertex_uniform_buffer: wgpu::Buffer =
+            init.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Vertex Uniform Buffer"),
+                size: 192,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+
+        let fragment_uniform_buffer = init.device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Fragment Uniform Buffer"),
             size: 32,
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         });
 
-        let model_mat = transforms::create_transforms(
-            [0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]
-        );
+        let model_mat =
+            transforms::create_transforms([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
         let normal_mat = (model_mat.invert().unwrap()).transpose();
 
-        let model_ref:&[f32; 16] = model_mat.as_ref();
-        let normal_ref:&[f32; 16] = normal_mat.as_ref();
-        init.queue.write_buffer(&vertex_uniform_buffer, 0, bytemuck::cast_slice(model_ref));
-        init.queue.write_buffer(&vertex_uniform_buffer, 128, bytemuck::cast_slice(normal_ref));
+        let model_ref: &[f32; 16] = model_mat.as_ref();
+        let normal_ref: &[f32; 16] = normal_mat.as_ref();
+        init.queue
+            .write_buffer(&vertex_uniform_buffer, 0, bytemuck::cast_slice(model_ref));
+        init.queue.write_buffer(
+            &vertex_uniform_buffer,
+            128,
+            bytemuck::cast_slice(normal_ref),
+        );
 
         let mut textures: HashMap<String, TextureObject> = HashMap::new();
 
         // create missing texture
-        textures.insert("textures/missing.png".to_string(), TextureObject::create("textures/missing.png", &init));
-        textures.insert("textures/tablet.png".to_string(), TextureObject::create("textures/tablet.png", &init));
-        textures.insert("textures/displacement.png".to_string(), TextureObject::create("textures/displacement.png", &init));
+        textures.insert(
+            "textures/missing.png".to_string(),
+            TextureObject::create("textures/missing.png", &init),
+        );
+        textures.insert(
+            "textures/tablet.png".to_string(),
+            TextureObject::create("textures/tablet.png", &init),
+        );
+        textures.insert(
+            "textures/displacement.png".to_string(),
+            TextureObject::create("textures/displacement.png", &init),
+        );
 
         // create font atlasses
-        textures.insert("fonts/NotoSansJP.ttf".to_string(), TextureObject::load_from_dynamic_image(load_font_atlas("fonts/NotoSansJP.ttf"), &init));
+        textures.insert(
+            "fonts/NotoSansJP.ttf".to_string(),
+            TextureObject::load_from_dynamic_image(load_font_atlas("fonts/NotoSansJP.ttf"), &init),
+        );
 
-        let mut font_maps: HashMap<String, HashMap<String, (f32, f32, f32, f32, f32)>> = HashMap::new();
+        let mut font_maps: HashMap<String, HashMap<String, (f32, f32, f32, f32, f32)>> =
+            HashMap::new();
 
-        font_maps.insert("NotoSansJP".to_string(), load_font_uvs("fonts/NotoSansJP.ttf"));
+        font_maps.insert(
+            "NotoSansJP".to_string(),
+            load_font_uvs("fonts/NotoSansJP.ttf"),
+        );
 
         let vertex_buffers = Vec::new();
         let uniform_bind_groups = Vec::new();
@@ -428,7 +479,6 @@ impl<'window> Renderer<'window> {
             project_mat,
             //depth_texture: wgpu::Texture,
             //depth_view: wgpu::TextureView,
-
             pipeline_displacement,
             pipeline_displacement_bones,
 
@@ -458,7 +508,7 @@ impl<'window> Renderer<'window> {
 
             job_tx,
 
-            pending_resize: None
+            pending_resize: None,
         }
     }
 
@@ -467,13 +517,23 @@ impl<'window> Renderer<'window> {
             self.init.instance.poll_all(true);
             self.init.size = new_size;
             self.pending_resize = Some(new_size);
-            self.project_mat = transforms::create_projection(new_size.width as f32 / new_size.height as f32);
+            self.project_mat =
+                transforms::create_projection(new_size.width as f32 / new_size.height as f32);
         }
     }
 
-    pub fn update(&mut self, _dt: std::time::Duration, keys: [bool; 6], mouse: [f32; 2], menu_tablet_state: usize) {
+    pub fn update(
+        &mut self,
+        _dt: std::time::Duration,
+        keys: [bool; 6],
+        mouse: [f32; 2],
+        menu_tablet_state: usize,
+    ) {
         let current_time = std::time::Instant::now();
-        let mut frame_time = current_time.duration_since(self.previous_frame_time).as_secs_f32() * 20.0;
+        let mut frame_time = current_time
+            .duration_since(self.previous_frame_time)
+            .as_secs_f32()
+            * 20.0;
         self.previous_frame_time = current_time;
 
         if frame_time > 5.0 {
@@ -488,11 +548,11 @@ impl<'window> Renderer<'window> {
             self.player.camera.rotation.y.cos() * self.player.camera.rotation.x.cos(),
             self.player.camera.rotation.x.sin(),
             self.player.camera.rotation.y.sin() * self.player.camera.rotation.x.cos(),
-        ).normalize();
+        )
+        .normalize();
 
-        let updated_camera_position = get_camera_movement(
-            &mut self.player, keys, forward, frame_time
-        );
+        let updated_camera_position =
+            get_camera_movement(&mut self.player, keys, forward, frame_time);
         self.player.camera.position += updated_camera_position;
 
         apply_gravity(&mut self.player, frame_time);
@@ -500,47 +560,69 @@ impl<'window> Renderer<'window> {
         if menu_tablet_state == 2 {
             for i in 0..self.world.get_objects().len() {
                 let object_type = self.world.get_objects()[i].get_object_type();
-                if object_type == ObjectType::TabletMenu || object_type == ObjectType::TabletMenuButton {
+                if object_type == ObjectType::TabletMenu
+                    || object_type == ObjectType::TabletMenuButton
+                {
                     let model_mat = transforms::create_transforms(
                         [
                             self.player.camera.position.x + forward.x,
                             self.player.camera.position.y + forward.y,
-                            self.player.camera.position.z + forward.z
-                            ],
+                            self.player.camera.position.z + forward.z,
+                        ],
                         [
                             -self.player.camera.rotation.x,
                             -self.player.camera.rotation.y + std::f32::consts::FRAC_PI_2,
-                            -self.player.camera.rotation.z
-                            ], [1.0, 1.0, 1.0]
+                            -self.player.camera.rotation.z,
+                        ],
+                        [1.0, 1.0, 1.0],
                     );
                     let normal_mat = (model_mat.invert().unwrap()).transpose();
 
-                    let model_ref:&[f32; 16] = model_mat.as_ref();
-                    let normal_ref:&[f32; 16] = normal_mat.as_ref();
+                    let model_ref: &[f32; 16] = model_mat.as_ref();
+                    let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
-                    self.init.queue.write_buffer(&self.model_uniform_buffers[i], 0, bytemuck::cast_slice(model_ref));
-                    self.init.queue.write_buffer(&self.model_uniform_buffers[i], 64, bytemuck::cast_slice(normal_ref));
+                    self.init.queue.write_buffer(
+                        &self.model_uniform_buffers[i],
+                        0,
+                        bytemuck::cast_slice(model_ref),
+                    );
+                    self.init.queue.write_buffer(
+                        &self.model_uniform_buffers[i],
+                        64,
+                        bytemuck::cast_slice(normal_ref),
+                    );
                 }
             }
         } else if menu_tablet_state == 3 {
             for i in 0..self.world.get_objects().len() {
                 let object_type = self.world.get_objects()[i].get_object_type();
-                if object_type == ObjectType::TabletMenu || object_type == ObjectType::TabletMenuButton {
+                if object_type == ObjectType::TabletMenu
+                    || object_type == ObjectType::TabletMenuButton
+                {
                     let model_mat = transforms::create_transforms(
                         [0.0, -10.0, 0.0],
                         [
                             -self.player.camera.rotation.x,
                             -self.player.camera.rotation.y + std::f32::consts::FRAC_PI_2,
-                            -self.player.camera.rotation.z
-                            ], [1.0, 1.0, 1.0]
+                            -self.player.camera.rotation.z,
+                        ],
+                        [1.0, 1.0, 1.0],
                     );
                     let normal_mat = (model_mat.invert().unwrap()).transpose();
 
-                    let model_ref:&[f32; 16] = model_mat.as_ref();
-                    let normal_ref:&[f32; 16] = normal_mat.as_ref();
+                    let model_ref: &[f32; 16] = model_mat.as_ref();
+                    let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
-                    self.init.queue.write_buffer(&self.model_uniform_buffers[i], 0, bytemuck::cast_slice(model_ref));
-                    self.init.queue.write_buffer(&self.model_uniform_buffers[i], 64, bytemuck::cast_slice(normal_ref));
+                    self.init.queue.write_buffer(
+                        &self.model_uniform_buffers[i],
+                        0,
+                        bytemuck::cast_slice(model_ref),
+                    );
+                    self.init.queue.write_buffer(
+                        &self.model_uniform_buffers[i],
+                        64,
+                        bytemuck::cast_slice(normal_ref),
+                    );
                 }
             }
         }
@@ -551,103 +633,156 @@ impl<'window> Renderer<'window> {
                     [
                         self.player.camera.position.x,
                         self.player.camera.position.y,
-                        self.player.camera.position.z
-                        ],
-                    [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]
+                        self.player.camera.position.z,
+                    ],
+                    [0.0, 0.0, 0.0],
+                    [1.0, 1.0, 1.0],
                 );
                 let normal_mat = (model_mat.invert().unwrap()).transpose();
 
-                let model_ref:&[f32; 16] = model_mat.as_ref();
-                let normal_ref:&[f32; 16] = normal_mat.as_ref();
-                let eye_position:&[f32; 3] = &self.player.camera.position.into();
-                self.init.queue.write_buffer(&self.fragment_uniform_buffer, 16, bytemuck::cast_slice(eye_position));
-                self.init.queue.write_buffer(&self.model_uniform_buffers[i], 0, bytemuck::cast_slice(model_ref));
-                self.init.queue.write_buffer(&self.model_uniform_buffers[i], 64, bytemuck::cast_slice(normal_ref));
+                let model_ref: &[f32; 16] = model_mat.as_ref();
+                let normal_ref: &[f32; 16] = normal_mat.as_ref();
+                let eye_position: &[f32; 3] = &self.player.camera.position.into();
+                self.init.queue.write_buffer(
+                    &self.fragment_uniform_buffer,
+                    16,
+                    bytemuck::cast_slice(eye_position),
+                );
+                self.init.queue.write_buffer(
+                    &self.model_uniform_buffers[i],
+                    0,
+                    bytemuck::cast_slice(model_ref),
+                );
+                self.init.queue.write_buffer(
+                    &self.model_uniform_buffers[i],
+                    64,
+                    bytemuck::cast_slice(normal_ref),
+                );
             } else if self.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
                 let skeleton = self.world.get_object(i).get_skeleton();
                 self.bones[i][skeleton["head"]].0.rotation.x = -self.player.camera.rotation.x;
                 self.bones[i][skeleton["neck"]].0.scale = [0.0, 0.0, 0.0].into();
-                self.bones[i][skeleton["root"]].0.rotation.y = -self.player.camera.rotation.y + 1.57079633;
+                self.bones[i][skeleton["root"]].0.rotation.y =
+                    -self.player.camera.rotation.y + 1.57079633;
                 self.update_bones(i);
 
                 let object = self.world.get_object(i);
                 let position = [
-                    object.get_position().x + self.player.camera.position.x - self.player.camera.rotation.y.cos() * 0.1,
+                    object.get_position().x + self.player.camera.position.x
+                        - self.player.camera.rotation.y.cos() * 0.1,
                     object.get_position().y + self.player.camera.position.y,
-                    object.get_position().z + self.player.camera.position.z - self.player.camera.rotation.y.sin() * 0.1
+                    object.get_position().z + self.player.camera.position.z
+                        - self.player.camera.rotation.y.sin() * 0.1,
                 ];
 
                 let model_mat = transforms::create_transforms(
                     position,
                     object.get_rotation().into(),
-                    object.get_scale().into()
+                    object.get_scale().into(),
                 );
                 let normal_mat = (model_mat.invert().unwrap()).transpose();
 
-                let model_ref:&[f32; 16] = model_mat.as_ref();
-                let normal_ref:&[f32; 16] = normal_mat.as_ref();
+                let model_ref: &[f32; 16] = model_mat.as_ref();
+                let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
-                self.init.queue.write_buffer(&self.model_uniform_buffers[i], 0, bytemuck::cast_slice(model_ref));
-                self.init.queue.write_buffer(&self.model_uniform_buffers[i], 64, bytemuck::cast_slice(normal_ref));
+                self.init.queue.write_buffer(
+                    &self.model_uniform_buffers[i],
+                    0,
+                    bytemuck::cast_slice(model_ref),
+                );
+                self.init.queue.write_buffer(
+                    &self.model_uniform_buffers[i],
+                    64,
+                    bytemuck::cast_slice(normal_ref),
+                );
             }
         }
 
         // update skybox positions
         if self.frame % 10 == 0 {
             let grabbable_object_index = raycast_grab(
-                self.world.get_objects(), self.player.camera.position, forward, 5
+                self.world.get_objects(),
+                self.player.camera.position,
+                forward,
+                5,
             );
 
             if grabbable_object_index > 0 {
-                let y_rotation = self.world.get_objects()[grabbable_object_index].get_rotation().y;
+                let y_rotation = self.world.get_objects()[grabbable_object_index]
+                    .get_rotation()
+                    .y;
                 self.world.objects[grabbable_object_index].set_rotation_y(y_rotation + 0.1);
                 let model_mat = transforms::create_transforms(
                     [0.0, 0.0, 0.0],
-                    [0.0, y_rotation + 0.1, 0.0], [1.0, 1.0, 1.0]
+                    [0.0, y_rotation + 0.1, 0.0],
+                    [1.0, 1.0, 1.0],
                 );
                 let normal_mat = (model_mat.invert().unwrap()).transpose();
 
-                let model_ref:&[f32; 16] = model_mat.as_ref();
-                let normal_ref:&[f32; 16] = normal_mat.as_ref();
-                let eye_position:&[f32; 3] = &self.player.camera.position.into();
-                self.init.queue.write_buffer(&self.fragment_uniform_buffer, 16, bytemuck::cast_slice(eye_position));
-                self.init.queue.write_buffer(&self.model_uniform_buffers[grabbable_object_index], 0, bytemuck::cast_slice(model_ref));
-                self.init.queue.write_buffer(&self.model_uniform_buffers[grabbable_object_index], 64, bytemuck::cast_slice(normal_ref));
+                let model_ref: &[f32; 16] = model_mat.as_ref();
+                let normal_ref: &[f32; 16] = normal_mat.as_ref();
+                let eye_position: &[f32; 3] = &self.player.camera.position.into();
+                self.init.queue.write_buffer(
+                    &self.fragment_uniform_buffer,
+                    16,
+                    bytemuck::cast_slice(eye_position),
+                );
+                self.init.queue.write_buffer(
+                    &self.model_uniform_buffers[grabbable_object_index],
+                    0,
+                    bytemuck::cast_slice(model_ref),
+                );
+                self.init.queue.write_buffer(
+                    &self.model_uniform_buffers[grabbable_object_index],
+                    64,
+                    bytemuck::cast_slice(normal_ref),
+                );
             }
 
             if let Some(size) = self.pending_resize.take() {
                 self.init.config.width = size.width;
                 self.init.config.height = size.height;
-                self.init.surface.configure(&self.init.device, &self.init.config);
+                self.init
+                    .surface
+                    .configure(&self.init.device, &self.init.config);
             }
 
-            let _ = self.job_tx.send(LocalUserUpdate::SendUserPosition(
-                Transform {
+            let _ = self
+                .job_tx
+                .send(LocalUserUpdate::SendUserPosition(Transform {
                     position: self.player.camera.position,
                     rotation: self.player.camera.rotation,
-                    scale: Vector3::new(0.0, 0.0, 0.0)
-                }
-            ));
+                    scale: Vector3::new(0.0, 0.0, 0.0),
+                }));
         }
 
         let up_direction = cgmath::Vector3::unit_y();
         let camera_position = Point3 {
             x: self.player.camera.position.x,
             y: self.player.camera.position.y,
-            z: self.player.camera.position.z
+            z: self.player.camera.position.z,
         };
         let (view_mat, project_mat, _) = transforms::create_view_rotation(
-            camera_position, self.player.camera.rotation.y, self.player.camera.rotation.x,
-            up_direction, self.init.config.width as f32 / self.init.config.height as f32
+            camera_position,
+            self.player.camera.rotation.y,
+            self.player.camera.rotation.x,
+            up_direction,
+            self.init.config.width as f32 / self.init.config.height as f32,
         );
 
         let view_project_mat = project_mat * view_mat;
-        let view_projection_ref:&[f32; 16] = view_project_mat.as_ref();
+        let view_projection_ref: &[f32; 16] = view_project_mat.as_ref();
 
-        self.init.queue.write_buffer(&self.vertex_uniform_buffer, 64, bytemuck::cast_slice(view_projection_ref));
+        self.init.queue.write_buffer(
+            &self.vertex_uniform_buffer,
+            64,
+            bytemuck::cast_slice(view_projection_ref),
+        );
 
         let current_time_updated = std::time::Instant::now();
-        let update_time = current_time_updated.duration_since(current_time).as_secs_f32();
+        let update_time = current_time_updated
+            .duration_since(current_time)
+            .as_secs_f32();
 
         // update ingame fps label when menu tablet is enabled
         if menu_tablet_state == 1 && self.frame % 60 == 0 {
@@ -655,41 +790,61 @@ impl<'window> Renderer<'window> {
                 match object.get_tag() {
                     "fps_label" => {
                         let fps_label = text::create_plane_with_text(
-                        (-0.5, -0.3, -0.02), (0.02, 0.02, 1.0),
-                        &self.font_maps["NotoSansJP"], [1.0, 1.0, 1.0], &format!("FPS: {}", (1.0 / update_time).round())
+                            (-0.5, -0.3, -0.02),
+                            (0.02, 0.02, 1.0),
+                            &self.font_maps["NotoSansJP"],
+                            [1.0, 1.0, 1.0],
+                            &format!("FPS: {}", (1.0 / update_time).round()),
                         );
                         let meshes = vertex::create_vertices(&fps_label);
                         for (vertices, _) in meshes {
                             self.num_vertices[index] = vec![vertices.len() as u32];
-                            let vertex_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor {
-                                label: Some("Vertex Buffer"),
-                                size: (size_of::<Vertex>() * vertices.len()) as u64,
-                                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                                mapped_at_creation: false
-                            });
+                            let vertex_buffer =
+                                self.init.device.create_buffer(&wgpu::BufferDescriptor {
+                                    label: Some("Vertex Buffer"),
+                                    size: (size_of::<Vertex>() * vertices.len()) as u64,
+                                    usage: wgpu::BufferUsages::VERTEX
+                                        | wgpu::BufferUsages::COPY_DST,
+                                    mapped_at_creation: false,
+                                });
                             self.vertex_buffers[index] = vec![vertex_buffer];
-                            self.init.queue.write_buffer(&self.vertex_buffers[index][0], 0, bytemuck::cast_slice(&vertices));
+                            self.init.queue.write_buffer(
+                                &self.vertex_buffers[index][0],
+                                0,
+                                bytemuck::cast_slice(&vertices),
+                            );
                         }
                     }
                     "ram_label" => {
                         let ram_label = text::create_plane_with_text(
-                        (-0.5, -0.2, -0.02), (0.02, 0.02, 1.0),
-                        &self.font_maps["NotoSansJP"], [1.0, 1.0, 1.0], &format!("RAM: {:.2} MB", ALLOCATOR.allocated() as f32 / 1000000.0)
+                            (-0.5, -0.2, -0.02),
+                            (0.02, 0.02, 1.0),
+                            &self.font_maps["NotoSansJP"],
+                            [1.0, 1.0, 1.0],
+                            &format!("RAM: {:.2} MB", ALLOCATOR.allocated() as f32 / 1000000.0),
                         );
                         let meshes = vertex::create_vertices(&ram_label);
                         for (vertices, _) in meshes {
                             self.num_vertices[index] = vec![vertices.len() as u32];
-                            let vertex_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor {
-                                label: Some("Vertex Buffer"),
-                                size: (size_of::<Vertex>() * vertices.len()) as u64,
-                                usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
-                                mapped_at_creation: false
-                            });
+                            let vertex_buffer =
+                                self.init.device.create_buffer(&wgpu::BufferDescriptor {
+                                    label: Some("Vertex Buffer"),
+                                    size: (size_of::<Vertex>() * vertices.len()) as u64,
+                                    usage: wgpu::BufferUsages::VERTEX
+                                        | wgpu::BufferUsages::COPY_DST,
+                                    mapped_at_creation: false,
+                                });
                             self.vertex_buffers[index] = vec![vertex_buffer];
-                            self.init.queue.write_buffer(&self.vertex_buffers[index][0], 0, bytemuck::cast_slice(&vertices));
+                            self.init.queue.write_buffer(
+                                &self.vertex_buffers[index][0],
+                                0,
+                                bytemuck::cast_slice(&vertices),
+                            );
                         }
                     }
-                    _ => { continue; }
+                    _ => {
+                        continue;
+                    }
                 };
             }
         }
@@ -703,11 +858,8 @@ impl<'window> Renderer<'window> {
 
         // TODO: Get rid of default pivot, this isn't dynamic yet cause fbx is making me go crazy
         let default_pivot = 120.0;
-        let bind_global = create_transforms(
-            [0.0, default_pivot, 0.0],
-            [0.0, 0.0, 0.0],
-            [1.0, 1.0, 1.0],
-        );
+        let bind_global =
+            create_transforms([0.0, default_pivot, 0.0], [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
         let inverse_bind = bind_global.invert().expect("BIND DOESN'T EXIST");
 
         // TODO: Change to bone updating based on hiarchy
@@ -716,7 +868,9 @@ impl<'window> Renderer<'window> {
             //    bone.0.position.into(), bone.0.rotation.into(), bone.0.scale.into()
             //);
             let mut global_matrix = create_transforms(
-                [bone.0.position.x, default_pivot, bone.0.rotation.z], bone.0.rotation.into(), bone.0.scale.into()
+                [bone.0.position.x, default_pivot, bone.0.rotation.z],
+                bone.0.rotation.into(),
+                bone.0.scale.into(),
             );
             //let mut bind_global = create_transforms(
             //    bone.1.position.into(),
@@ -742,7 +896,7 @@ impl<'window> Renderer<'window> {
                     let parent_matrix = create_transforms(
                         current_parent_bone.0.position.into(),
                         current_parent_bone.0.rotation.into(),
-                        current_parent_bone.0.scale.into()
+                        current_parent_bone.0.scale.into(),
                     );
                     global_matrix = parent_matrix * global_matrix;
 
@@ -754,7 +908,11 @@ impl<'window> Renderer<'window> {
             let final_matrix = global_matrix * inverse_bind;
             self.final_marices[object_index][bone_index] = final_matrix.into();
         }
-        self.init.queue.write_buffer(&self.bone_buffers[object_index], 0, bytemuck::cast_slice(&self.final_marices[object_index]));
+        self.init.queue.write_buffer(
+            &self.bone_buffers[object_index],
+            0,
+            bytemuck::cast_slice(&self.final_marices[object_index]),
+        );
     }
 
     pub fn set_world(&mut self, world: World) {
@@ -765,7 +923,10 @@ impl<'window> Renderer<'window> {
         self.num_vertices.clear();
 
         for texture in self.world.get_textures() {
-            self.textures.insert(texture.to_string(), TextureObject::create(texture, &self.init));
+            self.textures.insert(
+                texture.to_string(),
+                TextureObject::create(texture, &self.init),
+            );
         }
 
         for object in self.world.get_objects().iter().enumerate() {
@@ -779,34 +940,42 @@ impl<'window> Renderer<'window> {
             let bone_transforms = object.1.get_bones();
             self.final_marices.push(Vec::new());
             for _ in 0..bone_transforms.len() {
-                self.final_marices[object.0].push(
-                    [[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0],[0.0, 0.0, 0.0, 0.0]]
-                );
+                self.final_marices[object.0].push([
+                    [0.0, 0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0, 0.0],
+                    [0.0, 0.0, 0.0, 0.0],
+                ]);
             }
             self.bones.push(bone_transforms.clone());
 
             for bone in bone_transforms {
-                bones.push(transforms::create_transforms(
-                    bone.0.position.into(),
-                    bone.0.rotation.into(),
-                    bone.0.scale.into()
-                ).into());
+                bones.push(
+                    transforms::create_transforms(
+                        bone.0.position.into(),
+                        bone.0.rotation.into(),
+                        bone.0.scale.into(),
+                    )
+                    .into(),
+                );
             }
 
             let bone_buffer;
             if bones.len() > 0 {
                 println!("{}", object.0);
                 self.shader_type.push(ShaderType::DisplacementBones);
-                bone_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor{
+                bone_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some("Bone Buffer"),
                     size: (bones.len() * std::mem::size_of::<Matrix4<f32>>()) as u64,
                     usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
                     mapped_at_creation: false,
                 });
-                self.init.queue.write_buffer(&bone_buffer, 0, bytemuck::cast_slice(&bones));
+                self.init
+                    .queue
+                    .write_buffer(&bone_buffer, 0, bytemuck::cast_slice(&bones));
             } else {
                 self.shader_type.push(ShaderType::Displacement);
-                bone_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor{
+                bone_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some("Bone Buffer"),
                     size: 16,
                     usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
@@ -816,38 +985,48 @@ impl<'window> Renderer<'window> {
 
             self.bone_buffers.push(bone_buffer);
 
-            let model_uniform_buffer: wgpu::Buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor{
-                label: Some("Vertex Uniform Buffer"),
-                size: 128,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
+            let model_uniform_buffer: wgpu::Buffer =
+                self.init.device.create_buffer(&wgpu::BufferDescriptor {
+                    label: Some("Vertex Uniform Buffer"),
+                    size: 128,
+                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                    mapped_at_creation: false,
+                });
 
             let model_mat = transforms::create_transforms(
                 [
-                        object.1.get_position().x,
-                        object.1.get_position().y,
-                        object.1.get_position().z
-                    ], [
-                        object.1.get_rotation().x,
-                        object.1.get_rotation().y,
-                        object.1.get_rotation().z
-                    ], [
-                        object.1.get_scale().x,
-                        object.1.get_scale().y,
-                        object.1.get_scale().z
-                    ]
+                    object.1.get_position().x,
+                    object.1.get_position().y,
+                    object.1.get_position().z,
+                ],
+                [
+                    object.1.get_rotation().x,
+                    object.1.get_rotation().y,
+                    object.1.get_rotation().z,
+                ],
+                [
+                    object.1.get_scale().x,
+                    object.1.get_scale().y,
+                    object.1.get_scale().z,
+                ],
             );
             let normal_mat = (model_mat.invert().unwrap()).transpose();
 
-            let model_ref:&[f32; 16] = model_mat.as_ref();
-            let normal_ref:&[f32; 16] = normal_mat.as_ref();
-            self.init.queue.write_buffer(&model_uniform_buffer, 0, bytemuck::cast_slice(model_ref));
-            self.init.queue.write_buffer(&model_uniform_buffer, 64, bytemuck::cast_slice(normal_ref));
+            let model_ref: &[f32; 16] = model_mat.as_ref();
+            let normal_ref: &[f32; 16] = normal_mat.as_ref();
+            self.init
+                .queue
+                .write_buffer(&model_uniform_buffer, 0, bytemuck::cast_slice(model_ref));
+            self.init.queue.write_buffer(
+                &model_uniform_buffer,
+                64,
+                bytemuck::cast_slice(normal_ref),
+            );
 
             for (vertices, material_name) in meshes {
                 let material_found;
-                let bytes_filtered: Vec<u8> = material_name.bytes().filter(|c| c > &(31 as u8)).collect();
+                let bytes_filtered: Vec<u8> =
+                    material_name.bytes().filter(|c| c > &(31 as u8)).collect();
                 let material_string = String::from_utf8(bytes_filtered).unwrap();
 
                 if let Some(material) = materials.get(&material_string) {
@@ -859,44 +1038,78 @@ impl<'window> Renderer<'window> {
                 let material_found_texture = material_found.get_texture();
                 let material_found_displacement = material_found.get_displacement();
 
-                println!("loading: {} from: {}", material_found_texture, material_string);
+                println!(
+                    "loading: {} from: {}",
+                    material_found_texture, material_string
+                );
 
                 let texture_object;
                 if let Some(texture) = self.textures.get(material_found_texture) {
                     texture_object = texture;
-                } else { continue; }
+                } else {
+                    continue;
+                }
 
                 let texture_object_displacement;
                 if let Some(texture_displacement_name) = material_found_displacement {
-                    if let Some(texture_displacement) = self.textures.get(texture_displacement_name) {
+                    if let Some(texture_displacement) = self.textures.get(texture_displacement_name)
+                    {
                         texture_object_displacement = Some(texture_displacement);
-                    } else { texture_object_displacement = None; }
-                } else { texture_object_displacement = None; }
+                    } else {
+                        texture_object_displacement = None;
+                    }
+                } else {
+                    texture_object_displacement = None;
+                }
 
                 let uniform_bind_group;
                 let vertex_buffer;
                 if let Some(texture_displacement) = texture_object_displacement {
                     (uniform_bind_group, vertex_buffer) = Self::create_buffer_displacement(
-                        &self.init, &self.uniform_bind_group_layout,
-                        &self.vertex_uniform_buffer, &self.fragment_uniform_buffer, &model_uniform_buffer,
-                        &self.bone_buffers[object.0], &texture_displacement.texture, texture_displacement.texture_size,
+                        &self.init,
+                        &self.uniform_bind_group_layout,
+                        &self.vertex_uniform_buffer,
+                        &self.fragment_uniform_buffer,
+                        &model_uniform_buffer,
+                        &self.bone_buffers[object.0],
+                        &texture_displacement.texture,
+                        texture_displacement.texture_size,
                         &texture_displacement.texture_rgba,
-                        texture_displacement.texture_width, texture_displacement.texture_height,
-                        &texture_object.texture, texture_object.texture_size, &texture_object.texture_rgba,
-                        texture_object.texture_width, texture_object.texture_height, vertices.len(),
+                        texture_displacement.texture_width,
+                        texture_displacement.texture_height,
+                        &texture_object.texture,
+                        texture_object.texture_size,
+                        &texture_object.texture_rgba,
+                        texture_object.texture_width,
+                        texture_object.texture_height,
+                        vertices.len(),
                     );
                 } else {
-                    if let Some(texture_displacement) = self.textures.get("textures/displacement.png") {
+                    if let Some(texture_displacement) =
+                        self.textures.get("textures/displacement.png")
+                    {
                         (uniform_bind_group, vertex_buffer) = Self::create_buffer_displacement(
-                            &self.init, &self.uniform_bind_group_layout,
-                            &self.vertex_uniform_buffer, &self.fragment_uniform_buffer, &model_uniform_buffer,
-                            &self.bone_buffers[object.0], &texture_displacement.texture, texture_displacement.texture_size,
+                            &self.init,
+                            &self.uniform_bind_group_layout,
+                            &self.vertex_uniform_buffer,
+                            &self.fragment_uniform_buffer,
+                            &model_uniform_buffer,
+                            &self.bone_buffers[object.0],
+                            &texture_displacement.texture,
+                            texture_displacement.texture_size,
                             &texture_displacement.texture_rgba,
-                            texture_displacement.texture_width, texture_displacement.texture_height,
-                            &texture_object.texture, texture_object.texture_size, &texture_object.texture_rgba,
-                            texture_object.texture_width, texture_object.texture_height, vertices.len(),
+                            texture_displacement.texture_width,
+                            texture_displacement.texture_height,
+                            &texture_object.texture,
+                            texture_object.texture_size,
+                            &texture_object.texture_rgba,
+                            texture_object.texture_width,
+                            texture_object.texture_height,
+                            vertices.len(),
                         );
-                    } else { continue; }
+                    } else {
+                        continue;
+                    }
                 }
 
                 self.vertex_buffers[object.0].push(vertex_buffer);
@@ -904,8 +1117,9 @@ impl<'window> Renderer<'window> {
 
                 self.num_vertices[object.0].push(vertices.len() as u32);
                 self.init.queue.write_buffer(
-                    &self.vertex_buffers[object.0][self.vertex_buffers[object.0].len() - 1], 0,
-                    bytemuck::cast_slice(vertices)
+                    &self.vertex_buffers[object.0][self.vertex_buffers[object.0].len() - 1],
+                    0,
+                    bytemuck::cast_slice(vertices),
                 );
             }
 
@@ -931,7 +1145,9 @@ impl<'window> Renderer<'window> {
             wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
 
             wgpu::CurrentSurfaceTexture::Outdated => {
-                self.init.surface.configure(&self.init.device, &self.init.config);
+                self.init
+                    .surface
+                    .configure(&self.init.device, &self.init.config);
                 return Ok(());
             }
 
@@ -939,7 +1155,9 @@ impl<'window> Renderer<'window> {
                 return Ok(());
             }
 
-            wgpu::CurrentSurfaceTexture::Timeout | wgpu::CurrentSurfaceTexture::Occluded | wgpu::CurrentSurfaceTexture::Validation => {
+            wgpu::CurrentSurfaceTexture::Timeout
+            | wgpu::CurrentSurfaceTexture::Occluded
+            | wgpu::CurrentSurfaceTexture::Validation => {
                 return Ok(());
             }
         };
@@ -957,18 +1175,19 @@ impl<'window> Renderer<'window> {
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format:wgpu::TextureFormat::Depth24Plus,
+            format: wgpu::TextureFormat::Depth24Plus,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             label: None,
             view_formats: &[],
         });
         let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut encoder = self
-            .init.device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
+        let mut encoder =
+            self.init
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
