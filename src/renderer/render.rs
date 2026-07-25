@@ -657,7 +657,7 @@ impl<'window> Renderer<'window> {
             } else if self.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
                 let skeleton = self.world.get_object(i).get_skeleton();
                 self.bones[i][skeleton["head"]].0.rotation.x = -self.player.camera.rotation.x;
-                // TODO: make the local character this dissabled by default.
+                // TODO: make the local character have this dissabled by default.
                 self.bones[i][skeleton["neck"]].0.scale = [0.0, 0.0, 0.0].into();
                 self.update_bones(i);
 
