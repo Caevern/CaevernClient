@@ -853,7 +853,7 @@ impl<'window> Renderer<'window> {
     pub fn update_bones(&mut self, object_index: usize) {
         //let skeleton = self.world.get_object(object_index).get_skeleton();
 
-        // TODO: Get rid of default pivot, this isn't dynamic yet cause fbx is making me go crazy
+        // TODO: Get rid of default pivot, this isn't dynamic yet cause fbx is making me cry
         let default_pivot = 120.0;
         let bind_global =
             create_transforms([0.0, default_pivot, 0.0], [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
@@ -861,19 +861,15 @@ impl<'window> Renderer<'window> {
 
         // TODO: Change to bone updating based on hiarchy
         for (bone_index, bone) in self.bones[object_index].iter().enumerate() {
-            //let mut global_matrix = create_transforms(
-            //    bone.0.position.into(), bone.0.rotation.into(), bone.0.scale.into()
-            //);
             let mut global_matrix = create_transforms(
-                [bone.0.position.x, default_pivot, bone.0.rotation.z],
+                [
+                    bone.0.position.x,
+                    bone.0.position.y + default_pivot,
+                    bone.0.rotation.z,
+                ],
                 bone.0.rotation.into(),
                 bone.0.scale.into(),
             );
-            //let mut bind_global = create_transforms(
-            //    bone.1.position.into(),
-            //    bone.1.rotation.into(),
-            //    bone.1.scale.into(),
-            //);
 
             if bone.2 != -1 {
                 let mut current_parent = bone.2;
@@ -882,13 +878,6 @@ impl<'window> Renderer<'window> {
                         break;
                     }
                     let current_parent_bone = self.bones[object_index][current_parent as usize];
-
-                    /*let parent_bind = create_transforms(
-                        current_parent_bone.1.position.into(),
-                        current_parent_bone.1.rotation.into(),
-                        current_parent_bone.1.scale.into(),
-                    );
-                    bind_global = parent_bind * bind_global;*/
 
                     let parent_matrix = create_transforms(
                         current_parent_bone.0.position.into(),
@@ -901,7 +890,6 @@ impl<'window> Renderer<'window> {
                 }
             }
 
-            //let inverse_bind = bind_global.invert().expect("BIND DOESN'T EXIST");
             let final_matrix = global_matrix * inverse_bind;
             self.final_marices[object_index][bone_index] = final_matrix.into();
         }
