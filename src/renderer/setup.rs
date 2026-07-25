@@ -11,6 +11,8 @@ pub fn start_engine(world: World) {
         window: None,
         renderer: None,
 
+        depth_texture: None,
+
         window_size: (0, 0),
 
         title: "Caevern".to_string(),
@@ -25,7 +27,7 @@ pub fn start_engine(world: World) {
         xr_enabled: false,
         menu_tablet_state: 0,
 
-        home_world: world
+        home_world: world,
     };
 
     event_loop.run_app(&mut game_window).unwrap();

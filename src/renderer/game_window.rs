@@ -25,6 +25,8 @@ pub struct GameWindow<'window> {
     pub window: Option<Arc<Window>>,
     pub renderer: Option<Renderer<'window>>,
 
+    pub depth_texture: Option<wgpu::Texture>,
+
     pub window_size: (u32, u32),
 
     pub render_start_time: std::time::Instant,
@@ -64,6 +66,26 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         }
 
         let mut renderer = pollster::block_on(Renderer::new(&window, job_tx));
+
+        self.depth_texture = Some(
+            renderer
+                .init
+                .device
+                .create_texture(&wgpu::TextureDescriptor {
+                    size: wgpu::Extent3d {
+                        width: renderer.init.config.width,
+                        height: renderer.init.config.height,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Depth24Plus,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    label: None,
+                    view_formats: &[],
+                }),
+        );
 
         self.window_size = (renderer.init.size.width, renderer.init.size.height);
 
@@ -239,7 +261,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
                 self.mouse_movement = [0.0, 0.0];
 
-                match renderer.render() {
+                match renderer.render(&self.depth_texture.as_mut().unwrap()) {
                     Ok(_) => {
                         self.window.as_ref().unwrap().request_redraw();
                     }

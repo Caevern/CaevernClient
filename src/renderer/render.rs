@@ -1139,7 +1139,7 @@ impl<'window> Renderer<'window> {
         }
     }
 
-    pub fn render(&mut self) -> Result<(), ()> {
+    pub fn render(&mut self, depth_texture: &wgpu::Texture) -> Result<(), ()> {
         let output = match self.init.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => frame,
             wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
@@ -1166,20 +1166,6 @@ impl<'window> Renderer<'window> {
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
-        let depth_texture = self.init.device.create_texture(&wgpu::TextureDescriptor {
-            size: wgpu::Extent3d {
-                width: self.init.config.width,
-                height: self.init.config.height,
-                depth_or_array_layers: 1,
-            },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Depth24Plus,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            label: None,
-            view_formats: &[],
-        });
         let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let mut encoder =
