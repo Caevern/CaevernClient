@@ -1,8 +1,8 @@
-pub mod vertex;
-pub mod setup;
+pub mod eventloop;
 pub mod transform;
+pub mod vertex;
 
-mod render;
-mod transforms;
-mod texture_object;
 mod game_window;
+mod render;
+mod texture_object;
+mod transforms;
