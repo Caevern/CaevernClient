@@ -29,8 +29,11 @@
             "skeleton": [
                 {"body_part": "neck", "bone_name": "neck.xModel"},
                 {"body_part": "head", "bone_name": "head.xModel"},
-                {"body_part": "root", "bone_name": "root.xModel"}
-            ]
+                {"body_part": "root", "bone_name": "root.xModel"},
+                {"body_part": "arm_right", "bone_name": "arm_stretch.rModel"},
+                {"body_part": "arm_left", "bone_name": "arm_stretch.lModel"}
+            ],
+            "render_bones": false
         }
     ]
 }
