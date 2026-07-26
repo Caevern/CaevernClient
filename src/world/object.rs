@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, println};
 
 use cgmath::Vector3;
 
@@ -9,6 +9,7 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectType {
+    Bone,
     Cube,
     Camera,
     Sphere,
@@ -21,10 +22,10 @@ pub enum ObjectType {
     TabletMenuButton,
 }
 
-fn new_bone_vec(amount: usize) -> Vec<(Transform, Transform, i64)> {
+fn new_bone_vec(amount: usize) -> Vec<(Transform, Transform, i64, usize)> {
     let mut bones = Vec::new();
     for _ in 0..amount {
-        bones.push((Transform::zero(), Transform::zero(), -1));
+        bones.push((Transform::zero(), Transform::zero(), -1, 0));
     }
     bones
 }
@@ -36,7 +37,7 @@ pub struct Object {
     transform: Transform,
     vertices: Vec<(Vec<Vertex>, String)>,
     materials: HashMap<String, Material>,
-    bones: Vec<(Transform, Transform, i64)>,
+    bones: Vec<(Transform, Transform, i64, usize)>,
     skeleton: HashMap<String, usize>,
     movable: bool,
     tag: String,
@@ -109,12 +110,13 @@ impl Object {
 
     pub fn set_bones(
         &mut self,
-        bones: HashMap<i64, (usize, Transform, String, i64)>,
+        bones: HashMap<i64, (usize, Transform, String, i64, usize)>,
         position: Vector3<f32>,
         rotation: Vector3<f32>,
         scale: Vector3<f32>,
     ) {
-        let mut bones_converted: Vec<(Transform, Transform, i64)> = new_bone_vec(bones.len());
+        let mut bones_converted: Vec<(Transform, Transform, i64, usize)> =
+            new_bone_vec(bones.len());
         for bone in bones {
             if bone.1.0 > bones_converted.len() {
                 continue;
@@ -131,7 +133,9 @@ impl Object {
                     scale: bone.1.1.scale,
                 },
                 bone.1.3,
+                bone.1.4,
             );
+            println!("{}", bone.1.2);
         }
         self.bones = bones_converted;
     }
@@ -156,7 +160,7 @@ impl Object {
         self.object_type
     }
 
-    pub fn get_bones(&self) -> &Vec<(Transform, Transform, i64)> {
+    pub fn get_bones(&self) -> &Vec<(Transform, Transform, i64, usize)> {
         &self.bones
     }
     pub fn get_skeleton(&self) -> &HashMap<String, usize> {

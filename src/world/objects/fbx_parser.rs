@@ -1,7 +1,7 @@
 use cgmath::Vector3;
-use rust_embed::RustEmbed;
-use fbx::{File, Node};
 use fbx::Property;
+use fbx::{File, Node};
+use rust_embed::RustEmbed;
 use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, Cursor};
 
@@ -18,7 +18,7 @@ struct Mesh {
     uv: Vec<f64>,
     uv_indices: Vec<i32>,
     _normals: Vec<f64>,
-    id: i64
+    id: i64,
 }
 
 #[derive(Debug)]
@@ -30,7 +30,7 @@ struct Material {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectType {
     Mesh,
-    Bone
+    Bone,
 }
 
 #[derive(Debug)]
@@ -41,17 +41,17 @@ struct Transform {
     name: String,
     id: i64,
     parent: i64,
-    object: ObjectType
+    object: ObjectType,
 }
 
 pub struct Keyframe {
     pub time: f32,
-    pub transform: transform::Transform
+    pub transform: transform::Transform,
 }
 
 pub struct BoneAnimation {
     pub bone_id: i64,
-    pub keyframes: Vec<Keyframe>
+    pub keyframes: Vec<Keyframe>,
 }
 
 #[derive(Debug)]
@@ -99,29 +99,17 @@ pub struct SkinnedVertex {
 
 fn rotate_x(v: [f32; 3], angle: f32) -> [f32; 3] {
     let (s, c) = angle.sin_cos();
-    [
-        v[0],
-        v[1] * c - v[2] * s,
-        v[1] * s + v[2] * c,
-    ]
+    [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c]
 }
 
 fn rotate_y(v: [f32; 3], angle: f32) -> [f32; 3] {
     let (s, c) = angle.sin_cos();
-    [
-        v[0] * c + v[2] * s,
-        v[1],
-        -v[0] * s + v[2] * c,
-    ]
+    [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c]
 }
 
 fn rotate_z(v: [f32; 3], angle: f32) -> [f32; 3] {
     let (s, c) = angle.sin_cos();
-    [
-        v[0] * c - v[1] * s,
-        v[0] * s + v[1] * c,
-        v[2],
-    ]
+    [v[0] * c - v[1] * s, v[0] * s + v[1] * c, v[2]]
 }
 
 fn get_id(node: &Node) -> Option<i64> {
@@ -163,7 +151,6 @@ fn parse_clusters(node: &Node) -> HashMap<i64, Cluster> {
     if node.name == "Objects" {
         for child in &node.children {
             if child.name == "Deformer" {
-
                 let id = get_id(child).unwrap_or(0);
 
                 let deformer_type = match child.properties.get(2) {
@@ -197,12 +184,15 @@ fn parse_clusters(node: &Node) -> HashMap<i64, Cluster> {
                         }
                     }
 
-                    clusters.insert(id, Cluster {
+                    clusters.insert(
                         id,
-                        indices,
-                        weights,
-                        bone_id: 0,
-                    });
+                        Cluster {
+                            id,
+                            indices,
+                            weights,
+                            bone_id: 0,
+                        },
+                    );
                 }
             }
         }
@@ -236,9 +226,7 @@ fn parse_skins(node: &Node) -> HashSet<i64> {
     skins
 }
 
-fn _parse_animation_curves(node: &Node)
-    -> HashMap<i64, AnimationCurve>
-{
+fn _parse_animation_curves(node: &Node) -> HashMap<i64, AnimationCurve> {
     let mut curves = HashMap::new();
 
     if node.name != "Objects" {
@@ -273,10 +261,7 @@ fn _parse_animation_curves(node: &Node)
                             }
 
                             Property::F64Array(arr) => {
-                                values.extend(
-                                    arr.iter()
-                                        .map(|v| *v as f32)
-                                );
+                                values.extend(arr.iter().map(|v| *v as f32));
                             }
 
                             _ => {}
@@ -288,19 +273,13 @@ fn _parse_animation_curves(node: &Node)
             }
         }
 
-        curves.insert(id, AnimationCurve {
-            id,
-            times,
-            values,
-        });
+        curves.insert(id, AnimationCurve { id, times, values });
     }
 
     curves
 }
 
-fn _parse_curve_nodes(node: &Node)
-    -> HashMap<i64, AnimationCurveNode>
-{
+fn _parse_curve_nodes(node: &Node) -> HashMap<i64, AnimationCurveNode> {
     let mut nodes = HashMap::new();
 
     if node.name != "Objects" {
@@ -314,24 +293,18 @@ fn _parse_curve_nodes(node: &Node)
 
         let id = get_id(child).unwrap_or(0);
 
-        let property =
-            match child.properties.get(1) {
-                Some(Property::String(s)) => s.clone(),
-                _ => String::new(),
-            };
+        let property = match child.properties.get(1) {
+            Some(Property::String(s)) => s.clone(),
+            _ => String::new(),
+        };
 
-        nodes.insert(id, AnimationCurveNode {
-            id,
-            property,
-        });
+        nodes.insert(id, AnimationCurveNode { id, property });
     }
 
     nodes
 }
 
-fn parse_animation_stacks(node: &Node)
-    -> HashMap<i64, AnimationStack>
-{
+fn parse_animation_stacks(node: &Node) -> HashMap<i64, AnimationStack> {
     let mut stacks = HashMap::new();
 
     if node.name != "Objects" {
@@ -345,24 +318,18 @@ fn parse_animation_stacks(node: &Node)
 
         let id = get_id(child).unwrap_or(0);
 
-        let name =
-            match child.properties.get(1) {
-                Some(Property::String(s)) => s.clone(),
-                _ => "Unnamed".into(),
-            };
+        let name = match child.properties.get(1) {
+            Some(Property::String(s)) => s.clone(),
+            _ => "Unnamed".into(),
+        };
 
-        stacks.insert(id, AnimationStack {
-            id,
-            name,
-        });
+        stacks.insert(id, AnimationStack { id, name });
     }
 
     stacks
 }
 
-fn parse_animation_layers(node: &Node)
-    -> HashMap<i64, AnimationLayer>
-{
+fn parse_animation_layers(node: &Node) -> HashMap<i64, AnimationLayer> {
     let mut layers = HashMap::new();
 
     if node.name != "Objects" {
@@ -376,9 +343,7 @@ fn parse_animation_layers(node: &Node)
 
         let id = get_id(child).unwrap_or(0);
 
-        layers.insert(id, AnimationLayer {
-            id,
-        });
+        layers.insert(id, AnimationLayer { id });
     }
 
     layers
@@ -464,7 +429,7 @@ fn traverse_nodes(node: &Node) -> Vec<Mesh> {
             uv,
             uv_indices,
             _normals: normals,
-            id
+            id,
         });
     }
 
@@ -526,10 +491,9 @@ fn get_transform(node: &Node) -> Option<Transform> {
         }
 
         let node_type = match node.properties.get(2) {
-        Some(Property::String(s)) => s.as_str(),
+            Some(Property::String(s)) => s.as_str(),
             _ => "",
         };
-
 
         let id: i64;
         if let Some(id_found) = get_id(node) {
@@ -550,7 +514,7 @@ fn get_transform(node: &Node) -> Option<Transform> {
             name,
             id,
             parent: -1,
-            object
+            object,
         });
     }
 
@@ -582,20 +546,16 @@ fn parse_materials(node: &Node) -> HashMap<i64, Material> {
 
 fn pack_weights(
     influences: &[(i64, f32)],
-    bone_map: &HashMap<i64, (usize, transform::Transform, String, i64)>,
+    bone_map: &HashMap<i64, (usize, transform::Transform, String, i64, usize)>,
 ) -> ([u32; 4], [f32; 4]) {
-
     let mut ids = [0u32; 4];
     let mut weights = [0.0f32; 4];
 
     let mut sorted = influences.to_vec();
 
-    sorted.sort_by(|a, b|
-        b.1.partial_cmp(&a.1).unwrap());
+    sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
-    for (i, (bone_id, weight))
-        in sorted.iter().take(4).enumerate()
-    {
+    for (i, (bone_id, weight)) in sorted.iter().take(4).enumerate() {
         ids[i] = bone_map[bone_id].0 as u32;
         weights[i] = *weight;
     }
@@ -611,13 +571,31 @@ fn pack_weights(
     (ids, weights)
 }
 
-pub fn parse(path: &str, global_transform: transform::Transform) -> (Vec<(Vec<SkinnedVertex>, Vec<[i8; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, String)>, HashMap<i64, (usize, transform::Transform, String, i64)>) {
+pub fn parse(
+    path: &str,
+    global_transform: transform::Transform,
+) -> (
+    Vec<(
+        Vec<SkinnedVertex>,
+        Vec<[i8; 3]>,
+        Vec<[f32; 3]>,
+        Vec<[f32; 2]>,
+        String,
+    )>,
+    HashMap<i64, (usize, transform::Transform, String, i64, usize)>,
+) {
     let data = Assets::get(path).expect("Failed to get asset").data;
     let cursor = Cursor::new(data);
     let mut reader = BufReader::new(cursor);
     let file = File::read_from(&mut reader).expect("Failed to parse FBX file");
 
-    let mut mesh_data: Vec<(Vec<SkinnedVertex>, Vec<[i8; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, String)> = Vec::new();
+    let mut mesh_data: Vec<(
+        Vec<SkinnedVertex>,
+        Vec<[i8; 3]>,
+        Vec<[f32; 3]>,
+        Vec<[f32; 2]>,
+        String,
+    )> = Vec::new();
 
     let mut transforms = HashMap::new();
     let mut materials = HashMap::new();
@@ -707,11 +685,7 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> (Vec<(Vec<Sk
     }
 
     for (geom, cluster_ids) in &geometry_clusters {
-        println!(
-            "Geometry {} has {} clusters",
-            geom,
-            cluster_ids.len()
-        );
+        println!("Geometry {} has {} clusters", geom, cluster_ids.len());
     }
 
     let existing_keys: HashSet<_> = transforms.keys().cloned().collect();
@@ -725,7 +699,10 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> (Vec<(Vec<Sk
         }
     }
 
-    let bones: Vec<_> = transforms.values().filter(|t| t.object == ObjectType::Bone).collect();
+    let bones: Vec<_> = transforms
+        .values()
+        .filter(|t| t.object == ObjectType::Bone)
+        .collect();
     for (index, bone) in bones.iter().enumerate() {
         let mut parent_bone_index = -1;
         for (parent_index, parent_bone) in bones.iter().enumerate() {
@@ -733,13 +710,24 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> (Vec<(Vec<Sk
                 parent_bone_index = parent_index as i64;
             }
         }
-        bone_map.insert(bone.id, (index,
-            transform::Transform{
-                position: Vector3::new( bone.translation.0, bone.translation.1, bone.translation.2 ),
-                rotation: Vector3::new( bone.rotation.0, bone.rotation.1, bone.rotation.2 ),
-                scale: Vector3::new( bone.scaling.0, bone.scaling.1, bone.scaling.2 ),
-            }, bone.name.clone(), parent_bone_index
-        ));
+        bone_map.insert(
+            bone.id,
+            (
+                index,
+                transform::Transform {
+                    position: Vector3::new(
+                        bone.translation.0,
+                        bone.translation.1,
+                        bone.translation.2,
+                    ),
+                    rotation: Vector3::new(bone.rotation.0, bone.rotation.1, bone.rotation.2),
+                    scale: Vector3::new(bone.scaling.0, bone.scaling.1, bone.scaling.2),
+                },
+                bone.name.clone(),
+                parent_bone_index,
+                0,
+            ),
+        );
     }
 
     let mut selected_material = "default";
@@ -747,21 +735,23 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> (Vec<(Vec<Sk
     for node in &file.children {
         let meshes = traverse_nodes(node);
         for (index, mesh) in meshes.iter().enumerate() {
-            let mut transform = &Transform{
+            let mut transform = &Transform {
                 translation: (3.0 * index as f32, 0.0, 0.0),
                 rotation: (0.0, 0.0, 0.0),
                 scaling: (0.0, 0.0, 0.0),
                 name: "Unknown".to_string(),
                 id: 0,
                 parent: -1,
-                object: ObjectType::Bone
+                object: ObjectType::Bone,
             };
             let mut model_id = None;
             for connection in &connections {
                 if connection.from == mesh.id {
                     model_id = Some(connection.to);
                     if let Some(transform_found) = transforms.get(&connection.to) {
-                        if transform_found.object == ObjectType::Bone { continue; }
+                        if transform_found.object == ObjectType::Bone {
+                            continue;
+                        }
                         transform = transform_found;
                     }
                 }
@@ -785,7 +775,8 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> (Vec<(Vec<Sk
                 for cluster_id in cluster_ids {
                     let cluster = &clusters[cluster_id];
 
-                    for (&vertex_idx, &weight) in cluster.indices.iter().zip(cluster.weights.iter()) {
+                    for (&vertex_idx, &weight) in cluster.indices.iter().zip(cluster.weights.iter())
+                    {
                         vertex_weights[vertex_idx as usize].push((cluster.bone_id, weight as f32));
                     }
                 }
@@ -800,7 +791,13 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> (Vec<(Vec<Sk
             let mut current_polygon = vec![];
             let mut current_uvs = vec![];
 
-            mesh_data.push((Vec::new(), Vec::new(), Vec::new(), Vec::new(), selected_material.to_string()));
+            mesh_data.push((
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                Vec::new(),
+                selected_material.to_string(),
+            ));
             let mesh_data_index = mesh_data.len() - 1;
 
             for (index_uv, i) in mesh.indices.iter().enumerate() {
@@ -831,14 +828,29 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> (Vec<(Vec<Sk
 
             for tri in triangles {
                 let mut v = [
-                    mesh.vertices[tri[0]*3] as f32 * global_transform.scale.x * transform.scaling.0,
-                    mesh.vertices[tri[0]*3+1] as f32 * global_transform.scale.z * transform.scaling.2,
-                    mesh.vertices[tri[0]*3+2] as f32 * global_transform.scale.y * transform.scaling.1,
+                    mesh.vertices[tri[0] * 3] as f32
+                        * global_transform.scale.x
+                        * transform.scaling.0,
+                    mesh.vertices[tri[0] * 3 + 1] as f32
+                        * global_transform.scale.z
+                        * transform.scaling.2,
+                    mesh.vertices[tri[0] * 3 + 2] as f32
+                        * global_transform.scale.y
+                        * transform.scaling.1,
                 ];
 
-                v = rotate_x(v, (global_transform.rotation.x + transform.rotation.0) * 0.0174532925);
-                v = rotate_y(v, (global_transform.rotation.y + transform.rotation.1) * 0.0174532925);
-                v = rotate_z(v, (global_transform.rotation.z + transform.rotation.2) * 0.0174532925);
+                v = rotate_x(
+                    v,
+                    (global_transform.rotation.x + transform.rotation.0) * 0.0174532925,
+                );
+                v = rotate_y(
+                    v,
+                    (global_transform.rotation.y + transform.rotation.1) * 0.0174532925,
+                );
+                v = rotate_z(
+                    v,
+                    (global_transform.rotation.z + transform.rotation.2) * 0.0174532925,
+                );
 
                 // translate
                 v[0] += global_transform.position.x + transform.translation.0;
@@ -847,23 +859,42 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> (Vec<(Vec<Sk
 
                 let (bone_ids, weights) = pack_weights(&vertex_weights[tri[0]], &bone_map);
 
-                mesh_data[mesh_data_index].0.push(SkinnedVertex{ position: v, bone_ids, weights});
+                mesh_data[mesh_data_index].0.push(SkinnedVertex {
+                    position: v,
+                    bone_ids,
+                    weights,
+                });
                 mesh_data[mesh_data_index].3.push([
                     mesh.uv[tri[3] * 2] as f32,
-                    1.0 - mesh.uv[tri[3] * 2 + 1] as f32
+                    1.0 - mesh.uv[tri[3] * 2 + 1] as f32,
                 ]);
                 mesh_data[mesh_data_index].1.push([0, 1, 0]);
                 mesh_data[mesh_data_index].2.push([1.0, 1.0, 1.0]);
 
                 let mut v = [
-                    mesh.vertices[tri[1]*3] as f32 * global_transform.scale.x * transform.scaling.0,
-                    mesh.vertices[tri[1]*3+1] as f32 * global_transform.scale.z * transform.scaling.2,
-                    mesh.vertices[tri[1]*3+2] as f32 * global_transform.scale.y * transform.scaling.1,
+                    mesh.vertices[tri[1] * 3] as f32
+                        * global_transform.scale.x
+                        * transform.scaling.0,
+                    mesh.vertices[tri[1] * 3 + 1] as f32
+                        * global_transform.scale.z
+                        * transform.scaling.2,
+                    mesh.vertices[tri[1] * 3 + 2] as f32
+                        * global_transform.scale.y
+                        * transform.scaling.1,
                 ];
 
-                v = rotate_x(v, (global_transform.rotation.x + transform.rotation.0) * 0.0174532925);
-                v = rotate_y(v, (global_transform.rotation.y + transform.rotation.1) * 0.0174532925);
-                v = rotate_z(v, (global_transform.rotation.z + transform.rotation.2) * 0.0174532925);
+                v = rotate_x(
+                    v,
+                    (global_transform.rotation.x + transform.rotation.0) * 0.0174532925,
+                );
+                v = rotate_y(
+                    v,
+                    (global_transform.rotation.y + transform.rotation.1) * 0.0174532925,
+                );
+                v = rotate_z(
+                    v,
+                    (global_transform.rotation.z + transform.rotation.2) * 0.0174532925,
+                );
 
                 // translate
                 v[0] += global_transform.position.x + transform.translation.0;
@@ -872,23 +903,42 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> (Vec<(Vec<Sk
 
                 let (bone_ids, weights) = pack_weights(&vertex_weights[tri[1]], &bone_map);
 
-                mesh_data[mesh_data_index].0.push(SkinnedVertex { position: v, bone_ids, weights });
+                mesh_data[mesh_data_index].0.push(SkinnedVertex {
+                    position: v,
+                    bone_ids,
+                    weights,
+                });
                 mesh_data[mesh_data_index].3.push([
-                    mesh.uv[tri[4] * 2] as f32, 
-                    1.0 - mesh.uv[tri[4] * 2 + 1] as f32
+                    mesh.uv[tri[4] * 2] as f32,
+                    1.0 - mesh.uv[tri[4] * 2 + 1] as f32,
                 ]);
                 mesh_data[mesh_data_index].1.push([0, 1, 0]);
                 mesh_data[mesh_data_index].2.push([1.0, 1.0, 1.0]);
 
                 let mut v = [
-                    mesh.vertices[tri[2]*3] as f32 * global_transform.scale.x * transform.scaling.0,
-                    mesh.vertices[tri[2]*3+1] as f32 * global_transform.scale.z * transform.scaling.2,
-                    mesh.vertices[tri[2]*3+2] as f32 * global_transform.scale.y * transform.scaling.1,
+                    mesh.vertices[tri[2] * 3] as f32
+                        * global_transform.scale.x
+                        * transform.scaling.0,
+                    mesh.vertices[tri[2] * 3 + 1] as f32
+                        * global_transform.scale.z
+                        * transform.scaling.2,
+                    mesh.vertices[tri[2] * 3 + 2] as f32
+                        * global_transform.scale.y
+                        * transform.scaling.1,
                 ];
 
-                v = rotate_x(v, (global_transform.rotation.x + transform.rotation.0) * 0.0174532925);
-                v = rotate_y(v, (global_transform.rotation.y + transform.rotation.1) * 0.0174532925);
-                v = rotate_z(v, (global_transform.rotation.z + transform.rotation.2) * 0.0174532925);
+                v = rotate_x(
+                    v,
+                    (global_transform.rotation.x + transform.rotation.0) * 0.0174532925,
+                );
+                v = rotate_y(
+                    v,
+                    (global_transform.rotation.y + transform.rotation.1) * 0.0174532925,
+                );
+                v = rotate_z(
+                    v,
+                    (global_transform.rotation.z + transform.rotation.2) * 0.0174532925,
+                );
 
                 // translate
                 v[0] += global_transform.position.x + transform.translation.0;
@@ -897,10 +947,14 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> (Vec<(Vec<Sk
 
                 let (bone_ids, weights) = pack_weights(&vertex_weights[tri[2]], &bone_map);
 
-                mesh_data[mesh_data_index].0.push(SkinnedVertex { position: v, bone_ids, weights });
+                mesh_data[mesh_data_index].0.push(SkinnedVertex {
+                    position: v,
+                    bone_ids,
+                    weights,
+                });
                 mesh_data[mesh_data_index].3.push([
                     mesh.uv[tri[5] * 2] as f32,
-                    1.0 - mesh.uv[tri[5] * 2 + 1] as f32
+                    1.0 - mesh.uv[tri[5] * 2 + 1] as f32,
                 ]);
                 mesh_data[mesh_data_index].1.push([0, 1, 0]);
                 mesh_data[mesh_data_index].2.push([1.0, 1.0, 1.0]);

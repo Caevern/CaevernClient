@@ -144,8 +144,39 @@ impl World {
                         object.set_skeleton(skeleton);
                     }
                     if model_parsed.1.len() > 0 {
+                        let mut bone_values = model_parsed.1;
+
+                        if scene_object.render_bones {
+                            for bone in bone_values.iter_mut() {
+                                let bone_model_parsed = parse(
+                                    "models/sphere.fbx",
+                                    Transform::new(
+                                        Vector3::new(0.0, 0.0, 0.0),
+                                        Vector3::new(0.0, 0.0, 0.0),
+                                        Vector3::new(0.001, 0.001, 0.001),
+                                    ),
+                                );
+                                let mut bone_object = Object::create(
+                                    ObjectType::Mesh,
+                                    create_vertices_skinned(&bone_model_parsed.0),
+                                );
+
+                                bone_object.set_position(
+                                    -2.5 + bone.1.1.position.x * 0.01,
+                                    3.0 + bone.1.1.position.z * 0.01,
+                                    bone.1.1.position.y * 0.01,
+                                );
+                                bone_object.set_default_texture("textures/missing.png");
+                                bone_object.set_movable(true);
+
+                                let bone_object_id = self.objects.len();
+                                bone.1.4 = bone_object_id;
+
+                                self.add_object(bone_object);
+                            }
+                        }
                         object.set_bones(
-                            model_parsed.1,
+                            bone_values,
                             Vector3::new(0.0, 0.0, 0.0),
                             Vector3::new(0.0, 0.0, 0.0),
                             Vector3::new(1.0, 1.0, 1.0),

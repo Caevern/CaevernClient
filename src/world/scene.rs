@@ -1,5 +1,5 @@
 use rust_embed::RustEmbed;
-use serde::{ Serialize, Deserialize };
+use serde::{Deserialize, Serialize};
 
 #[derive(RustEmbed)]
 #[folder = "assets/"]
@@ -15,7 +15,10 @@ pub struct Scene {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Object {
+    #[serde(default = "default_on")]
     pub is_static: bool,
+    #[serde(default = "default_off")]
+    pub render_bones: bool,
 
     pub reference: String,
 
@@ -32,6 +35,13 @@ pub struct Object {
     pub displace: String,
 
     pub transform: Transform,
+}
+
+fn default_off() -> bool {
+    false
+}
+fn default_on() -> bool {
+    true
 }
 
 fn default_texture() -> String {
@@ -52,13 +62,13 @@ fn default_displace() -> String {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Material {
     pub name: String,
-    pub texture: String
+    pub texture: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BoneIdentifier {
     pub body_part: String,
-    pub bone_name: String
+    pub bone_name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
