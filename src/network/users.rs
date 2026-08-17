@@ -1,18 +1,23 @@
-use std::{sync::mpsc::Receiver, thread};
+use std::{
+    collections::HashSet,
+    println,
+    sync::mpsc::{Receiver, Sender},
+    thread,
+};
 use tungstenite::{Message, connect};
 
-use crate::renderer::transform::Transform;
+use crate::{
+    network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate},
+    renderer::transform::Transform,
+};
 
-pub enum LocalUserUpdate {
-    SendUserPosition(Transform),
-}
-pub enum UsersUpdate {
-    SetUserPosition(Transform, u64),
-}
-
-pub fn start_user_handler(job_rx: Receiver<LocalUserUpdate>) {
+pub fn start_user_handler(
+    data_thread_rx: Receiver<UserUpdate>,
+    avatar_thread_tx: Sender<AvatarUpdate>,
+) {
     thread::spawn(move || {
         let mut user_id = 0;
+        let mut users_loaded = HashSet::new();
 
         let (mut socket, _response) =
             connect("ws://localhost:42142/ws/user").expect("Can't connect");
@@ -20,9 +25,9 @@ pub fn start_user_handler(job_rx: Receiver<LocalUserUpdate>) {
         let _ = socket.send(Message::Binary(vec![1].into()));
 
         loop {
-            if let Ok(job) = job_rx.recv() {
+            if let Ok(job) = data_thread_rx.recv() {
                 match job {
-                    LocalUserUpdate::SendUserPosition(transform) => {
+                    UserUpdate::SendUserPosition(transform) => {
                         let mut data_sending = vec![8];
                         for byte in transform.position.x.to_be_bytes() {
                             data_sending.push(byte);
@@ -58,8 +63,9 @@ pub fn start_user_handler(job_rx: Receiver<LocalUserUpdate>) {
                             let _ = socket.send(Message::Binary(vec![2].into()));
                         }
                         3 => {
-                            println!("RECEIVED PLAYER DATA!? {}", data.len());
+                            println!("Received {} bytes of player data", data.len());
                             let player_amount = (data.len() - 1) / 28;
+                            println!("player count: {}", player_amount);
                             for i in 0..player_amount {
                                 let player_id = u32::from_be_bytes([
                                     data[(i * 28) + 1],
@@ -67,10 +73,16 @@ pub fn start_user_handler(job_rx: Receiver<LocalUserUpdate>) {
                                     data[(i * 28) + 3],
                                     data[(i * 28) + 4],
                                 ]);
-                                if player_id == user_id {
-                                    continue;
+                                println!("Player: {}", player_id);
+
+                                if !users_loaded.contains(&player_id) {
+                                    users_loaded.insert(player_id);
+                                    avatar_thread_tx.send(AvatarUpdate::RegisterUser(
+                                        Transform::zero(),
+                                        player_id,
+                                    ));
+                                    println!("Registering user with id: {}", player_id);
                                 }
-                                println!("player: {}", player_id);
                             }
                             let _ = socket.send(Message::Binary(vec![2].into()));
                         }

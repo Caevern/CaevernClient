@@ -15,7 +15,8 @@ use winit::keyboard::PhysicalKey;
 use winit::window::WindowAttributes;
 use winit::window::{Icon, Window};
 
-use crate::network::users::LocalUserUpdate;
+use crate::network::avatar_updates::AvatarUpdate;
+use crate::network::user_updates::UserUpdate;
 use crate::network::users::start_user_handler;
 use crate::renderer::render::Renderer;
 use crate::world::world::World;
@@ -52,7 +53,8 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
             .with_window_icon(self.icon.clone());
         let window = Arc::new(event_loop.create_window(attributes).unwrap());
 
-        let (job_tx, job_rx) = mpsc::channel::<LocalUserUpdate>();
+        let (data_thread_tx, data_thread_rx) = mpsc::channel::<UserUpdate>();
+        let (avatar_thread_tx, avatar_thread_rx) = mpsc::channel::<AvatarUpdate>();
 
         // TODO: change xr_enabled to an actual option
         self.xr_enabled = false;
@@ -65,7 +67,8 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
             }
         }
 
-        let mut renderer = pollster::block_on(Renderer::new(&window, job_tx));
+        let mut renderer =
+            pollster::block_on(Renderer::new(&window, data_thread_tx, avatar_thread_rx));
 
         self.depth_texture = Some(
             renderer
@@ -89,7 +92,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
         self.window_size = (renderer.init.size.width, renderer.init.size.height);
 
-        start_user_handler(job_rx);
+        start_user_handler(data_thread_rx, avatar_thread_tx);
 
         renderer.set_world(self.home_world.clone());
 

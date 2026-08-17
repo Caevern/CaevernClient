@@ -3,13 +3,14 @@ use rust_embed::RustEmbed;
 use std::collections::HashMap;
 use std::println;
 use std::sync::Arc;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Receiver, Sender};
 use wgpu::BindGroup;
 use winit::window::Window;
 
 use crate::ALLOCATOR;
 use crate::interract::raycast::raycast_grab;
-use crate::network::users::LocalUserUpdate;
+use crate::network::avatar_updates::AvatarUpdate;
+use crate::network::user_updates::UserUpdate;
 use crate::physics::gravity::apply_gravity;
 use crate::physics::movement::{get_camera_movement, get_camera_rotation};
 use crate::renderer::texture_object::TextureObject;
@@ -66,7 +67,8 @@ pub struct Renderer<'window> {
     current_camera: usize,
 
     // networking
-    job_tx: Sender<LocalUserUpdate>,
+    data_thread_tx: Sender<UserUpdate>,
+    avatar_thread_rx: Receiver<AvatarUpdate>,
 
     pending_resize: Option<winit::dpi::PhysicalSize<u32>>,
 }
@@ -185,7 +187,11 @@ impl<'window> Renderer<'window> {
         return (uniform_bind_group, vertex_buffer);
     }
 
-    pub async fn new(window: &Arc<Window>, job_tx: Sender<LocalUserUpdate>) -> Self {
+    pub async fn new(
+        window: &Arc<Window>,
+        data_thread_tx: Sender<UserUpdate>,
+        avatar_thread_rx: Receiver<AvatarUpdate>,
+    ) -> Self {
         let init = transforms::InitWgpu::init_wgpu(window).await;
 
         let camera_position: (f32, f32, f32) = (-10.0, 4.0, 0.0);
@@ -502,7 +508,8 @@ impl<'window> Renderer<'window> {
             world: World::new(),
             current_camera: 0,
 
-            job_tx,
+            data_thread_tx,
+            avatar_thread_rx,
 
             pending_resize: None,
         }
@@ -655,14 +662,16 @@ impl<'window> Renderer<'window> {
                     bytemuck::cast_slice(normal_ref),
                 );
             } else if self.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
-                let skeleton = self.world.get_object(i).get_skeleton();
-                self.bones[i][skeleton["head"]].0.rotation.x = -self.player.camera.rotation.x;
-                //self.bones[i][skeleton["arm_right"]].0.rotation.z = -self.player.camera.rotation.x;
-                /*self.bones[i][skeleton["head"]].0.rotation.y =
-                -self.player.camera.rotation.y - 1.57079633;*/
-                // TODO: make the local character have this dissabled by default.
-                self.bones[i][skeleton["neck"]].0.scale = [0.0, 0.0, 0.0].into();
-                self.update_bone(i, skeleton["head"]);
+                if self.frame < 60 {
+                    let skeleton = self.world.get_object(i).get_skeleton();
+                    //self.bones[i][skeleton["head"]].0.rotation.x = -self.player.camera.rotation.x;
+                    //self.bones[i][skeleton["arm_right"]].0.rotation.z = -self.player.camera.rotation.x;
+                    /*self.bones[i][skeleton["head"]].0.rotation.y =
+                    -self.player.camera.rotation.y - 1.57079633;*/
+                    // TODO: make the local character have this dissabled by default.
+                    self.bones[i][skeleton["neck"]].0.scale = [0.0, 0.0, 0.0].into();
+                    self.update_bone(i, skeleton["head"]);
+                }
 
                 let object = self.world.get_object(i);
                 let position = [
@@ -696,6 +705,10 @@ impl<'window> Renderer<'window> {
                     bytemuck::cast_slice(normal_ref),
                 );
             }
+        }
+
+        if let Ok(avatar_update) = self.avatar_thread_rx.try_recv() {
+            println!("RECEIVED AVATAR UPDATE!!!");
         }
 
         if self.frame % 20 == 1 {
@@ -756,8 +769,8 @@ impl<'window> Renderer<'window> {
             }
 
             let _ = self
-                .job_tx
-                .send(LocalUserUpdate::SendUserPosition(Transform {
+                .data_thread_tx
+                .send(UserUpdate::SendUserPosition(Transform {
                     position: self.player.camera.position,
                     rotation: self.player.camera.rotation,
                     scale: Vector3::new(0.0, 0.0, 0.0),
