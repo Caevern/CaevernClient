@@ -1,25 +1,27 @@
 use cgmath::*;
 use rust_embed::RustEmbed;
 use std::collections::HashMap;
-use std::println;
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender};
+use std::{f32, println};
 use wgpu::BindGroup;
 use winit::window::Window;
 
 use crate::ALLOCATOR;
 use crate::interract::raycast::raycast_grab;
 use crate::network::avatar_updates::AvatarUpdate;
-use crate::network::user_updates::UserUpdate;
+use crate::network::user_updates::UserUpdate::{self, UpdateAvatarId};
 use crate::physics::gravity::apply_gravity;
 use crate::physics::movement::{get_camera_movement, get_camera_rotation};
 use crate::renderer::texture_object::TextureObject;
 use crate::renderer::transform::Transform;
 use crate::renderer::transforms::create_transforms;
-use crate::renderer::vertex::Vertex;
+use crate::renderer::vertex::{Vertex, create_vertices_skinned};
 use crate::renderer::{transform, transforms, vertex};
 use crate::setup::fonts::{load_font_atlas, load_font_uvs};
-use crate::world::object::ObjectType;
+use crate::world::material::Material;
+use crate::world::object::{Object, ObjectType};
+use crate::world::objects::fbx_parser::parse;
 use crate::world::objects::player::Player;
 use crate::world::objects::text;
 use crate::world::world::World;
@@ -65,6 +67,10 @@ pub struct Renderer<'window> {
 
     world: World,
     current_camera: usize,
+
+    fallback_vertices: Vec<(Vec<Vertex>, String)>,
+    fallback_bones: HashMap<i64, (usize, Transform, String, i64, usize)>,
+    fallback_skeleton: HashMap<String, usize>,
 
     // networking
     data_thread_tx: Sender<UserUpdate>,
@@ -469,6 +475,23 @@ impl<'window> Renderer<'window> {
             load_font_uvs("fonts/NotoSansJP.ttf"),
         );
 
+        let model_parsed = parse("models/fallback.fbx", Transform::zero());
+        let fallback_vertices = create_vertices_skinned(&model_parsed.0);
+        let fallback_bones = model_parsed.1;
+
+        let bone_bindings = vec![("head".to_string(), "head.xModel")];
+
+        let mut fallback_skeleton = HashMap::new();
+        for bone_binding in bone_bindings {
+            for bone in &fallback_bones {
+                let filtered: String = bone.1.2.chars().filter(|c| (*c as u32) >= 32).collect();
+                if filtered == bone_binding.1 {
+                    fallback_skeleton.insert(bone_binding.0, bone.1.0);
+                    break;
+                }
+            }
+        }
+
         let vertex_buffers = Vec::new();
         let uniform_bind_groups = Vec::new();
         let num_vertices = Vec::new();
@@ -507,6 +530,10 @@ impl<'window> Renderer<'window> {
 
             world: World::new(),
             current_camera: 0,
+
+            fallback_vertices,
+            fallback_bones,
+            fallback_skeleton,
 
             data_thread_tx,
             avatar_thread_rx,
@@ -687,6 +714,18 @@ impl<'window> Renderer<'window> {
                     object.get_rotation().z,
                 ];
 
+                let _ = self
+                    .data_thread_tx
+                    .send(UserUpdate::SendUserPosition(Transform {
+                        position: position.into(),
+                        rotation: Vector3::new(
+                            -self.player.camera.rotation.x,
+                            rotation[1],
+                            -self.player.camera.rotation.z,
+                        ),
+                        scale: Vector3::new(1.0, 1.0, 1.0),
+                    }));
+
                 let model_mat =
                     transforms::create_transforms(position, rotation, object.get_scale().into());
                 let normal_mat = (model_mat.invert().unwrap()).transpose();
@@ -707,8 +746,95 @@ impl<'window> Renderer<'window> {
             }
         }
 
+        // TODO: Refactor into an avatar struct
         if let Ok(avatar_update) = self.avatar_thread_rx.try_recv() {
-            println!("RECEIVED AVATAR UPDATE!!!");
+            match avatar_update {
+                AvatarUpdate::RegisterUser(transform, id) => {
+                    println!("Registered User Avatar");
+                    let mut object =
+                        Object::create(ObjectType::Mesh, self.fallback_vertices.clone());
+
+                    object.set_bones(
+                        self.fallback_bones.clone(),
+                        Vector3::new(0.0, 0.0, 0.0),
+                        Vector3::new(0.0, 0.0, 0.0),
+                        Vector3::new(1.0, 1.0, 1.0),
+                    );
+                    object.set_skeleton(self.fallback_skeleton.clone());
+
+                    object.set_position(
+                        transform.position.x,
+                        transform.position.y,
+                        transform.position.z,
+                    );
+                    object.set_rotation(0.0, transform.rotation.y + f32::consts::PI, 0.0);
+                    object.set_scale(0.017, 0.017, 0.017);
+
+                    object.add_material(
+                        Material::from_texture("textures/CG_Body_Base_color.png"),
+                        "BodyMaterial".to_string(),
+                    );
+                    object.add_material(
+                        Material::from_texture("textures/CG_Hairs_Base_color.png"),
+                        "HairsMaterial".to_string(),
+                    );
+                    object.add_material(
+                        Material::from_texture("textures/CG_Dress_Base_color.png"),
+                        "DressMaterial".to_string(),
+                    );
+
+                    let object_id = self.world.get_objects().len();
+
+                    self.data_thread_tx
+                        .send(UpdateAvatarId(id, object_id))
+                        .expect(
+                            "Updating the avatar lookup table with the network stack has failed.",
+                        );
+
+                    self.create_rendered_object(&object);
+                    self.world.add_object(object);
+
+                    self.bones[object_id][self.fallback_skeleton["head"]]
+                        .0
+                        .rotation = [transform.rotation.x, 0.0, transform.rotation.z].into();
+                    self.update_bones(object_id);
+                }
+                AvatarUpdate::SetUserPosition(transform, object_id) => {
+                    self.bones[object_id][self.fallback_skeleton["head"]]
+                        .0
+                        .rotation = [transform.rotation.x, 0.0, transform.rotation.z].into();
+                    self.update_bone(object_id, self.fallback_skeleton["head"]);
+
+                    let object = self.world.get_object(object_id);
+                    let position = [
+                        transform.position.x,
+                        transform.position.y,
+                        transform.position.z,
+                    ];
+                    let rotation = [0.0, transform.rotation.y + f32::consts::PI, 0.0];
+
+                    let model_mat = transforms::create_transforms(
+                        position,
+                        rotation,
+                        object.get_scale().into(),
+                    );
+                    let normal_mat = (model_mat.invert().unwrap()).transpose();
+
+                    let model_ref: &[f32; 16] = model_mat.as_ref();
+                    let normal_ref: &[f32; 16] = normal_mat.as_ref();
+
+                    self.init.queue.write_buffer(
+                        &self.model_uniform_buffers[object_id],
+                        0,
+                        bytemuck::cast_slice(model_ref),
+                    );
+                    self.init.queue.write_buffer(
+                        &self.model_uniform_buffers[object_id],
+                        64,
+                        bytemuck::cast_slice(normal_ref),
+                    );
+                }
+            }
         }
 
         if self.frame % 20 == 1 {
@@ -760,6 +886,7 @@ impl<'window> Renderer<'window> {
                 );
             }
 
+            // TODO: Fix resizing with static resize buffer
             if let Some(size) = self.pending_resize.take() {
                 self.init.config.width = size.width;
                 self.init.config.height = size.height;
@@ -767,14 +894,6 @@ impl<'window> Renderer<'window> {
                     .surface
                     .configure(&self.init.device, &self.init.config);
             }
-
-            let _ = self
-                .data_thread_tx
-                .send(UserUpdate::SendUserPosition(Transform {
-                    position: self.player.camera.position,
-                    rotation: self.player.camera.rotation,
-                    scale: Vector3::new(0.0, 0.0, 0.0),
-                }));
         }
 
         let up_direction = cgmath::Vector3::unit_y();
@@ -1100,6 +1219,212 @@ impl<'window> Renderer<'window> {
             0,
             bytemuck::cast_slice(&self.final_marices[object_index]),
         );
+    }
+
+    // TODO: Use this in the set world to reduce duplicate code
+    pub fn create_rendered_object(&mut self, object: &Object) {
+        for texture in self.world.get_textures() {
+            if self.textures.contains_key(&texture.to_string()) {
+                continue;
+            }
+
+            self.textures.insert(
+                texture.to_string(),
+                TextureObject::create(texture, &self.init),
+            );
+        }
+
+        let meshes = object.get_vertices();
+        let materials = object.get_materials();
+        let mut bones: Vec<[[f32; 4]; 4]> = Vec::new();
+        self.vertex_buffers.push(Vec::new());
+        self.uniform_bind_groups.push(Vec::new());
+        self.num_vertices.push(Vec::new());
+
+        let object_id = self.vertex_buffers.len() - 1;
+
+        let bone_transforms = object.get_bones();
+        self.final_marices.push(Vec::new());
+        for _ in 0..bone_transforms.len() {
+            self.final_marices[object_id].push([
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+                [0.0, 0.0, 0.0, 0.0],
+            ]);
+        }
+        self.bones.push(bone_transforms.clone());
+
+        for bone in bone_transforms {
+            bones.push(
+                transforms::create_transforms(
+                    bone.0.position.into(),
+                    bone.0.rotation.into(),
+                    bone.0.scale.into(),
+                )
+                .into(),
+            );
+        }
+
+        let bone_buffer;
+        if bones.len() > 0 {
+            println!("{}", object_id);
+            self.shader_type.push(ShaderType::DisplacementBones);
+            bone_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Bone Buffer"),
+                size: (bones.len() * std::mem::size_of::<Matrix4<f32>>()) as u64,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+            self.init
+                .queue
+                .write_buffer(&bone_buffer, 0, bytemuck::cast_slice(&bones));
+        } else {
+            self.shader_type.push(ShaderType::Displacement);
+            bone_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Bone Buffer"),
+                size: 16,
+                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+        }
+
+        self.bone_buffers.push(bone_buffer);
+
+        let model_uniform_buffer: wgpu::Buffer =
+            self.init.device.create_buffer(&wgpu::BufferDescriptor {
+                label: Some("Vertex Uniform Buffer"),
+                size: 128,
+                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+                mapped_at_creation: false,
+            });
+
+        let model_mat = transforms::create_transforms(
+            [
+                object.get_position().x,
+                object.get_position().y,
+                object.get_position().z,
+            ],
+            [
+                object.get_rotation().x,
+                object.get_rotation().y,
+                object.get_rotation().z,
+            ],
+            [
+                object.get_scale().x,
+                object.get_scale().y,
+                object.get_scale().z,
+            ],
+        );
+        let normal_mat = (model_mat.invert().unwrap()).transpose();
+
+        let model_ref: &[f32; 16] = model_mat.as_ref();
+        let normal_ref: &[f32; 16] = normal_mat.as_ref();
+        self.init
+            .queue
+            .write_buffer(&model_uniform_buffer, 0, bytemuck::cast_slice(model_ref));
+        self.init
+            .queue
+            .write_buffer(&model_uniform_buffer, 64, bytemuck::cast_slice(normal_ref));
+
+        for (vertices, material_name) in meshes {
+            let material_found;
+            let bytes_filtered: Vec<u8> =
+                material_name.bytes().filter(|c| c > &(31 as u8)).collect();
+            let material_string = String::from_utf8(bytes_filtered).unwrap();
+
+            if let Some(material) = materials.get(&material_string) {
+                material_found = material;
+            } else {
+                material_found = &materials.get("default").unwrap();
+            }
+
+            let material_found_texture = material_found.get_texture();
+            let material_found_displacement = material_found.get_displacement();
+
+            println!(
+                "loading: {} from: {}",
+                material_found_texture, material_string
+            );
+
+            let texture_object;
+            if let Some(texture) = self.textures.get(material_found_texture) {
+                texture_object = texture;
+            } else {
+                continue;
+            }
+
+            let texture_object_displacement;
+            if let Some(texture_displacement_name) = material_found_displacement {
+                if let Some(texture_displacement) = self.textures.get(texture_displacement_name) {
+                    texture_object_displacement = Some(texture_displacement);
+                } else {
+                    texture_object_displacement = None;
+                }
+            } else {
+                texture_object_displacement = None;
+            }
+
+            let uniform_bind_group;
+            let vertex_buffer;
+            if let Some(texture_displacement) = texture_object_displacement {
+                (uniform_bind_group, vertex_buffer) = Self::create_buffer_displacement(
+                    &self.init,
+                    &self.uniform_bind_group_layout,
+                    &self.vertex_uniform_buffer,
+                    &self.fragment_uniform_buffer,
+                    &model_uniform_buffer,
+                    &self.bone_buffers[object_id],
+                    &texture_displacement.texture,
+                    texture_displacement.texture_size,
+                    &texture_displacement.texture_rgba,
+                    texture_displacement.texture_width,
+                    texture_displacement.texture_height,
+                    &texture_object.texture,
+                    texture_object.texture_size,
+                    &texture_object.texture_rgba,
+                    texture_object.texture_width,
+                    texture_object.texture_height,
+                    vertices.len(),
+                );
+            } else {
+                if let Some(texture_displacement) = self.textures.get("textures/displacement.png") {
+                    (uniform_bind_group, vertex_buffer) = Self::create_buffer_displacement(
+                        &self.init,
+                        &self.uniform_bind_group_layout,
+                        &self.vertex_uniform_buffer,
+                        &self.fragment_uniform_buffer,
+                        &model_uniform_buffer,
+                        &self.bone_buffers[object_id],
+                        &texture_displacement.texture,
+                        texture_displacement.texture_size,
+                        &texture_displacement.texture_rgba,
+                        texture_displacement.texture_width,
+                        texture_displacement.texture_height,
+                        &texture_object.texture,
+                        texture_object.texture_size,
+                        &texture_object.texture_rgba,
+                        texture_object.texture_width,
+                        texture_object.texture_height,
+                        vertices.len(),
+                    );
+                } else {
+                    continue;
+                }
+            }
+
+            self.vertex_buffers[object_id].push(vertex_buffer);
+            self.uniform_bind_groups[object_id].push(uniform_bind_group);
+
+            self.num_vertices[object_id].push(vertices.len() as u32);
+            self.init.queue.write_buffer(
+                &self.vertex_buffers[object_id][self.vertex_buffers[object_id].len() - 1],
+                0,
+                bytemuck::cast_slice(vertices),
+            );
+        }
+
+        self.model_uniform_buffers.push(model_uniform_buffer);
     }
 
     pub fn set_world(&mut self, world: World) {

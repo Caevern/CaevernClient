@@ -1,6 +1,7 @@
+use cgmath::Vector3;
 use std::{
-    collections::HashSet,
-    println,
+    collections::HashMap,
+    f32, println,
     sync::mpsc::{Receiver, Sender},
     thread,
 };
@@ -17,7 +18,7 @@ pub fn start_user_handler(
 ) {
     thread::spawn(move || {
         let mut user_id = 0;
-        let mut users_loaded = HashSet::new();
+        let mut users_loaded = HashMap::new();
 
         let (mut socket, _response) =
             connect("ws://localhost:42142/ws/user").expect("Can't connect");
@@ -50,6 +51,10 @@ pub fn start_user_handler(
 
                         let _ = socket.send(Message::Binary(data_sending.into()));
                     }
+
+                    UserUpdate::UpdateAvatarId(temp_user_id, object_id) => {
+                        users_loaded.insert(temp_user_id, object_id);
+                    }
                 }
             }
 
@@ -75,13 +80,67 @@ pub fn start_user_handler(
                                 ]);
                                 println!("Player: {}", player_id);
 
-                                if !users_loaded.contains(&player_id) {
-                                    users_loaded.insert(player_id);
-                                    avatar_thread_tx.send(AvatarUpdate::RegisterUser(
-                                        Transform::zero(),
-                                        player_id,
-                                    ));
+                                let transform = Transform::new(
+                                    Vector3::new(
+                                        f32::from_be_bytes([
+                                            data[(i * 28) + 5],
+                                            data[(i * 28) + 6],
+                                            data[(i * 28) + 7],
+                                            data[(i * 28) + 8],
+                                        ]),
+                                        f32::from_be_bytes([
+                                            data[(i * 28) + 9],
+                                            data[(i * 28) + 10],
+                                            data[(i * 28) + 11],
+                                            data[(i * 28) + 12],
+                                        ]),
+                                        f32::from_be_bytes([
+                                            data[(i * 28) + 13],
+                                            data[(i * 28) + 14],
+                                            data[(i * 28) + 15],
+                                            data[(i * 28) + 16],
+                                        ]),
+                                    ),
+                                    Vector3::new(
+                                        f32::from_be_bytes([
+                                            data[(i * 28) + 17],
+                                            data[(i * 28) + 18],
+                                            data[(i * 28) + 19],
+                                            data[(i * 28) + 20],
+                                        ]),
+                                        f32::from_be_bytes([
+                                            data[(i * 28) + 21],
+                                            data[(i * 28) + 22],
+                                            data[(i * 28) + 23],
+                                            data[(i * 28) + 24],
+                                        ]) - f32::consts::PI,
+                                        f32::from_be_bytes([
+                                            data[(i * 28) + 25],
+                                            data[(i * 28) + 26],
+                                            data[(i * 28) + 27],
+                                            data[(i * 28) + 28],
+                                        ]),
+                                    ),
+                                    Vector3::new(1.0, 1.0, 1.0),
+                                );
+
+                                if !users_loaded.contains_key(&player_id) {
+                                    users_loaded.insert(player_id, 0);
                                     println!("Registering user with id: {}", player_id);
+                                    avatar_thread_tx
+                                        .send(AvatarUpdate::RegisterUser(transform, player_id))
+                                        .expect(
+                                            "Registering user with game has FAILED (somehow...)",
+                                        );
+                                } else if users_loaded.contains_key(&player_id) {
+                                    avatar_thread_tx
+                                        .send(AvatarUpdate::SetUserPosition(
+                                            transform,
+                                            *users_loaded.get(&player_id).unwrap(),
+                                        ))
+                                        .expect(
+                                            "Setting avatar position in game thread has FAILED (somehow...)",
+                                        );
                                 }
                             }
                             let _ = socket.send(Message::Binary(vec![2].into()));
