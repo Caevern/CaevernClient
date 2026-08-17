@@ -1,22 +1,21 @@
-use tungstenite::{connect, Message};
 use std::{sync::mpsc::Receiver, thread};
+use tungstenite::{Message, connect};
 
 use crate::renderer::transform::Transform;
 
 pub enum LocalUserUpdate {
-    SendUserPosition(Transform)
+    SendUserPosition(Transform),
 }
 pub enum UsersUpdate {
-    SetUserPosition(Transform, u64)
+    SetUserPosition(Transform, u64),
 }
 
 pub fn start_user_handler(job_rx: Receiver<LocalUserUpdate>) {
     thread::spawn(move || {
         let mut user_id = 0;
 
-        let (mut socket, _response) = connect(
-    "ws://localhost:42142/ws/user"
-        ).expect("Can't connect");
+        let (mut socket, _response) =
+            connect("ws://localhost:42142/ws/user").expect("Can't connect");
 
         let _ = socket.send(Message::Binary(vec![1].into()));
 
@@ -63,15 +62,22 @@ pub fn start_user_handler(job_rx: Receiver<LocalUserUpdate>) {
                             let player_amount = (data.len() - 1) / 28;
                             for i in 0..player_amount {
                                 let player_id = u32::from_be_bytes([
-                                    data[(i * 28) + 1], data[(i * 28) + 2], data[(i * 28) + 3], data[(i * 28) + 4]
+                                    data[(i * 28) + 1],
+                                    data[(i * 28) + 2],
+                                    data[(i * 28) + 3],
+                                    data[(i * 28) + 4],
                                 ]);
-                                if player_id == user_id { continue; }
+                                if player_id == user_id {
+                                    continue;
+                                }
                                 println!("player: {}", player_id);
                             }
                             let _ = socket.send(Message::Binary(vec![2].into()));
                         }
                         0 => {}
-                        _ => { println!("Unknown Command ({})", data[0]); }
+                        _ => {
+                            println!("Unknown Command ({})", data[0]);
+                        }
                     }
                 }
             } else {
