@@ -15,7 +15,8 @@ use winit::keyboard::PhysicalKey;
 use winit::window::WindowAttributes;
 use winit::window::{Icon, Window};
 
-use crate::network::users::LocalUserUpdate;
+use crate::network::avatar_updates::AvatarUpdate;
+use crate::network::user_updates::UserUpdate;
 use crate::network::users::start_user_handler;
 use crate::renderer::render::Renderer;
 use crate::world::world::World;
@@ -52,7 +53,8 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
             .with_window_icon(self.icon.clone());
         let window = Arc::new(event_loop.create_window(attributes).unwrap());
 
-        let (job_tx, job_rx) = mpsc::channel::<LocalUserUpdate>();
+        let (data_thread_tx, data_thread_rx) = mpsc::channel::<UserUpdate>();
+        let (avatar_thread_tx, avatar_thread_rx) = mpsc::channel::<AvatarUpdate>();
 
         // TODO: change xr_enabled to an actual option
         self.xr_enabled = false;
@@ -65,7 +67,8 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
             }
         }
 
-        let mut renderer = pollster::block_on(Renderer::new(&window, job_tx));
+        let mut renderer =
+            pollster::block_on(Renderer::new(&window, data_thread_tx, avatar_thread_rx));
 
         self.depth_texture = Some(
             renderer
@@ -89,7 +92,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
         self.window_size = (renderer.init.size.width, renderer.init.size.height);
 
-        start_user_handler(job_rx);
+        start_user_handler(data_thread_rx, avatar_thread_tx);
 
         renderer.set_world(self.home_world.clone());
 
@@ -135,6 +138,24 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                                 {
                                     eprintln!("Failed to lock the cursor: {:?}", err);
                                     self.use_confined = true;
+
+                                    if let Err(err) =
+                                        self.window.as_ref().unwrap().set_cursor_grab(
+                                            winit::window::CursorGrabMode::Confined,
+                                        )
+                                    {
+                                        eprintln!("Failed to confine the cursor: {:?}", err);
+                                    }
+                                    let window_size = self.window.as_ref().unwrap().inner_size();
+                                    let center_x = window_size.width as f64 / 2.0;
+                                    let center_y = window_size.height as f64 / 2.0;
+                                    self.window
+                                        .as_ref()
+                                        .unwrap()
+                                        .set_cursor_position(winit::dpi::PhysicalPosition::new(
+                                            center_x, center_y,
+                                        ))
+                                        .expect("Failed to set cursor position");
                                 }
                                 self.window.as_mut().unwrap().set_cursor_visible(false);
                                 self.mouse_locked = true;
@@ -166,9 +187,19 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     PhysicalKey::Code(KeyCode::Space) => {
                         self.keys[4] = true;
                     }
-                    PhysicalKey::Code(KeyCode::Escape)
-                    | PhysicalKey::Code(KeyCode::SuperLeft)
+                    PhysicalKey::Code(KeyCode::SuperLeft)
                     | PhysicalKey::Code(KeyCode::SuperRight) => {
+                        if let Err(err) = self
+                            .window
+                            .as_ref()
+                            .unwrap()
+                            .set_cursor_grab(winit::window::CursorGrabMode::None)
+                        {
+                            eprintln!("Failed to unlock the cursor: {:?}", err);
+                        }
+                        self.window.as_ref().unwrap().set_cursor_visible(true);
+                    }
+                    PhysicalKey::Code(KeyCode::Escape) => {
                         if self.menu_tablet_state == 0 {
                             self.menu_tablet_state = 2;
                             self.mouse_locked = false;
@@ -196,6 +227,24 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                                         err
                                     );
                                     self.use_confined = true;
+
+                                    if let Err(err) =
+                                        self.window.as_ref().unwrap().set_cursor_grab(
+                                            winit::window::CursorGrabMode::Confined,
+                                        )
+                                    {
+                                        eprintln!("Failed to confine the cursor: {:?}", err);
+                                    }
+                                    let window_size = self.window.as_ref().unwrap().inner_size();
+                                    let center_x = window_size.width as f64 / 2.0;
+                                    let center_y = window_size.height as f64 / 2.0;
+                                    self.window
+                                        .as_ref()
+                                        .unwrap()
+                                        .set_cursor_position(winit::dpi::PhysicalPosition::new(
+                                            center_x, center_y,
+                                        ))
+                                        .expect("Failed to set cursor position");
                                 }
                             } else {
                                 if let Err(err) = self
@@ -204,10 +253,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                                     .unwrap()
                                     .set_cursor_grab(winit::window::CursorGrabMode::Confined)
                                 {
-                                    eprintln!(
-                                        "Failed to confine the cursor, switching to locked: {:?}",
-                                        err
-                                    );
+                                    eprintln!("Failed to confine the cursor: {:?}", err);
                                 }
                                 let window_size = self.window.as_ref().unwrap().inner_size();
                                 let center_x = window_size.width as f64 / 2.0;
