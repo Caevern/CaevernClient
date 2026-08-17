@@ -8,7 +8,10 @@ use std::{
 use tungstenite::{Message, connect};
 
 use crate::{
-    network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate},
+    network::{
+        avatar_updates::AvatarUpdate,
+        user_updates::UserUpdate::{self, SendUserPosition},
+    },
     renderer::transform::Transform,
 };
 
@@ -26,7 +29,16 @@ pub fn start_user_handler(
         let _ = socket.send(Message::Binary(vec![1].into()));
 
         loop {
-            if let Ok(job) = data_thread_rx.recv() {
+            if let Ok(mut job) = data_thread_rx.recv() {
+                match job {
+                    UserUpdate::SendUserPosition(_) => {
+                        while let Ok(newer_job) = data_thread_rx.try_recv() {
+                            job = newer_job;
+                        }
+                    }
+                    _ => (),
+                }
+
                 match job {
                     UserUpdate::SendUserPosition(transform) => {
                         let mut data_sending = vec![8];
@@ -55,6 +67,10 @@ pub fn start_user_handler(
                     UserUpdate::UpdateAvatarId(temp_user_id, object_id) => {
                         users_loaded.insert(temp_user_id, object_id);
                     }
+
+                    UserUpdate::SendReadySignal => {
+                        let _ = socket.send(Message::Binary(vec![2].into()));
+                    }
                 }
             }
 
@@ -65,12 +81,10 @@ pub fn start_user_handler(
                         2 => {
                             user_id = u32::from_be_bytes([data[1], data[2], data[3], data[4]]);
                             println!("Received Free ID {}", user_id);
-                            let _ = socket.send(Message::Binary(vec![2].into()));
                         }
                         3 => {
-                            println!("Received {} bytes of player data", data.len());
                             let player_amount = (data.len() - 1) / 28;
-                            println!("player count: {}", player_amount);
+
                             for i in 0..player_amount {
                                 let player_id = u32::from_be_bytes([
                                     data[(i * 28) + 1],
@@ -78,7 +92,6 @@ pub fn start_user_handler(
                                     data[(i * 28) + 3],
                                     data[(i * 28) + 4],
                                 ]);
-                                println!("Player: {}", player_id);
 
                                 let transform = Transform::new(
                                     Vector3::new(
@@ -133,10 +146,15 @@ pub fn start_user_handler(
                                             "Registering user with game has FAILED (somehow...)",
                                         );
                                 } else if users_loaded.contains_key(&player_id) {
+                                    let object_id = *users_loaded.get(&player_id).unwrap();
+                                    if object_id == 0 {
+                                        continue;
+                                    }
+
                                     avatar_thread_tx
                                         .send(AvatarUpdate::SetUserPosition(
                                             transform,
-                                            *users_loaded.get(&player_id).unwrap(),
+                                            object_id,
                                         ))
                                         .expect(
                                             "Setting avatar position in game thread has FAILED (somehow...)",

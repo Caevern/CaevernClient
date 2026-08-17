@@ -785,12 +785,6 @@ impl<'window> Renderer<'window> {
 
                     let object_id = self.world.get_objects().len();
 
-                    self.data_thread_tx
-                        .send(UpdateAvatarId(id, object_id))
-                        .expect(
-                            "Updating the avatar lookup table with the network stack has failed.",
-                        );
-
                     self.create_rendered_object(&object);
                     self.world.add_object(object);
 
@@ -798,6 +792,12 @@ impl<'window> Renderer<'window> {
                         .0
                         .rotation = [transform.rotation.x, 0.0, transform.rotation.z].into();
                     self.update_bones(object_id);
+
+                    self.data_thread_tx
+                        .send(UpdateAvatarId(id, object_id))
+                        .expect(
+                            "Updating the avatar lookup table with the network stack has failed.",
+                        );
                 }
                 AvatarUpdate::SetUserPosition(transform, object_id) => {
                     self.bones[object_id][self.fallback_skeleton["head"]]
@@ -1649,6 +1649,10 @@ impl<'window> Renderer<'window> {
             self.player.camera.position.z = object_position.z as f32;
             self.player.camera.rotation = self.world.get_camera(self.current_camera).get_rotation();
         }
+
+        self.data_thread_tx
+            .send(UserUpdate::SendReadySignal)
+            .expect("Sending user ready signal failed :C");
     }
 
     pub fn render(&mut self, depth_texture: &wgpu::Texture) -> Result<(), ()> {
