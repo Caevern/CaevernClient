@@ -40,7 +40,7 @@ Custom engine? Of course! :D
 - [ ] Camera (Taking pictures)
 - [ ] Voice Chat
 - [x] Player Avatar
-- [ ] Render other players
+- [x] Render other players
 
 # Todo List Server:
 - [x] Player location data
