@@ -1,4 +1,4 @@
-use futures_util::SinkExt;
+use futures_util::{SinkExt, StreamExt};
 use opus::{Application, Channels, Encoder};
 use rtc::{
     interceptor::Registry,
@@ -10,7 +10,7 @@ use rtc::{
     },
 };
 use serde::{Deserialize, Serialize};
-use std::{println, sync::Arc, time::Duration};
+use std::{println, sync::Arc, thread, time::Duration};
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::connect_async;
 use tungstenite::Message;
@@ -18,7 +18,8 @@ use webrtc::{
     media_stream::track_local::{TrackLocal, static_sample::TrackLocalStaticSample},
     peer_connection::{
         MediaEngine, PeerConnection, PeerConnectionBuilder, PeerConnectionEventHandler,
-        RTCConfigurationBuilder, RTCIceGatheringState, RTCPeerConnectionIceEvent,
+        RTCConfigurationBuilder, RTCIceConnectionState, RTCIceGatheringState, RTCIceServer,
+        RTCPeerConnectionIceEvent, RTCPeerConnectionState, RTCSessionDescription,
         register_default_interceptors,
     },
 };
@@ -47,6 +48,14 @@ impl PeerConnectionEventHandler for VoiceHandler {
     }
     async fn on_ice_candidate(&self, event: RTCPeerConnectionIceEvent) {
         println!("ICE candidate: {:?}", event.candidate);
+    }
+
+    async fn on_ice_connection_state_change(&self, state: RTCIceConnectionState) {
+        println!("CLIENT ICE connection state: {:?}", state);
+    }
+
+    async fn on_connection_state_change(&self, state: RTCPeerConnectionState) {
+        println!("CLIENT connection state: {:?}", state);
     }
 }
 
@@ -135,47 +144,95 @@ pub async fn start_voice_handler() {
         .await
         .expect("Failed to send voice offer");
 
-    let mut encoder = Encoder::new(48_000, Channels::Mono, Application::Voip)
-        .expect("Failed to create Opus encoder");
+    thread::spawn(move || {
+        let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
 
-    let (_stream, rx, sample_rate) = start_microphone();
-    let mut buffer = Vec::<f32>::new();
+        runtime.block_on(async {
+            let mut encoder = Encoder::new(48_000, Channels::Mono, Application::Voip)
+                .expect("Failed to create Opus encoder");
 
-    while let Ok(samples) = rx.recv() {
-        for stereo in samples.chunks_exact(2) {
-            let mono = (stereo[0] + stereo[1]) * 0.5;
-            buffer.push(mono);
-        }
+            let (_stream, rx, _sample_rate) = start_microphone();
+            let mut buffer = Vec::<f32>::new();
 
-        while buffer.len() >= 960 {
-            let frame: Vec<f32> = buffer.drain(..960).collect();
+            while let Ok(samples) = rx.recv() {
+                for stereo in samples.chunks_exact(2) {
+                    let mono = (stereo[0] + stereo[1]) * 0.5;
+                    buffer.push(mono);
+                }
 
-            let data = frame
-                .iter()
-                .flat_map(|sample| sample.to_le_bytes())
-                .collect::<Vec<u8>>();
+                while buffer.len() >= 960 {
+                    let frame: Vec<f32> = buffer.drain(..960).collect();
 
-            let mut encoded = vec![0u8; 1500];
+                    let mut encoded = vec![0u8; 1500];
 
-            let len = encoder
-                .encode_float(&frame, &mut encoded)
-                .expect("Failed to encode Opus");
+                    let len = encoder
+                        .encode_float(&frame, &mut encoded)
+                        .expect("Failed to encode Opus");
 
-            encoded.truncate(len);
+                    encoded.truncate(len);
 
-            audio_track
-                .write_sample(
-                    ssrc,
-                    111,
-                    &Sample {
-                        data: encoded.into(),
-                        duration: Duration::from_millis(20),
-                        ..Default::default()
-                    },
-                    &[],
-                )
-                .await
-                .expect("Failed to write audio sample");
+                    audio_track
+                        .write_sample(
+                            ssrc,
+                            111,
+                            &Sample {
+                                data: encoded.into(),
+                                duration: Duration::from_millis(20),
+                                ..Default::default()
+                            },
+                            &[],
+                        )
+                        .await
+                        .expect("Failed to write audio sample");
+                }
+            }
+        });
+    });
+
+    while let Some(message) = socket.next().await {
+        match message {
+            Ok(Message::Text(text)) => {
+                let signal =
+                    serde_json::from_str::<VoiceSignal>(&text).expect("Invalid voice signal");
+
+                match signal {
+                    VoiceSignal::Answer { sdp } => {
+                        println!("Received server answer");
+
+                        let answer =
+                            RTCSessionDescription::answer(sdp).expect("Invalid server SDP answer");
+
+                        pc.set_remote_description(answer)
+                            .await
+                            .expect("Failed to set remote description");
+
+                        println!("Remote description set!");
+                    }
+
+                    VoiceSignal::IceCandidate { candidate } => {
+                        println!("Received server ICE candidate: {candidate}");
+
+                        // Add it to pc here once your signaling format
+                        // contains enough information to construct RTCIceCandidate.
+                    }
+
+                    VoiceSignal::Offer { .. } => {
+                        println!("Unexpected offer from server");
+                    }
+                }
+            }
+
+            Ok(Message::Close(_)) => {
+                println!("Voice WebSocket closed");
+                break;
+            }
+
+            Ok(_) => {}
+
+            Err(err) => {
+                eprintln!("Voice WebSocket error: {err}");
+                break;
+            }
         }
     }
 }
