@@ -17,7 +17,6 @@ use winit::window::WindowAttributes;
 use winit::window::{Icon, Window};
 
 use crate::network::avatar_updates::AvatarUpdate;
-use crate::network::start_microphone::start_microphone;
 use crate::network::user_updates::UserUpdate;
 use crate::network::users::start_user_handler;
 use crate::network::voice::start_voice_handler;

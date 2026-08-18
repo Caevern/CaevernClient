@@ -1,24 +1,31 @@
+use cpal::{
+    StreamConfig,
+    traits::{DeviceTrait, HostTrait, StreamTrait},
+};
 use futures_util::{SinkExt, StreamExt};
-use opus::{Application, Channels, Encoder};
+use opus::{Application, Channels, Decoder, Encoder};
 use rtc::{
     interceptor::Registry,
     media::Sample,
     media_stream::MediaStreamTrack,
     rtp_transceiver::{
-        RTCRtpTransceiverDirection, RTCRtpTransceiverInit,
+        RTCRtpTransceiverInit,
         rtp_sender::{RTCRtpCodec, RTCRtpCodingParameters, RTCRtpEncodingParameters, RtpCodecKind},
     },
 };
 use serde::{Deserialize, Serialize};
-use std::{println, sync::Arc, thread, time::Duration};
-use tokio::sync::mpsc::Sender;
+use std::{collections::VecDeque, println, sync::Arc, thread, time::Duration};
+use tokio::sync::mpsc::{Receiver, Sender};
 use tokio_tungstenite::connect_async;
 use tungstenite::Message;
 use webrtc::{
-    media_stream::track_local::{TrackLocal, static_sample::TrackLocalStaticSample},
+    media_stream::{
+        track_local::{TrackLocal, static_sample::TrackLocalStaticSample},
+        track_remote::{TrackRemote, TrackRemoteEvent},
+    },
     peer_connection::{
         MediaEngine, PeerConnection, PeerConnectionBuilder, PeerConnectionEventHandler,
-        RTCConfigurationBuilder, RTCIceConnectionState, RTCIceGatheringState, RTCIceServer,
+        RTCConfigurationBuilder, RTCIceConnectionState, RTCIceGatheringState,
         RTCPeerConnectionIceEvent, RTCPeerConnectionState, RTCSessionDescription,
         register_default_interceptors,
     },
@@ -37,6 +44,7 @@ pub enum VoiceSignal {
 #[derive(Clone)]
 struct VoiceHandler {
     ice_tx: Sender<bool>,
+    tx: Sender<Vec<f32>>,
 }
 
 #[async_trait::async_trait]
@@ -47,16 +55,103 @@ impl PeerConnectionEventHandler for VoiceHandler {
         }
     }
     async fn on_ice_candidate(&self, event: RTCPeerConnectionIceEvent) {
-        println!("ICE candidate: {:?}", event.candidate);
+        println!("MIC ICE candidate: {:?}", event.candidate);
     }
 
     async fn on_ice_connection_state_change(&self, state: RTCIceConnectionState) {
-        println!("CLIENT ICE connection state: {:?}", state);
+        println!("MIC CLIENT ICE connection state: {:?}", state);
     }
 
     async fn on_connection_state_change(&self, state: RTCPeerConnectionState) {
-        println!("CLIENT connection state: {:?}", state);
+        println!("MIC CLIENT connection state: {:?}", state);
     }
+
+    async fn on_track(&self, track: Arc<dyn TrackRemote>) {
+        println!("Received remote audio!");
+
+        let mut decoder =
+            Decoder::new(48_000, Channels::Mono).expect("Failed to create Opus decoder");
+
+        let tx = self.tx.clone();
+
+        tokio::spawn(async move {
+            while let Some(event) = track.poll().await {
+                if let TrackRemoteEvent::OnRtpPacket(packet) = event {
+                    let mut pcm = vec![0.0f32; 960];
+
+                    match decoder.decode_float(&packet.payload, &mut pcm, false) {
+                        Ok(samples) => {
+                            let pcm = pcm[..samples].to_vec();
+
+                            let _ = tx.send(pcm).await;
+                        }
+
+                        Err(err) => {
+                            eprintln!("Opus decode error: {err}");
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+pub fn start_speaker(mut rx: Receiver<Vec<f32>>) -> cpal::Stream {
+    let host = cpal::default_host();
+
+    let device = host
+        .default_output_device()
+        .expect("No output device found");
+
+    println!("Speaker: {}", device.description().unwrap().name());
+
+    let supported = device
+        .default_output_config()
+        .expect("Failed to get speaker config");
+
+    println!(
+        "Speaker format: {} Hz, {} channels, {:?}",
+        supported.sample_rate(),
+        supported.channels(),
+        supported.sample_format()
+    );
+
+    let config: cpal::StreamConfig = supported.clone().into();
+
+    let channels = config.channels as usize;
+
+    let mut buffer = VecDeque::<f32>::new();
+
+    let stream = match supported.sample_format() {
+        cpal::SampleFormat::F32 => device
+            .build_output_stream(
+                config,
+                move |output: &mut [f32], _| {
+                    while let Ok(samples) = rx.try_recv() {
+                        buffer.extend(samples);
+                    }
+
+                    for frame in output.chunks_mut(channels) {
+                        let sample = buffer.pop_front().unwrap_or(0.0);
+
+                        for channel in frame {
+                            *channel = sample;
+                        }
+                    }
+                },
+                move |err| {
+                    eprintln!("Speaker error: {err}");
+                },
+                None,
+            )
+            .expect("Failed to build speaker stream"),
+
+        format => panic!("Unsupported speaker format: {format:?}"),
+    };
+
+    stream.play().expect("Failed to start speaker");
+
+    stream
 }
 
 pub async fn start_voice_handler() {
@@ -90,6 +185,13 @@ pub async fn start_voice_handler() {
     );
 
     let (ice_tx, mut ice_rx) = tokio::sync::mpsc::channel(32);
+    let (tx, rx) = tokio::sync::mpsc::channel::<Vec<f32>>(100);
+
+    thread::spawn(move || {
+        let _stream = start_speaker(rx);
+
+        std::thread::park();
+    });
 
     let config = RTCConfigurationBuilder::default().build();
 
@@ -105,7 +207,7 @@ pub async fn start_voice_handler() {
         .with_configuration(config)
         .with_media_engine(media_engine)
         .with_interceptor_registry(registry)
-        .with_handler(Arc::new(VoiceHandler { ice_tx }))
+        .with_handler(Arc::new(VoiceHandler { ice_tx, tx }))
         .with_udp_addrs(vec!["0.0.0.0:0"])
         .build()
         .await

@@ -39,6 +39,7 @@ Custom engine? Of course! :D
 - [ ] Chunked entity culling for static elements
 - [ ] Camera (Taking pictures)
 - [ ] Voice Chat
+- [ ] Distance based Voice Chat
 - [x] Player Avatar
 - [x] Render other players
 
