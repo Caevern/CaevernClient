@@ -35,8 +35,6 @@ pub fn start_microphone() -> (cpal::Stream, mpsc::Receiver<Vec<f32>>, u32) {
                 .build_input_stream(
                     config,
                     move |data: &[f32], _| {
-                        println!("Received {} samples", data.len());
-
                         let _ = tx.send(data.to_vec());
                     },
                     move |err| {
@@ -54,8 +52,6 @@ pub fn start_microphone() -> (cpal::Stream, mpsc::Receiver<Vec<f32>>, u32) {
                 .build_input_stream(
                     config,
                     move |data: &[i16], _| {
-                        println!("Received {} samples", data.len());
-
                         let samples = data.iter().map(|&x| x as f32 / i16::MAX as f32).collect();
 
                         let _ = tx.send(samples);
@@ -75,8 +71,6 @@ pub fn start_microphone() -> (cpal::Stream, mpsc::Receiver<Vec<f32>>, u32) {
                 .build_input_stream(
                     config,
                     move |data: &[u16], _| {
-                        println!("Received {} samples", data.len());
-
                         let samples = data
                             .iter()
                             .map(|&x| (x as f32 / u16::MAX as f32) * 2.0 - 1.0)
