@@ -5,10 +5,7 @@ Custom server architecture? Of course,
 Custom packet system? Of course,  
 Custom engine? Of course! :D  
 
-# Requirements
-- 512MB Storage
-- 256MB Ram
-- 1 CPU core
+What's private stays private with peer to peer connections, this includes chat messages. (In progress)
 
 # Todo List Client:
 - [x] Basic Rendering
