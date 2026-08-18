@@ -7,6 +7,9 @@ Custom engine? Of course! :D
 
 What's private stays private with peer to peer connections, this includes chat messages. (In progress)
 
+# Project Board:
+https://trello.com/b/gDEogvXM/caevern-client
+
 # Todo List Client:
 - [x] Basic Rendering
 - [x] Text Rendering
