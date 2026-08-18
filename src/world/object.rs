@@ -135,7 +135,6 @@ impl Object {
                 bone.1.3,
                 bone.1.4,
             );
-            println!("{}", bone.1.2);
         }
         self.bones = bones_converted;
     }

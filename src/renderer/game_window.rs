@@ -1,6 +1,7 @@
 use std::println;
 use std::sync::Arc;
 use std::sync::mpsc;
+use std::thread;
 
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalPosition;
@@ -16,8 +17,10 @@ use winit::window::WindowAttributes;
 use winit::window::{Icon, Window};
 
 use crate::network::avatar_updates::AvatarUpdate;
+use crate::network::start_microphone::start_microphone;
 use crate::network::user_updates::UserUpdate;
 use crate::network::users::start_user_handler;
+use crate::network::voice::start_voice_handler;
 use crate::renderer::render::Renderer;
 use crate::world::world::World;
 use crate::xr::xr_manager::XRManager;
@@ -93,6 +96,13 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         self.window_size = (renderer.init.size.width, renderer.init.size.height);
 
         start_user_handler(data_thread_rx, avatar_thread_tx);
+        thread::spawn(move || {
+            let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
+
+            runtime.block_on(async {
+                start_voice_handler().await;
+            });
+        });
 
         renderer.set_world(self.home_world.clone());
 

@@ -8,10 +8,7 @@ use std::{
 use tungstenite::{Message, connect};
 
 use crate::{
-    network::{
-        avatar_updates::AvatarUpdate,
-        user_updates::UserUpdate::{self, SendUserPosition},
-    },
+    network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate},
     renderer::transform::Transform,
 };
 
@@ -25,6 +22,7 @@ pub fn start_user_handler(
 
         let (mut socket, _response) =
             connect("ws://localhost:42142/ws/user").expect("Can't connect");
+        println!("Connected to websocket /ws/user");
 
         let _ = socket.send(Message::Binary(vec![1].into()));
 
@@ -170,7 +168,7 @@ pub fn start_user_handler(
                     }
                 }
             } else {
-                println!("Socket has closed!")
+                println!("Socket has closed, removed client: {}", user_id);
             }
         }
     });
