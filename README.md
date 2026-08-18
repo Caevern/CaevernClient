@@ -10,39 +10,6 @@ What's private stays private with peer to peer connections, this includes chat m
 # Project Board:
 https://trello.com/b/gDEogvXM/caevern-client
 
-# Todo List Client:
-- [x] Basic Rendering
-- [x] Text Rendering
-- [ ] OpenXR intergration
-- [ ] OpenXR initialization
-- [ ] OpenXR rendering
-- [x] Mesh importing FBX
-- [x] Material importing FBX
-- [x] Material displacement
-- [x] Bone importing FBX
-- [x] Bone implementation
-- [x] Bone hierarchy
-- [ ] Dynamic bone writing
-- [ ] Animation importing FBX
-- [x] Font importer
-- [x] World data file loader
-- [x] World parser
-- [x] Dynamic world loading and compiling
-- [x] Dynamic font loading
-- [ ] World loading from Github repo
-- [ ] Unity exporting plugin (for making worlds and avatars)
-- [ ] Mirror system
-- [ ] Video system
-- [ ] Portal system
-- [ ] Dynamic UI system (non hardcoded)
-- [ ] Entity culling
-- [ ] Chunked entity culling for static elements
-- [ ] Camera (Taking pictures)
-- [ ] Voice Chat
-- [ ] Distance based Voice Chat
-- [x] Player Avatar
-- [x] Render other players
-
 # Todo List Server:
 - [x] Player location data
 - [ ] Player authentication
