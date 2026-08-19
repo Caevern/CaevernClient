@@ -17,7 +17,7 @@ use crate::renderer::texture_object::TextureObject;
 use crate::renderer::transform::Transform;
 use crate::renderer::transforms::create_transforms;
 use crate::renderer::vertex::{Vertex, create_vertices_skinned};
-use crate::renderer::{transform, transforms, vertex};
+use crate::renderer::{init_wgpu, transform, transforms, vertex};
 use crate::setup::fonts::{load_font_atlas, load_font_uvs};
 use crate::world::material::Material;
 use crate::world::object::{Object, ObjectType};
@@ -37,7 +37,7 @@ pub enum ShaderType {
 pub struct Assets;
 
 pub struct Renderer<'window> {
-    pub init: transforms::InitWgpu<'window>,
+    pub init: init_wgpu::InitWgpu<'window>,
     project_mat: Matrix4<f32>,
 
     pipeline_displacement: wgpu::RenderPipeline,
@@ -78,7 +78,7 @@ pub struct Renderer<'window> {
 }
 impl<'window> Renderer<'window> {
     fn create_buffer_displacement(
-        init: &transforms::InitWgpu,
+        init: &init_wgpu::InitWgpu,
         uniform_bind_group_layout: &wgpu::BindGroupLayout,
         vertex_uniform_buffer: &wgpu::Buffer,
         fragment_uniform_buffer: &wgpu::Buffer,
@@ -196,7 +196,7 @@ impl<'window> Renderer<'window> {
         data_thread_tx: Sender<UserUpdate>,
         avatar_thread_rx: Receiver<AvatarUpdate>,
     ) -> Self {
-        let init = transforms::InitWgpu::init_wgpu(window).await;
+        let init = init_wgpu::InitWgpu::init_wgpu(window).await;
 
         let camera_position: (f32, f32, f32) = (-10.0, 4.0, 0.0);
         let camera_rotation: (f32, f32, f32) = (0.0, 0.0, 0.0);
