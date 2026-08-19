@@ -60,15 +60,10 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         let (data_thread_tx, data_thread_rx) = mpsc::channel::<UserUpdate>();
         let (avatar_thread_tx, avatar_thread_rx) = mpsc::channel::<AvatarUpdate>();
 
-        // TODO: change xr_enabled to an actual option
-        self.xr_enabled = false;
-
-        if self.xr_enabled {
-            if let Ok(_xr) = XRManager::new() {
-                println!("STARTED XRManager!!!")
-            } else {
-                println!("Initializing XRManager has failed :C")
-            }
+        if let Ok(_xr) = XRManager::new() {
+            println!("STARTED XRManager!!!")
+        } else {
+            println!("Initializing XRManager has failed :C")
         }
 
         let mut renderer =
