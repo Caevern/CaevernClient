@@ -44,7 +44,10 @@ pub struct GameWindow<'window> {
 
     pub mouse_locked: bool,
     pub use_confined: bool,
+
     pub xr_enabled: bool,
+    pub xr_manager: Option<XRManager>,
+
     pub menu_tablet_state: usize,
 
     pub home_world: World,
@@ -60,14 +63,16 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         let (data_thread_tx, data_thread_rx) = mpsc::channel::<UserUpdate>();
         let (avatar_thread_tx, avatar_thread_rx) = mpsc::channel::<AvatarUpdate>();
 
-        if let Ok(_xr) = XRManager::new() {
-            println!("STARTED XRManager!!!")
+        let mut renderer =
+            pollster::block_on(Renderer::new(&window, data_thread_tx, avatar_thread_rx));
+
+        if let Ok(xr) = XRManager::new() {
+            println!("STARTED XRManager!!!");
+            self.xr_manager = Some(xr);
+            self.xr_enabled = true;
         } else {
             println!("Initializing XRManager has failed :C")
         }
-
-        let mut renderer =
-            pollster::block_on(Renderer::new(&window, data_thread_tx, avatar_thread_rx));
 
         self.depth_texture = Some(
             renderer

@@ -24,7 +24,10 @@ pub fn start_engine(world: World) {
 
         mouse_locked: false,
         use_confined: false,
+
         xr_enabled: false,
+        xr_manager: None,
+
         menu_tablet_state: 0,
 
         home_world: world,

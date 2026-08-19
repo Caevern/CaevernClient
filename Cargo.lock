@@ -6,6 +6,7 @@ version = 4
 name = "Caevern"
 version = "0.1.0"
 dependencies = [
+ "ash",
  "async-trait",
  "bytemuck",
  "cap",
@@ -30,6 +31,7 @@ dependencies = [
  "url",
  "webrtc",
  "wgpu",
+ "wgpu-hal",
  "winit",
 ]
 

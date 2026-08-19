@@ -5,4 +5,4 @@ pub mod vertex;
 mod game_window;
 mod render;
 mod texture_object;
-mod transforms;
+pub mod transforms;
