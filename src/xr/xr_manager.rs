@@ -4,8 +4,6 @@ pub struct XRManager {
     _instance: openxr::Instance,
     _system: Option<openxr::SystemId>,
     _session: Option<openxr::Session<openxr::Vulkan>>,
-    frame_waiter: openxr::FrameWaiter,
-    frame_stream: openxr::FrameStream<openxr::Vulkan>,
     _frame_waiter: Option<openxr::FrameWaiter>,
     _frame_stream: Option<openxr::FrameStream<openxr::Vulkan>>,
     _views: Vec<openxr::View>,
@@ -170,10 +168,8 @@ impl XRManager {
             _instance: instance,
             _system: Some(system),
             _session: Some(session),
-            frame_waiter,
-            frame_stream,
-            _frame_waiter: None,
-            _frame_stream: None,
+            _frame_waiter: Some(frame_waiter),
+            _frame_stream: Some(frame_stream),
             _views: Vec::new(),
         })
     }
