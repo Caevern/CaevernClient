@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::sync::mpsc;
 use std::thread;
 
+use tungstenite::connect;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalPosition;
 use winit::event::DeviceEvent;
@@ -17,8 +18,9 @@ use winit::window::WindowAttributes;
 use winit::window::{Icon, Window};
 
 use crate::network::avatar_updates::AvatarUpdate;
+use crate::network::user_authenticate::authenticate_user;
+use crate::network::user_handler::start_user_handler;
 use crate::network::user_updates::UserUpdate;
-use crate::network::users::start_user_handler;
 use crate::network::voice::start_voice_handler;
 use crate::renderer::render::Renderer;
 use crate::world::world::World;
@@ -94,12 +96,18 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
         self.window_size = (renderer.init.size.width, renderer.init.size.height);
 
-        start_user_handler(data_thread_rx, avatar_thread_tx);
+        let (socket, _) = connect("ws://localhost:42142/ws/user").expect("Can't connect");
+
+        let (socket, user_id) = authenticate_user(socket);
+        println!("User ID: {}", user_id);
+
+        start_user_handler(socket, data_thread_rx, avatar_thread_tx, user_id);
+
         thread::spawn(move || {
             let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
 
             runtime.block_on(async {
-                start_voice_handler().await;
+                start_voice_handler(user_id).await;
             });
         });
 

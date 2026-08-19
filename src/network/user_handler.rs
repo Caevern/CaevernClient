@@ -1,11 +1,13 @@
 use cgmath::Vector3;
 use std::{
     collections::HashMap,
-    f32, println,
+    f32,
+    net::TcpStream,
+    println,
     sync::mpsc::{Receiver, Sender},
     thread,
 };
-use tungstenite::{Message, connect};
+use tungstenite::{Message, WebSocket, connect, stream::MaybeTlsStream};
 
 use crate::{
     network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate},
@@ -13,18 +15,13 @@ use crate::{
 };
 
 pub fn start_user_handler(
+    mut socket: WebSocket<MaybeTlsStream<TcpStream>>,
     data_thread_rx: Receiver<UserUpdate>,
     avatar_thread_tx: Sender<AvatarUpdate>,
+    user_id: u32,
 ) {
     thread::spawn(move || {
-        let mut user_id = 0;
         let mut users_loaded = HashMap::new();
-
-        let (mut socket, _response) =
-            connect("ws://localhost:42142/ws/user").expect("Can't connect");
-        println!("Connected to websocket /ws/user");
-
-        let _ = socket.send(Message::Binary(vec![1].into()));
 
         loop {
             if let Ok(mut job) = data_thread_rx.recv() {
@@ -76,10 +73,6 @@ pub fn start_user_handler(
                 let data = result.into_data();
                 if data.len() > 0 {
                     match data[0] {
-                        2 => {
-                            user_id = u32::from_be_bytes([data[1], data[2], data[3], data[4]]);
-                            println!("Received Free ID {}", user_id);
-                        }
                         3 => {
                             let player_amount = (data.len() - 1) / 28;
 

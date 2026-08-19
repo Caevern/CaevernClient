@@ -154,11 +154,18 @@ pub fn start_speaker(mut rx: Receiver<Vec<f32>>) -> cpal::Stream {
     stream
 }
 
-pub async fn start_voice_handler() {
+pub async fn start_voice_handler(user_id: u32) {
     let (mut socket, _) = connect_async("ws://localhost:42142/ws/voice")
         .await
         .expect("Can't connect");
     println!("Connected to websocket /ws/voice");
+
+    socket
+        .send(Message::Text(
+            format!("{{\"type\":\"Auth\",\"user_data\":\"{}\"}}", user_id).into(),
+        ))
+        .await
+        .expect("Failed to send voice offer");
 
     let ssrc = rand::random::<u32>();
     let media_track = MediaStreamTrack::new(
@@ -240,6 +247,7 @@ pub async fn start_voice_handler() {
     };
 
     let text = serde_json::to_string(&signal).expect("Failed to serialize voice offer");
+    println!("{}", text);
 
     socket
         .send(Message::Text(text.into()))
