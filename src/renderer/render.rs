@@ -75,8 +75,6 @@ pub struct Renderer<'window> {
     // networking
     data_thread_tx: Sender<UserUpdate>,
     avatar_thread_rx: Receiver<AvatarUpdate>,
-
-    pending_resize: Option<winit::dpi::PhysicalSize<u32>>,
 }
 impl<'window> Renderer<'window> {
     fn create_buffer_displacement(
@@ -537,8 +535,6 @@ impl<'window> Renderer<'window> {
 
             data_thread_tx,
             avatar_thread_rx,
-
-            pending_resize: None,
         }
     }
 
@@ -546,7 +542,11 @@ impl<'window> Renderer<'window> {
         if new_size.width > 0 && new_size.height > 0 {
             self.init.instance.poll_all(true);
             self.init.size = new_size;
-            self.pending_resize = Some(new_size);
+            self.init.config.width = new_size.width;
+            self.init.config.height = new_size.height;
+            self.init
+                .surface
+                .configure(&self.init.device, &self.init.config);
             self.project_mat =
                 transforms::create_projection(new_size.width as f32 / new_size.height as f32);
         }
@@ -884,15 +884,6 @@ impl<'window> Renderer<'window> {
                     64,
                     bytemuck::cast_slice(normal_ref),
                 );
-            }
-
-            // TODO: Fix resizing with static resize buffer
-            if let Some(size) = self.pending_resize.take() {
-                self.init.config.width = size.width;
-                self.init.config.height = size.height;
-                self.init
-                    .surface
-                    .configure(&self.init.device, &self.init.config);
             }
         }
 
