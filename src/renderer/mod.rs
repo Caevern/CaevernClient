@@ -2,8 +2,9 @@ pub mod eventloop;
 pub mod transform;
 pub mod vertex;
 
+mod buffers;
 mod game_window;
 mod init_wgpu;
 mod render;
 mod texture_object;
-pub mod transforms;
+mod transforms;
