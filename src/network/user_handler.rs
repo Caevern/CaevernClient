@@ -7,7 +7,7 @@ use std::{
     sync::mpsc::{Receiver, Sender},
     thread,
 };
-use tungstenite::{Message, WebSocket, connect, stream::MaybeTlsStream};
+use tungstenite::{Message, WebSocket, stream::MaybeTlsStream};
 
 use crate::{
     network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate},

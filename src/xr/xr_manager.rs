@@ -1,10 +1,10 @@
 pub struct XRManager {
-    instance: openxr::Instance,
-    system: Option<openxr::SystemId>,
-    session: Option<openxr::Session<openxr::Vulkan>>,
-    frame_waiter: Option<openxr::FrameWaiter>,
-    frame_stream: Option<openxr::FrameStream<openxr::Vulkan>>,
-    views: Vec<openxr::View>,
+    _instance: openxr::Instance,
+    _system: Option<openxr::SystemId>,
+    _session: Option<openxr::Session<openxr::Vulkan>>,
+    _frame_waiter: Option<openxr::FrameWaiter>,
+    _frame_stream: Option<openxr::FrameStream<openxr::Vulkan>>,
+    _views: Vec<openxr::View>,
 }
 impl XRManager {
     pub fn new() -> Result<Self, openxr::sys::Result> {
@@ -24,12 +24,12 @@ impl XRManager {
         )?;
 
         Ok(Self {
-            instance,
-            system: None,
-            session: None,
-            frame_waiter: None,
-            frame_stream: None,
-            views: Vec::new(),
+            _instance: instance,
+            _system: None,
+            _session: None,
+            _frame_waiter: None,
+            _frame_stream: None,
+            _views: Vec::new(),
         })
     }
 }

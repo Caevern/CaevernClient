@@ -1,16 +1,12 @@
-use cpal::{
-    StreamConfig,
-    traits::{DeviceTrait, HostTrait, StreamTrait},
-};
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use futures_util::{SinkExt, StreamExt};
 use opus::{Application, Channels, Decoder, Encoder};
 use rtc::{
     interceptor::Registry,
     media::Sample,
     media_stream::MediaStreamTrack,
-    rtp_transceiver::{
-        RTCRtpTransceiverInit,
-        rtp_sender::{RTCRtpCodec, RTCRtpCodingParameters, RTCRtpEncodingParameters, RtpCodecKind},
+    rtp_transceiver::rtp_sender::{
+        RTCRtpCodec, RTCRtpCodingParameters, RTCRtpEncodingParameters, RtpCodecKind,
     },
 };
 use serde::{Deserialize, Serialize};
