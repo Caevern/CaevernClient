@@ -96,20 +96,23 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
         self.window_size = (renderer.init.size.width, renderer.init.size.height);
 
-        let (socket, _) = connect("ws://localhost:42142/ws/user").expect("Can't connect");
+        if let Ok((socket, _)) = connect("ws://localhost:42142/ws/user") {
+            let (socket, user_id) = authenticate_user(socket);
+            println!("User ID: {}", user_id);
 
-        let (socket, user_id) = authenticate_user(socket);
-        println!("User ID: {}", user_id);
+            start_user_handler(socket, data_thread_rx, avatar_thread_tx, user_id);
 
-        start_user_handler(socket, data_thread_rx, avatar_thread_tx, user_id);
+            thread::spawn(move || {
+                let runtime =
+                    tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
 
-        thread::spawn(move || {
-            let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
-
-            runtime.block_on(async {
-                start_voice_handler(user_id).await;
+                runtime.block_on(async {
+                    start_voice_handler(user_id).await;
+                });
             });
-        });
+        } else {
+            println!("Failed to connect to websocket /ws/user, not connected to any server");
+        }
 
         renderer.set_world(self.home_world.clone());
 
