@@ -1,3 +1,4 @@
+use ash::vk::PipelineLayoutCreateInfo;
 use cgmath::*;
 use rust_embed::RustEmbed;
 use std::collections::HashMap;
@@ -14,19 +15,22 @@ use crate::physics::gravity::apply_gravity;
 use crate::physics::movement::{get_camera_movement, get_camera_rotation};
 use crate::renderer::buffers::bind_group_layout::create_bind_group_layout;
 use crate::renderer::buffers::displacement_buffer::create_buffer_displacement;
+use crate::renderer::default_elements::register_default_textures;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
 use crate::renderer::texture_object::TextureObject;
 use crate::renderer::transform::Transform;
 use crate::renderer::transforms::create_transforms;
 use crate::renderer::vertex::{Vertex, create_vertices_skinned};
 use crate::renderer::{init_wgpu, transform, transforms, vertex};
-use crate::setup::fonts::{load_font_atlas, load_font_uvs};
+use crate::setup::fonts::load_font_uvs;
 use crate::world::material::Material;
 use crate::world::object::{Object, ObjectType};
 use crate::world::objects::fbx_parser::parse;
 use crate::world::objects::player::Player;
+use crate::world::objects::skeleton::create_skeleton;
 use crate::world::objects::text;
 use crate::world::world::World;
+use crate::xr::xr_manager::XRManager;
 
 #[derive(PartialEq)]
 pub enum ShaderType {
@@ -38,8 +42,8 @@ pub enum ShaderType {
 #[folder = "assets/"]
 pub struct Assets;
 
-pub struct Renderer<'window> {
-    pub init: init_wgpu::InitWgpu<'window>,
+pub struct RendererOpenXR {
+    pub init: XRManager,
     project_mat: Matrix4<f32>,
 
     pipeline_displacement: wgpu::RenderPipeline,
@@ -78,30 +82,30 @@ pub struct Renderer<'window> {
     data_thread_tx: Sender<UserUpdate>,
     avatar_thread_rx: Receiver<AvatarUpdate>,
 }
-impl<'window> Renderer<'window> {
+impl RendererOpenXR {
     pub async fn new(
-        window: &Arc<Window>,
+        init: XRManager,
         data_thread_tx: Sender<UserUpdate>,
         avatar_thread_rx: Receiver<AvatarUpdate>,
     ) -> Self {
-        let init = init_wgpu::InitWgpu::init_wgpu(window).await;
-
         let (_, project_mat, _) = transforms::create_view_projection(
             (0.0, 0.0, 0.0).into(),
             (0.0, 0.0, 0.0).into(),
             cgmath::Vector3::unit_y(),
-            init.config.width as f32 / init.config.height as f32,
+            1.0,
         );
 
-        let uniform_bind_group_layout: wgpu::BindGroupLayout = create_bind_group_layout(&init);
+        let uniform_bind_group_layout: wgpu::BindGroupLayout =
+            create_bind_group_layout(&init.device);
 
-        let pipeline_layout = init
-            .device
-            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
-                bind_group_layouts: &[Some(&uniform_bind_group_layout)],
-                immediate_size: 0,
-            });
+        let pipeline_layout = unsafe {
+            init.device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: Some("Render Pipeline Layout"),
+                    bind_group_layouts: &[Some(&uniform_bind_group_layout)],
+                    immediate_size: 0,
+                })
+        };
 
         let shader_displacement = init
             .device
@@ -116,7 +120,7 @@ impl<'window> Renderer<'window> {
             &init.device,
             &pipeline_layout,
             &shader_displacement,
-            init.config.format,
+            wgpu::TextureFormat::Bgra8UnormSrgb,
         );
 
         let shader_displacement_bones =
@@ -132,7 +136,7 @@ impl<'window> Renderer<'window> {
             &init.device,
             &pipeline_layout,
             &shader_displacement_bones,
-            init.config.format,
+            wgpu::TextureFormat::Bgra8UnormSrgb,
         );
 
         let vertex_uniform_buffer: wgpu::Buffer =
@@ -165,26 +169,7 @@ impl<'window> Renderer<'window> {
         );
 
         let mut textures: HashMap<String, TextureObject> = HashMap::new();
-
-        // create missing texture
-        textures.insert(
-            "textures/missing.png".to_string(),
-            TextureObject::create("textures/missing.png", &init),
-        );
-        textures.insert(
-            "textures/tablet.png".to_string(),
-            TextureObject::create("textures/tablet.png", &init),
-        );
-        textures.insert(
-            "textures/displacement.png".to_string(),
-            TextureObject::create("textures/displacement.png", &init),
-        );
-
-        // create font atlasses
-        textures.insert(
-            "fonts/NotoSansJP.ttf".to_string(),
-            TextureObject::load_from_dynamic_image(load_font_atlas("fonts/NotoSansJP.ttf"), &init),
-        );
+        register_default_textures(&mut textures, &init.device);
 
         let mut font_maps: HashMap<String, HashMap<String, (f32, f32, f32, f32, f32)>> =
             HashMap::new();
@@ -199,17 +184,7 @@ impl<'window> Renderer<'window> {
         let fallback_bones = model_parsed.1;
 
         let bone_bindings = vec![("head".to_string(), "head.xModel")];
-
-        let mut fallback_skeleton = HashMap::new();
-        for bone_binding in bone_bindings {
-            for bone in &fallback_bones {
-                let filtered: String = bone.1.2.chars().filter(|c| (*c as u32) >= 32).collect();
-                if filtered == bone_binding.1 {
-                    fallback_skeleton.insert(bone_binding.0, bone.1.0);
-                    break;
-                }
-            }
-        }
+        let fallback_skeleton = create_skeleton(bone_bindings, &fallback_bones);
 
         let vertex_buffers = Vec::new();
         let uniform_bind_groups = Vec::new();
@@ -256,20 +231,6 @@ impl<'window> Renderer<'window> {
 
             data_thread_tx,
             avatar_thread_rx,
-        }
-    }
-
-    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        if new_size.width > 0 && new_size.height > 0 {
-            self.init.instance.poll_all(true);
-            self.init.size = new_size;
-            self.init.config.width = new_size.width;
-            self.init.config.height = new_size.height;
-            self.init
-                .surface
-                .configure(&self.init.device, &self.init.config);
-            self.project_mat =
-                transforms::create_projection(new_size.width as f32 / new_size.height as f32);
         }
     }
 
@@ -619,7 +580,7 @@ impl<'window> Renderer<'window> {
             self.player.camera.rotation.y,
             self.player.camera.rotation.x,
             up_direction,
-            self.init.config.width as f32 / self.init.config.height as f32,
+            1.0,
         );
 
         let view_project_mat = project_mat * view_mat;
@@ -942,7 +903,7 @@ impl<'window> Renderer<'window> {
 
             self.textures.insert(
                 texture.to_string(),
-                TextureObject::create(texture, &self.init),
+                TextureObject::create(texture, &self.init.device),
             );
         }
 
@@ -1081,7 +1042,8 @@ impl<'window> Renderer<'window> {
             let vertex_buffer;
             if let Some(texture_displacement) = texture_object_displacement {
                 (uniform_bind_group, vertex_buffer) = create_buffer_displacement(
-                    &self.init,
+                    &self.init.queue,
+                    &self.init.device,
                     &self.uniform_bind_group_layout,
                     &self.vertex_uniform_buffer,
                     &self.fragment_uniform_buffer,
@@ -1102,7 +1064,8 @@ impl<'window> Renderer<'window> {
             } else {
                 if let Some(texture_displacement) = self.textures.get("textures/displacement.png") {
                     (uniform_bind_group, vertex_buffer) = create_buffer_displacement(
-                        &self.init,
+                        &self.init.queue,
+                        &self.init.device,
                         &self.uniform_bind_group_layout,
                         &self.vertex_uniform_buffer,
                         &self.fragment_uniform_buffer,
@@ -1149,7 +1112,7 @@ impl<'window> Renderer<'window> {
         for texture in self.world.get_textures() {
             self.textures.insert(
                 texture.to_string(),
-                TextureObject::create(texture, &self.init),
+                TextureObject::create(texture, &self.init.device),
             );
         }
 
@@ -1290,7 +1253,8 @@ impl<'window> Renderer<'window> {
                 let vertex_buffer;
                 if let Some(texture_displacement) = texture_object_displacement {
                     (uniform_bind_group, vertex_buffer) = create_buffer_displacement(
-                        &self.init,
+                        &self.init.queue,
+                        &self.init.device,
                         &self.uniform_bind_group_layout,
                         &self.vertex_uniform_buffer,
                         &self.fragment_uniform_buffer,
@@ -1313,7 +1277,8 @@ impl<'window> Renderer<'window> {
                         self.textures.get("textures/displacement.png")
                     {
                         (uniform_bind_group, vertex_buffer) = create_buffer_displacement(
-                            &self.init,
+                            &self.init.queue,
+                            &self.init.device,
                             &self.uniform_bind_group_layout,
                             &self.vertex_uniform_buffer,
                             &self.fragment_uniform_buffer,
@@ -1368,7 +1333,7 @@ impl<'window> Renderer<'window> {
     }
 
     pub fn render(&mut self, depth_texture: &wgpu::Texture) -> Result<(), ()> {
-        let output = match self.init.surface.get_current_texture() {
+        /*let output = match self.init.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => frame,
             wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
 
@@ -1461,7 +1426,7 @@ impl<'window> Renderer<'window> {
         }
 
         self.init.queue.submit(Some(encoder.finish()));
-        self.init.queue.present(output);
+        self.init.queue.present(output);*/
 
         Ok(())
     }

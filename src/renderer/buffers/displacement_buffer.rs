@@ -1,9 +1,10 @@
 use wgpu::BindGroup;
 
-use crate::renderer::{init_wgpu, vertex::Vertex};
+use crate::renderer::vertex::Vertex;
 
 pub fn create_buffer_displacement(
-    init: &init_wgpu::InitWgpu,
+    queue: &wgpu::Queue,
+    device: &wgpu::Device,
     uniform_bind_group_layout: &wgpu::BindGroupLayout,
     vertex_uniform_buffer: &wgpu::Buffer,
     fragment_uniform_buffer: &wgpu::Buffer,
@@ -21,7 +22,7 @@ pub fn create_buffer_displacement(
     height: u32,
     vertex_num: usize,
 ) -> (BindGroup, wgpu::Buffer) {
-    init.queue.write_texture(
+    queue.write_texture(
         wgpu::TexelCopyTextureInfo {
             texture: &texture,
             mip_level: 0,
@@ -37,7 +38,7 @@ pub fn create_buffer_displacement(
         texture_size,
     );
 
-    init.queue.write_texture(
+    queue.write_texture(
         wgpu::TexelCopyTextureInfo {
             texture: &displacement_texture,
             mip_level: 0,
@@ -56,7 +57,7 @@ pub fn create_buffer_displacement(
     let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
     let displacement_texture_view =
         displacement_texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let sampler = init.device.create_sampler(&wgpu::SamplerDescriptor {
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
         address_mode_u: wgpu::AddressMode::ClampToEdge,
         address_mode_v: wgpu::AddressMode::ClampToEdge,
         address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -66,7 +67,7 @@ pub fn create_buffer_displacement(
         ..Default::default()
     });
 
-    let uniform_bind_group = init.device.create_bind_group(&wgpu::BindGroupDescriptor {
+    let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
         layout: &uniform_bind_group_layout,
         entries: &[
             wgpu::BindGroupEntry {
@@ -106,7 +107,7 @@ pub fn create_buffer_displacement(
     });
 
     let max_buffer_size = size_of::<Vertex>() * vertex_num;
-    let vertex_buffer = init.device.create_buffer(&wgpu::BufferDescriptor {
+    let vertex_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Vertex Buffer"),
         size: max_buffer_size as u64,
         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,

@@ -1,4 +1,4 @@
-use crate::renderer::{init_wgpu, render::Assets};
+use crate::renderer::render_windowed::Assets;
 use image::{DynamicImage, GenericImageView};
 
 pub struct TextureObject {
@@ -9,7 +9,7 @@ pub struct TextureObject {
     pub texture_height: u32,
 }
 impl TextureObject {
-    pub fn create(path: &str, init: &init_wgpu::InitWgpu) -> Self {
+    pub fn create(path: &str, device: &wgpu::Device) -> Self {
         let texture_data = Assets::get(path).expect("Failed to load embedded texture");
         let img = image::load_from_memory(&texture_data.data).expect("Failed to load texture");
         println!("loaded {}", path);
@@ -21,7 +21,7 @@ impl TextureObject {
             depth_or_array_layers: 1,
         };
 
-        let texture: wgpu::Texture = init.device.create_texture(&wgpu::TextureDescriptor {
+        let texture: wgpu::Texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Texture"),
             size: texture_size,
             mip_level_count: 1,
@@ -41,7 +41,7 @@ impl TextureObject {
         }
     }
 
-    pub fn load_from_dynamic_image(img: DynamicImage, init: &init_wgpu::InitWgpu) -> Self {
+    pub fn load_from_dynamic_image(img: DynamicImage, device: &wgpu::Device) -> Self {
         let texture_rgba = img.to_rgba8().to_vec();
         let (width, height) = img.dimensions();
         let texture_size = wgpu::Extent3d {
@@ -50,7 +50,7 @@ impl TextureObject {
             depth_or_array_layers: 1,
         };
 
-        let texture: wgpu::Texture = init.device.create_texture(&wgpu::TextureDescriptor {
+        let texture: wgpu::Texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Texture"),
             size: texture_size,
             mip_level_count: 1,

@@ -1,12 +1,16 @@
 use ash::vk::{self, Handle};
+use wgpu::BackendOptions;
+use wgpu_hal::Instance;
 
 pub struct XRManager {
-    _instance: openxr::Instance,
-    _system: Option<openxr::SystemId>,
-    _session: Option<openxr::Session<openxr::Vulkan>>,
-    _frame_waiter: Option<openxr::FrameWaiter>,
-    _frame_stream: Option<openxr::FrameStream<openxr::Vulkan>>,
-    _views: Vec<openxr::View>,
+    instance: openxr::Instance,
+    system: openxr::SystemId,
+    pub session: openxr::Session<openxr::Vulkan>,
+    frame_waiter: openxr::FrameWaiter,
+    frame_stream: openxr::FrameStream<openxr::Vulkan>,
+    views: Vec<openxr::View>,
+    pub device: wgpu::Device,
+    pub queue: wgpu::Queue,
 }
 impl XRManager {
     pub fn new() -> Result<Self, openxr::sys::Result> {
@@ -23,7 +27,7 @@ impl XRManager {
         extensions.khr_vulkan_enable2 = true;
         #[cfg(target_os = "android")]
         {
-            enabled_extensions.khr_android_create_instance = true;
+            extensions.khr_android_create_instance = true;
         }
 
         let instance = entry.create_instance(
@@ -96,6 +100,44 @@ impl XRManager {
             )
         };
 
+        let requirements = instance.graphics_requirements::<openxr::Vulkan>(system)?;
+        println!("Got graphics requirements");
+
+        let enabled_extensions = unsafe {
+            vk_entry
+                .enumerate_instance_extension_properties(None)
+                .expect("Failed to enumerate Vulkan instance extensions")
+                .into_iter()
+                .map(|ext| {
+                    let name = std::ffi::CStr::from_ptr(ext.extension_name.as_ptr());
+                    name.to_owned()
+                })
+                .map(|name| Box::leak(name.into_boxed_c_str()) as &'static std::ffi::CStr)
+                .collect::<Vec<_>>()
+        };
+        println!("Got enabled extensions");
+
+        let hal_instance = unsafe {
+            wgpu_hal::vulkan::Instance::from_raw(
+                vk_entry.clone(),
+                vk_instance.clone(),
+                vk_app_info.api_version,
+                0,
+                None,
+                enabled_extensions,
+                wgpu::InstanceFlags::empty(),
+                wgpu::MemoryBudgetThresholds::default(),
+                false,
+                None,
+            )
+            .expect("Failed to create hal instance")
+        };
+        println!("Created hal instance");
+
+        let hal_adapters = unsafe { hal_instance.enumerate_adapters(None) };
+        let wgpu_instance =
+            unsafe { wgpu::Instance::from_hal::<wgpu_hal::api::Vulkan>(hal_instance) };
+
         let vk_physical_device = unsafe {
             vk::PhysicalDevice::from_raw(
                 instance
@@ -103,6 +145,20 @@ impl XRManager {
                     .unwrap() as _,
             )
         };
+
+        let hal_adapter = hal_adapters
+            .into_iter()
+            .find(|adapter| adapter.adapter.raw_physical_device() == vk_physical_device)
+            .expect("Failed to find hal adapter");
+
+        let required_device_extensions = hal_adapter
+            .adapter
+            .required_device_extensions(wgpu::Features::empty());
+
+        let device_extension_names: Vec<*const std::ffi::c_char> = required_device_extensions
+            .iter()
+            .map(|ext| ext.as_ptr())
+            .collect();
 
         let queue_family_index = unsafe {
             vk_instance
@@ -123,7 +179,8 @@ impl XRManager {
             .queue_family_index(queue_family_index)
             .queue_priorities(std::slice::from_ref(&1.0f32));
         let device_create_info = vk::DeviceCreateInfo::default()
-            .queue_create_infos(std::slice::from_ref(&queue_create_info));
+            .queue_create_infos(std::slice::from_ref(&queue_create_info))
+            .enabled_extension_names(&device_extension_names);
 
         let vk_device_raw = unsafe {
             instance
@@ -143,13 +200,6 @@ impl XRManager {
             )
         };
 
-        let requirements = instance.graphics_requirements::<openxr::Vulkan>(system)?;
-
-        println!(
-            "OpenXR Vulkan: {} -> {}",
-            requirements.min_api_version_supported, requirements.max_api_version_supported,
-        );
-
         let (session, frame_waiter, frame_stream) = unsafe {
             instance.create_session::<openxr::Vulkan>(
                 system,
@@ -164,13 +214,53 @@ impl XRManager {
         };
         println!("Created session");
 
+        let hal_device = unsafe {
+            hal_adapter
+                .adapter
+                .device_from_raw(
+                    vk_device,
+                    None,
+                    &required_device_extensions,
+                    wgpu::Features::empty(),
+                    &wgpu::Limits::default(),
+                    &wgpu::MemoryHints::default(),
+                    queue_family_index,
+                    0,
+                )
+                .expect("Failed to create hal device")
+        };
+
+        let wgpu_adapter =
+            unsafe { wgpu_instance.create_adapter_from_hal::<wgpu_hal::api::Vulkan>(hal_adapter) };
+        let (device, queue) = unsafe {
+            wgpu_adapter.create_device_from_hal(
+                hal_device,
+                &wgpu::DeviceDescriptor {
+                    label: Some("OpenXR Vulkan Device"),
+                    required_features: wgpu::Features::empty(),
+                    required_limits: wgpu::Limits::default(),
+                    experimental_features: wgpu::ExperimentalFeatures::default(),
+                    memory_hints: wgpu::MemoryHints::default(),
+                    trace: wgpu::Trace::Off,
+                },
+            )
+        }
+        .expect("Failed to create device from hal");
+
+        println!(
+            "OpenXR Vulkan: {} -> {}",
+            requirements.min_api_version_supported, requirements.max_api_version_supported,
+        );
+
         Ok(Self {
-            _instance: instance,
-            _system: Some(system),
-            _session: Some(session),
-            _frame_waiter: Some(frame_waiter),
-            _frame_stream: Some(frame_stream),
-            _views: Vec::new(),
+            instance: instance,
+            system: system,
+            session: session,
+            frame_waiter: frame_waiter,
+            frame_stream: frame_stream,
+            views: Vec::new(),
+            device: device,
+            queue: queue,
         })
     }
 

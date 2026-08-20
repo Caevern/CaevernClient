@@ -9,7 +9,9 @@ pub fn start_engine(world: World) {
 
     let mut game_window = GameWindow {
         window: None,
-        renderer: None,
+
+        windowed_renderer: None,
+        openxr_renderer: None,
 
         depth_texture: None,
 
@@ -26,7 +28,6 @@ pub fn start_engine(world: World) {
         use_confined: false,
 
         xr_enabled: false,
-        xr_manager: None,
 
         menu_tablet_state: 0,
 

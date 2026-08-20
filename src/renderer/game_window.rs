@@ -22,13 +22,16 @@ use crate::network::user_authenticate::authenticate_user;
 use crate::network::user_handler::start_user_handler;
 use crate::network::user_updates::UserUpdate;
 use crate::network::voice::start_voice_handler;
-use crate::renderer::render::Renderer;
+use crate::renderer::render_openxr::RendererOpenXR;
+use crate::renderer::render_windowed::RendererWindowed;
 use crate::world::world::World;
 use crate::xr::xr_manager::XRManager;
 
 pub struct GameWindow<'window> {
     pub window: Option<Arc<Window>>,
-    pub renderer: Option<Renderer<'window>>,
+
+    pub windowed_renderer: Option<RendererWindowed<'window>>,
+    pub openxr_renderer: Option<RendererOpenXR>,
 
     pub depth_texture: Option<wgpu::Texture>,
 
@@ -46,7 +49,6 @@ pub struct GameWindow<'window> {
     pub use_confined: bool,
 
     pub xr_enabled: bool,
-    pub xr_manager: Option<XRManager>,
 
     pub menu_tablet_state: usize,
 
@@ -55,46 +57,8 @@ pub struct GameWindow<'window> {
 
 impl<'window> ApplicationHandler for GameWindow<'window> {
     fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
-        let attributes = WindowAttributes::default()
-            .with_title(self.title.clone())
-            .with_window_icon(self.icon.clone());
-        let window = Arc::new(event_loop.create_window(attributes).unwrap());
-
         let (data_thread_tx, data_thread_rx) = mpsc::channel::<UserUpdate>();
         let (avatar_thread_tx, avatar_thread_rx) = mpsc::channel::<AvatarUpdate>();
-
-        let mut renderer =
-            pollster::block_on(Renderer::new(&window, data_thread_tx, avatar_thread_rx));
-
-        if let Ok(xr) = XRManager::new() {
-            println!("STARTED XRManager!!!");
-            self.xr_manager = Some(xr);
-            self.xr_enabled = true;
-        } else {
-            println!("Initializing XRManager has failed :C")
-        }
-
-        self.depth_texture = Some(
-            renderer
-                .init
-                .device
-                .create_texture(&wgpu::TextureDescriptor {
-                    size: wgpu::Extent3d {
-                        width: renderer.init.config.width,
-                        height: renderer.init.config.height,
-                        depth_or_array_layers: 1,
-                    },
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format: wgpu::TextureFormat::Depth24Plus,
-                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                    label: None,
-                    view_formats: &[],
-                }),
-        );
-
-        self.window_size = (renderer.init.size.width, renderer.init.size.height);
 
         if let Ok((socket, _)) = connect("ws://localhost:42142/ws/user") {
             let (socket, user_id) = authenticate_user(socket);
@@ -114,11 +78,56 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
             println!("Failed to connect to websocket /ws/user, not connected to any server");
         }
 
-        renderer.set_world(self.home_world.clone());
+        if let Ok(xr) = XRManager::new() {
+            println!("STARTED XRManager!!!");
+            self.xr_enabled = true;
+
+            let mut renderer_openxr =
+                pollster::block_on(RendererOpenXR::new(xr, data_thread_tx, avatar_thread_rx));
+
+            renderer_openxr.set_world(self.home_world.clone());
+
+            self.openxr_renderer = Some(renderer_openxr);
+        } else {
+            println!("Initializing XRManager has failed :C");
+
+            let attributes = WindowAttributes::default()
+                .with_title(self.title.clone())
+                .with_window_icon(self.icon.clone());
+            let window = Arc::new(event_loop.create_window(attributes).unwrap());
+
+            let mut renderer = pollster::block_on(RendererWindowed::new(
+                &window,
+                data_thread_tx,
+                avatar_thread_rx,
+            ));
+
+            self.depth_texture = Some(renderer.init.device.create_texture(
+                &wgpu::TextureDescriptor {
+                    size: wgpu::Extent3d {
+                        width: renderer.init.config.width,
+                        height: renderer.init.config.height,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Depth24Plus,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    label: None,
+                    view_formats: &[],
+                },
+            ));
+
+            self.window_size = (renderer.init.size.width, renderer.init.size.height);
+
+            renderer.set_world(self.home_world.clone());
+
+            self.windowed_renderer = Some(renderer);
+            self.window = Some(window);
+        }
 
         self.render_start_time = std::time::Instant::now();
-        self.renderer = Some(renderer);
-        self.window = Some(window);
     }
 
     fn window_event(
@@ -130,13 +139,13 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         match event {
             WindowEvent::CloseRequested => {
                 println!("Closing Caevern");
-                self.renderer = None;
+                self.windowed_renderer = None;
                 self.window = None;
                 event_loop.exit()
             }
 
             WindowEvent::Resized(size) => {
-                let renderer = self.renderer.as_mut().unwrap();
+                let renderer = self.windowed_renderer.as_mut().unwrap();
                 renderer.resize(size);
                 self.depth_texture = Some(renderer.init.device.create_texture(
                     &wgpu::TextureDescriptor {
@@ -331,7 +340,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 let now = std::time::Instant::now();
                 let dt = now - self.render_start_time;
 
-                let renderer = self.renderer.as_mut().unwrap();
+                let renderer = self.windowed_renderer.as_mut().unwrap();
 
                 renderer.update(dt, self.keys, self.mouse_movement, self.menu_tablet_state);
 
