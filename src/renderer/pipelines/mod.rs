@@ -1,2 +1,1 @@
-pub mod displacement;
-pub mod displacement_bones;
+pub mod displacement_default;

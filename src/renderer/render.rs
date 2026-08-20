@@ -14,8 +14,7 @@ use crate::physics::gravity::apply_gravity;
 use crate::physics::movement::{get_camera_movement, get_camera_rotation};
 use crate::renderer::buffers::bind_group_layout::create_bind_group_layout;
 use crate::renderer::buffers::displacement_buffer::create_buffer_displacement;
-use crate::renderer::pipelines::displacement::create_displacement_pipeline;
-use crate::renderer::pipelines::displacement_bones::create_displacement_bones_pipeline;
+use crate::renderer::pipelines::displacement_default::create_pipeline;
 use crate::renderer::texture_object::TextureObject;
 use crate::renderer::transform::Transform;
 use crate::renderer::transforms::create_transforms;
@@ -113,7 +112,7 @@ impl<'window> Renderer<'window> {
                 ),
             });
 
-        let pipeline_displacement = create_displacement_pipeline(
+        let pipeline_displacement = create_pipeline(
             &init.device,
             &pipeline_layout,
             &shader_displacement,
@@ -129,7 +128,7 @@ impl<'window> Renderer<'window> {
                     ),
                 });
 
-        let pipeline_displacement_bones = create_displacement_bones_pipeline(
+        let pipeline_displacement_bones = create_pipeline(
             &init.device,
             &pipeline_layout,
             &shader_displacement_bones,

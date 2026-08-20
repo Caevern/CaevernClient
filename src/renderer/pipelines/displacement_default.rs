@@ -1,22 +1,22 @@
 use crate::renderer::vertex::Vertex;
 
-pub fn create_displacement_bones_pipeline(
+pub fn create_pipeline(
     device: &wgpu::Device,
     pipeline_layout: &wgpu::PipelineLayout,
-    shader_displacement_bones: &wgpu::ShaderModule,
+    shader: &wgpu::ShaderModule,
     format: wgpu::TextureFormat,
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some("Render Pipeline"),
         layout: Some(&pipeline_layout),
         vertex: wgpu::VertexState {
-            module: &shader_displacement_bones,
+            module: &shader,
             entry_point: Some("vs_main"),
             buffers: &[Some(Vertex::desc())],
             compilation_options: wgpu::PipelineCompilationOptions::default(),
         },
         fragment: Some(wgpu::FragmentState {
-            module: &shader_displacement_bones,
+            module: &shader,
             entry_point: Some("fs_main"),
             targets: &[Some(wgpu::ColorTargetState {
                 format: format,
