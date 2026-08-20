@@ -15,6 +15,9 @@ use crate::physics::gravity::apply_gravity;
 use crate::physics::movement::{get_camera_movement, get_camera_rotation};
 use crate::renderer::buffers::bind_group_layout::create_bind_group_layout;
 use crate::renderer::buffers::displacement_buffer::create_buffer_displacement;
+use crate::renderer::buffers::uniform_buffers::{
+    create_fragment_uniform_buffer, create_vertex_uniform_buffer,
+};
 use crate::renderer::default_elements::register_default_textures;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
 use crate::renderer::texture_object::TextureObject;
@@ -139,20 +142,8 @@ impl RendererOpenXR {
             wgpu::TextureFormat::Bgra8UnormSrgb,
         );
 
-        let vertex_uniform_buffer: wgpu::Buffer =
-            init.device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("Vertex Uniform Buffer"),
-                size: 192,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-
-        let fragment_uniform_buffer = init.device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Fragment Uniform Buffer"),
-            size: 32,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+        let vertex_uniform_buffer = create_vertex_uniform_buffer(&init.device);
+        let fragment_uniform_buffer = create_fragment_uniform_buffer(&init.device);
 
         let model_mat =
             transforms::create_transforms([0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]);
