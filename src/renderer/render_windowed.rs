@@ -45,7 +45,6 @@ pub struct Assets;
 
 pub struct RendererWindowed<'window> {
     pub init: init_wgpu::InitWgpu<'window>,
-    project_mat: Matrix4<f32>,
 
     pipeline_displacement: wgpu::RenderPipeline,
     pipeline_displacement_bones: wgpu::RenderPipeline,
@@ -90,13 +89,6 @@ impl<'window> RendererWindowed<'window> {
         avatar_thread_rx: Receiver<AvatarUpdate>,
     ) -> Self {
         let init = init_wgpu::InitWgpu::init_wgpu(window).await;
-
-        let (_, project_mat, _) = transforms::create_view_projection(
-            (0.0, 0.0, 0.0).into(),
-            (0.0, 0.0, 0.0).into(),
-            cgmath::Vector3::unit_y(),
-            init.config.width as f32 / init.config.height as f32,
-        );
 
         let uniform_bind_group_layout: wgpu::BindGroupLayout =
             create_bind_group_layout(&init.device);
@@ -186,7 +178,6 @@ impl<'window> RendererWindowed<'window> {
 
         Self {
             init,
-            project_mat,
 
             pipeline_displacement,
             pipeline_displacement_bones,
@@ -233,8 +224,6 @@ impl<'window> RendererWindowed<'window> {
             self.init
                 .surface
                 .configure(&self.init.device, &self.init.config);
-            self.project_mat =
-                transforms::create_projection(new_size.width as f32 / new_size.height as f32);
         }
     }
 

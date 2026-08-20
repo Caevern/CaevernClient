@@ -47,7 +47,6 @@ pub struct Assets;
 
 pub struct RendererOpenXR {
     pub init: XRManager,
-    project_mat: Matrix4<f32>,
 
     pipeline_displacement: wgpu::RenderPipeline,
     pipeline_displacement_bones: wgpu::RenderPipeline,
@@ -91,24 +90,16 @@ impl RendererOpenXR {
         data_thread_tx: Sender<UserUpdate>,
         avatar_thread_rx: Receiver<AvatarUpdate>,
     ) -> Self {
-        let (_, project_mat, _) = transforms::create_view_projection(
-            (0.0, 0.0, 0.0).into(),
-            (0.0, 0.0, 0.0).into(),
-            cgmath::Vector3::unit_y(),
-            1.0,
-        );
-
         let uniform_bind_group_layout: wgpu::BindGroupLayout =
             create_bind_group_layout(&init.device);
 
-        let pipeline_layout = unsafe {
-            init.device
-                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: Some("Render Pipeline Layout"),
-                    bind_group_layouts: &[Some(&uniform_bind_group_layout)],
-                    immediate_size: 0,
-                })
-        };
+        let pipeline_layout = init
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[Some(&uniform_bind_group_layout)],
+                immediate_size: 0,
+            });
 
         let shader_displacement = init
             .device
@@ -187,7 +178,6 @@ impl RendererOpenXR {
 
         Self {
             init,
-            project_mat,
 
             pipeline_displacement,
             pipeline_displacement_bones,
