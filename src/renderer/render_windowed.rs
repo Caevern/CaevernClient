@@ -168,14 +168,6 @@ impl<'window> RendererWindowed<'window> {
         let bone_bindings = vec![("head".to_string(), "head.xModel")];
         let fallback_skeleton = create_skeleton(bone_bindings, &fallback_bones);
 
-        let vertex_buffers = Vec::new();
-        let uniform_bind_groups = Vec::new();
-        let num_vertices = Vec::new();
-        let bone_buffers = Vec::new();
-        let shader_type = Vec::new();
-
-        let previous_frame_time = std::time::Instant::now();
-
         Self {
             init,
 
@@ -183,15 +175,15 @@ impl<'window> RendererWindowed<'window> {
             pipeline_displacement_bones,
 
             frame: 0,
-            previous_frame_time,
+            previous_frame_time: std::time::Instant::now(),
 
-            vertex_buffers,
-            uniform_bind_groups,
-            num_vertices,
-            bone_buffers,
+            vertex_buffers: Vec::new(),
+            uniform_bind_groups: Vec::new(),
+            num_vertices: Vec::new(),
+            bone_buffers: Vec::new(),
             bones: Vec::new(),
             final_marices: Vec::new(),
-            shader_type,
+            shader_type: Vec::new(),
 
             uniform_bind_group_layout,
             vertex_uniform_buffer,
