@@ -19,6 +19,6 @@ pub fn apply_gravity(player: &mut Player, frame_time: f32) {
         return;
     }
 
-    player.forces.y -= 20.0 * frame_time;
+    player.forces.y -= player.gravity * frame_time;
     player.camera.position.y += player.forces.y * frame_time;
 }

@@ -12,6 +12,7 @@
     ],
     "skeleton": [
         {"body_part": "neck", "bone_name": "neck.xModel"},
-        {"body_part": "head", "bone_name": "head.xModel"}
+        {"body_part": "head", "bone_name": "head.xModel"},
+        {"body_part": "root", "bone_name": "root.xModel"}
     ]
 }
