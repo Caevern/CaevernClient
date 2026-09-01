@@ -1,7 +1,7 @@
 use bytemuck::{Pod, Zeroable};
 use std::mem;
 
-use crate::world::objects::fbx_parser::SkinnedVertex;
+use crate::renderer::skinned_vertex::SkinnedVertex;
 
 // The vertex struct is one singular vertex
 #[repr(C)]

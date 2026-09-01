@@ -7,7 +7,7 @@ use crate::{
     world::{
         material::Material,
         object::{Object, ObjectType},
-        objects::fbx_parser::parse,
+        parsers::fbx_parser::parse,
         scene::load_scene,
     },
 };

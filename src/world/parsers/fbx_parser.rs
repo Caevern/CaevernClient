@@ -5,6 +5,7 @@ use rust_embed::RustEmbed;
 use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, Cursor};
 
+use crate::renderer::skinned_vertex::SkinnedVertex;
 use crate::renderer::transform;
 
 #[derive(RustEmbed)]
@@ -89,12 +90,6 @@ struct Cluster {
     indices: Vec<i32>,
     weights: Vec<f64>,
     bone_id: i64,
-}
-
-pub struct SkinnedVertex {
-    pub position: [f32; 3],
-    pub bone_ids: [u32; 4],
-    pub weights: [f32; 4],
 }
 
 fn rotate_x(v: [f32; 3], angle: f32) -> [f32; 3] {

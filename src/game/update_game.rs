@@ -6,16 +6,13 @@ use std::{
 use cgmath::{InnerSpace, Vector3};
 
 use crate::{
-    network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate},
-    physics::{
+    network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate}, physics::{
         gravity::apply_gravity,
         movement::{get_camera_movement, get_camera_rotation},
-    },
-    renderer::{
+    }, renderer::{
         transform::Transform,
         vertex::{Vertex, create_vertices_skinned},
-    },
-    world::objects::{fbx_parser::parse, player::Player, skeleton::create_skeleton},
+    }, world::{objects::{player::Player, skeleton::create_skeleton}, parsers::fbx_parser::parse},
 };
 
 pub struct Engine {

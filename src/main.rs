@@ -17,7 +17,7 @@ use world::object::Object;
 use crate::renderer::transform::Transform;
 use crate::setup::fonts::load_font_uvs;
 use crate::world::objects::text;
-use crate::world::{object::ObjectType, objects::fbx_parser::parse};
+use crate::world::{object::ObjectType, parsers::fbx_parser::parse};
 
 #[global_allocator]
 static ALLOCATOR: Cap<alloc::System> = Cap::new(alloc::System, usize::max_value());
