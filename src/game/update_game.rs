@@ -54,7 +54,6 @@ impl Engine {
     }
 
     pub fn update(&mut self, mouse: [f32; 2], keys: [bool; 6], frame_time: f32) {
-        println!("{}", frame_time);
         let updated_camera_rotation = get_camera_rotation(&self.player, mouse, frame_time);
         self.player.camera.rotation.x = updated_camera_rotation.0;
         self.player.camera.rotation.y = updated_camera_rotation.1;
