@@ -1,5 +1,6 @@
 // Copyright 2026 Charli van Nood
 
+pub mod game;
 pub mod interract;
 pub mod network;
 pub mod physics;

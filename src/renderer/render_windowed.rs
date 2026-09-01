@@ -2,14 +2,11 @@ use cgmath::*;
 use rust_embed::RustEmbed;
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::sync::mpsc::{Receiver, Sender};
 use std::{f32, println};
 use winit::window::Window;
 
 use crate::ALLOCATOR;
 use crate::interract::raycast::raycast_grab;
-use crate::network::avatar_updates::AvatarUpdate;
-use crate::network::user_updates::UserUpdate::{self, UpdateAvatarId};
 use crate::physics::gravity::apply_gravity;
 use crate::physics::movement::{get_camera_movement, get_camera_rotation};
 use crate::renderer::buffers::bind_group_layout::create_bind_group_layout;
@@ -20,16 +17,12 @@ use crate::renderer::buffers::uniform_buffers::{
 use crate::renderer::default_elements::register_default_textures;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
 use crate::renderer::texture_object::TextureObject;
-use crate::renderer::transform::Transform;
 use crate::renderer::transforms::create_transforms;
-use crate::renderer::vertex::{Vertex, create_vertices_skinned};
+use crate::renderer::vertex::Vertex;
 use crate::renderer::{init_wgpu, transform, transforms, vertex};
 use crate::setup::fonts::load_font_uvs;
-use crate::world::material::Material;
 use crate::world::object::{Object, ObjectType};
-use crate::world::objects::fbx_parser::parse;
-use crate::world::objects::player::Player;
-use crate::world::objects::skeleton::create_skeleton;
+use crate::world::objects::player::{self, Player};
 use crate::world::objects::text;
 use crate::world::world::World;
 
@@ -68,26 +61,11 @@ pub struct RendererWindowed<'window> {
     textures: HashMap<String, TextureObject>,
     font_maps: HashMap<String, HashMap<String, (f32, f32, f32, f32, f32)>>,
 
-    // the client position and rotation
-    player: Player,
-
     world: World,
     current_camera: usize,
-
-    fallback_vertices: Vec<(Vec<Vertex>, String)>,
-    fallback_bones: HashMap<i64, (usize, Transform, String, i64, usize)>,
-    fallback_skeleton: HashMap<String, usize>,
-
-    // networking
-    data_thread_tx: Sender<UserUpdate>,
-    avatar_thread_rx: Receiver<AvatarUpdate>,
 }
 impl<'window> RendererWindowed<'window> {
-    pub async fn new(
-        window: &Arc<Window>,
-        data_thread_tx: Sender<UserUpdate>,
-        avatar_thread_rx: Receiver<AvatarUpdate>,
-    ) -> Self {
+    pub async fn new(window: &Arc<Window>) -> Self {
         let init = init_wgpu::InitWgpu::init_wgpu(window).await;
 
         let uniform_bind_group_layout: wgpu::BindGroupLayout =
@@ -161,13 +139,6 @@ impl<'window> RendererWindowed<'window> {
             load_font_uvs("fonts/NotoSansJP.ttf"),
         );
 
-        let model_parsed = parse("models/fallback.fbx", Transform::zero());
-        let fallback_vertices = create_vertices_skinned(&model_parsed.0);
-        let fallback_bones = model_parsed.1;
-
-        let bone_bindings = vec![("head".to_string(), "head.xModel")];
-        let fallback_skeleton = create_skeleton(bone_bindings, &fallback_bones);
-
         Self {
             init,
 
@@ -193,17 +164,8 @@ impl<'window> RendererWindowed<'window> {
             textures,
             font_maps,
 
-            player: Player::new(),
-
             world: World::new(),
             current_camera: 0,
-
-            fallback_vertices,
-            fallback_bones,
-            fallback_skeleton,
-
-            data_thread_tx,
-            avatar_thread_rx,
         }
     }
 
@@ -219,40 +181,13 @@ impl<'window> RendererWindowed<'window> {
         }
     }
 
-    pub fn update(
-        &mut self,
-        _dt: std::time::Duration,
-        keys: [bool; 6],
-        mouse: [f32; 2],
-        menu_tablet_state: usize,
-    ) {
-        let current_time = std::time::Instant::now();
-        let mut frame_time = current_time
-            .duration_since(self.previous_frame_time)
-            .as_secs_f32()
-            * 20.0;
-        self.previous_frame_time = current_time;
-
-        if frame_time > 5.0 {
-            frame_time = 5.0
-        }
-
-        let updated_camera_rotation = get_camera_rotation(&self.player, mouse, frame_time);
-        self.player.camera.rotation.x = updated_camera_rotation.0;
-        self.player.camera.rotation.y = updated_camera_rotation.1;
-
+    pub fn update(&mut self, frame_time: f32, menu_tablet_state: usize, player: &Player) {
         let forward = Vector3::new(
-            self.player.camera.rotation.y.cos() * self.player.camera.rotation.x.cos(),
-            self.player.camera.rotation.x.sin(),
-            self.player.camera.rotation.y.sin() * self.player.camera.rotation.x.cos(),
+            player.camera.rotation.y.cos() * player.camera.rotation.x.cos(),
+            player.camera.rotation.x.sin(),
+            player.camera.rotation.y.sin() * player.camera.rotation.x.cos(),
         )
         .normalize();
-
-        let updated_camera_position =
-            get_camera_movement(&mut self.player, keys, forward, frame_time);
-        self.player.camera.position += updated_camera_position;
-
-        apply_gravity(&mut self.player, frame_time);
 
         if menu_tablet_state == 2 {
             for i in 0..self.world.get_objects().len() {
@@ -262,14 +197,14 @@ impl<'window> RendererWindowed<'window> {
                 {
                     let model_mat = transforms::create_transforms(
                         [
-                            self.player.camera.position.x + forward.x,
-                            self.player.camera.position.y + forward.y,
-                            self.player.camera.position.z + forward.z,
+                            player.camera.position.x + forward.x,
+                            player.camera.position.y + forward.y,
+                            player.camera.position.z + forward.z,
                         ],
                         [
-                            -self.player.camera.rotation.x,
-                            -self.player.camera.rotation.y + std::f32::consts::FRAC_PI_2,
-                            -self.player.camera.rotation.z,
+                            -player.camera.rotation.x,
+                            -player.camera.rotation.y + std::f32::consts::FRAC_PI_2,
+                            -player.camera.rotation.z,
                         ],
                         [1.0, 1.0, 1.0],
                     );
@@ -299,9 +234,9 @@ impl<'window> RendererWindowed<'window> {
                     let model_mat = transforms::create_transforms(
                         [0.0, -10.0, 0.0],
                         [
-                            -self.player.camera.rotation.x,
-                            -self.player.camera.rotation.y + std::f32::consts::FRAC_PI_2,
-                            -self.player.camera.rotation.z,
+                            -player.camera.rotation.x,
+                            -player.camera.rotation.y + std::f32::consts::FRAC_PI_2,
+                            -player.camera.rotation.z,
                         ],
                         [1.0, 1.0, 1.0],
                     );
@@ -328,9 +263,9 @@ impl<'window> RendererWindowed<'window> {
             if self.world.get_object(i).get_object_type() == ObjectType::Skybox {
                 let model_mat = transforms::create_transforms(
                     [
-                        self.player.camera.position.x,
-                        self.player.camera.position.y,
-                        self.player.camera.position.z,
+                        player.camera.position.x,
+                        player.camera.position.y,
+                        player.camera.position.z,
                     ],
                     [0.0, 0.0, 0.0],
                     [1.0, 1.0, 1.0],
@@ -339,7 +274,7 @@ impl<'window> RendererWindowed<'window> {
 
                 let model_ref: &[f32; 16] = model_mat.as_ref();
                 let normal_ref: &[f32; 16] = normal_mat.as_ref();
-                let eye_position: &[f32; 3] = &self.player.camera.position.into();
+                let eye_position: &[f32; 3] = &player.camera.position.into();
                 self.init.queue.write_buffer(
                     &self.fragment_uniform_buffer,
                     16,
@@ -358,10 +293,10 @@ impl<'window> RendererWindowed<'window> {
             } else if self.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
                 if self.frame < 60 {
                     let skeleton = self.world.get_object(i).get_skeleton();
-                    //self.bones[i][skeleton["head"]].0.rotation.x = -self.player.camera.rotation.x;
-                    //self.bones[i][skeleton["arm_right"]].0.rotation.z = -self.player.camera.rotation.x;
+                    //self.bones[i][skeleton["head"]].0.rotation.x = -player.camera.rotation.x;
+                    //self.bones[i][skeleton["arm_right"]].0.rotation.z = -player.camera.rotation.x;
                     /*self.bones[i][skeleton["head"]].0.rotation.y =
-                    -self.player.camera.rotation.y - 1.57079633;*/
+                    -player.camera.rotation.y - 1.57079633;*/
                     // TODO: make the local character have this dissabled by default.
                     self.bones[i][skeleton["neck"]].0.scale = [0.0, 0.0, 0.0].into();
                     self.update_bone(i, skeleton["head"]);
@@ -369,29 +304,29 @@ impl<'window> RendererWindowed<'window> {
 
                 let object = self.world.get_object(i);
                 let position = [
-                    object.get_position().x + self.player.camera.position.x
-                        - self.player.camera.rotation.y.cos() * 0.1,
-                    object.get_position().y + self.player.camera.position.y,
-                    object.get_position().z + self.player.camera.position.z
-                        - self.player.camera.rotation.y.sin() * 0.1,
+                    object.get_position().x + player.camera.position.x
+                        - player.camera.rotation.y.cos() * 0.1,
+                    object.get_position().y + player.camera.position.y,
+                    object.get_position().z + player.camera.position.z
+                        - player.camera.rotation.y.sin() * 0.1,
                 ];
                 let rotation = [
                     object.get_rotation().x,
-                    object.get_rotation().y - self.player.camera.rotation.y + 1.57079633,
+                    object.get_rotation().y - player.camera.rotation.y + 1.57079633,
                     object.get_rotation().z,
                 ];
 
-                let _ = self
-                    .data_thread_tx
-                    .send(UserUpdate::SendUserPosition(Transform {
-                        position: position.into(),
-                        rotation: Vector3::new(
-                            -self.player.camera.rotation.x,
-                            rotation[1],
-                            -self.player.camera.rotation.z,
-                        ),
-                        scale: Vector3::new(1.0, 1.0, 1.0),
-                    }));
+                /*let _ = self
+                .data_thread_tx
+                .send(UserUpdate::SendUserPosition(Transform {
+                    position: position.into(),
+                    rotation: Vector3::new(
+                        -player.camera.rotation.x,
+                        rotation[1],
+                        -player.camera.rotation.z,
+                    ),
+                    scale: Vector3::new(1.0, 1.0, 1.0),
+                }));*/
 
                 let model_mat =
                     transforms::create_transforms(position, rotation, object.get_scale().into());
@@ -414,7 +349,7 @@ impl<'window> RendererWindowed<'window> {
         }
 
         // TODO: Refactor into an avatar struct
-        if let Ok(avatar_update) = self.avatar_thread_rx.try_recv() {
+        /*if let Ok(avatar_update) = self.avatar_thread_rx.try_recv() {
             match avatar_update {
                 AvatarUpdate::RegisterUser(transform, id) => {
                     println!("Registered User Avatar");
@@ -502,7 +437,7 @@ impl<'window> RendererWindowed<'window> {
                     );
                 }
             }
-        }
+        }*/
 
         if self.frame % 20 == 1 {
             for i in 0..self.world.get_objects().len() {
@@ -514,12 +449,8 @@ impl<'window> RendererWindowed<'window> {
 
         // update skybox positions
         if self.frame % 10 == 0 {
-            let grabbable_object_index = raycast_grab(
-                self.world.get_objects(),
-                self.player.camera.position,
-                forward,
-                5,
-            );
+            let grabbable_object_index =
+                raycast_grab(self.world.get_objects(), player.camera.position, forward, 5);
 
             if grabbable_object_index > 0 {
                 let y_rotation = self.world.get_objects()[grabbable_object_index]
@@ -535,7 +466,7 @@ impl<'window> RendererWindowed<'window> {
 
                 let model_ref: &[f32; 16] = model_mat.as_ref();
                 let normal_ref: &[f32; 16] = normal_mat.as_ref();
-                let eye_position: &[f32; 3] = &self.player.camera.position.into();
+                let eye_position: &[f32; 3] = &player.camera.position.into();
                 self.init.queue.write_buffer(
                     &self.fragment_uniform_buffer,
                     16,
@@ -556,14 +487,14 @@ impl<'window> RendererWindowed<'window> {
 
         let up_direction = cgmath::Vector3::unit_y();
         let camera_position = Point3 {
-            x: self.player.camera.position.x,
-            y: self.player.camera.position.y,
-            z: self.player.camera.position.z,
+            x: player.camera.position.x,
+            y: player.camera.position.y,
+            z: player.camera.position.z,
         };
         let (view_mat, project_mat, _) = transforms::create_view_rotation(
             camera_position,
-            self.player.camera.rotation.y,
-            self.player.camera.rotation.x,
+            player.camera.rotation.y,
+            player.camera.rotation.x,
             up_direction,
             self.init.config.width as f32 / self.init.config.height as f32,
         );
@@ -577,11 +508,6 @@ impl<'window> RendererWindowed<'window> {
             bytemuck::cast_slice(view_projection_ref),
         );
 
-        let current_time_updated = std::time::Instant::now();
-        let update_time = current_time_updated
-            .duration_since(current_time)
-            .as_secs_f32();
-
         // update ingame fps label when menu tablet is enabled
         if menu_tablet_state == 1 && self.frame % 60 == 0 {
             for (index, object) in self.world.get_objects().iter().enumerate() {
@@ -592,7 +518,7 @@ impl<'window> RendererWindowed<'window> {
                             (0.02, 0.02, 1.0),
                             &self.font_maps["NotoSansJP"],
                             [1.0, 1.0, 1.0],
-                            &format!("FPS: {}", (1.0 / update_time).round()),
+                            &format!("FPS: {}", (1.0 / frame_time).round()),
                         );
                         let meshes = vertex::create_vertices(&fps_label);
                         for (vertices, _) in meshes {
@@ -1304,17 +1230,9 @@ impl<'window> RendererWindowed<'window> {
             object.clear_vertices();
         }
 
-        if self.world.get_cameras().len() > self.current_camera {
-            let object_position = self.world.get_camera(self.current_camera).get_position();
-            self.player.camera.position.x = object_position.x as f32;
-            self.player.camera.position.y = object_position.y as f32;
-            self.player.camera.position.z = object_position.z as f32;
-            self.player.camera.rotation = self.world.get_camera(self.current_camera).get_rotation();
-        }
-
-        self.data_thread_tx
-            .send(UserUpdate::SendReadySignal)
-            .expect("Sending user ready signal failed :C");
+        /*self.data_thread_tx
+        .send(UserUpdate::SendReadySignal)
+        .expect("Sending user ready signal failed :C");*/
     }
 
     pub fn render(&mut self, depth_texture: &wgpu::Texture) -> Result<(), ()> {

@@ -13,6 +13,8 @@ pub fn start_engine(world: World) {
         windowed_renderer: None,
         openxr_renderer: None,
 
+        engine: None,
+
         depth_texture: None,
 
         window_size: (0, 0),

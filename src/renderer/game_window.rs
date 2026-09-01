@@ -17,6 +17,7 @@ use winit::keyboard::PhysicalKey;
 use winit::window::WindowAttributes;
 use winit::window::{Icon, Window};
 
+use crate::game::update_game::Engine;
 use crate::network::avatar_updates::AvatarUpdate;
 use crate::network::user_authenticate::authenticate_user;
 use crate::network::user_handler::start_user_handler;
@@ -32,6 +33,8 @@ pub struct GameWindow<'window> {
 
     pub windowed_renderer: Option<RendererWindowed<'window>>,
     pub openxr_renderer: Option<RendererOpenXR>,
+
+    pub engine: Option<Engine>,
 
     pub depth_texture: Option<wgpu::Texture>,
 
@@ -60,6 +63,8 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         let (data_thread_tx, data_thread_rx) = mpsc::channel::<UserUpdate>();
         let (avatar_thread_tx, avatar_thread_rx) = mpsc::channel::<AvatarUpdate>();
 
+        self.engine = Some(Engine::new(data_thread_tx, avatar_thread_rx));
+
         if let Ok((socket, _)) = connect("ws://localhost:42142/ws/user") {
             let (socket, user_id) = authenticate_user(socket);
             println!("User ID: {}", user_id);
@@ -82,28 +87,27 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
             println!("STARTED XRManager!!!");
             self.xr_enabled = true;
 
-            let mut renderer_openxr =
-                pollster::block_on(RendererOpenXR::new(xr, data_thread_tx, avatar_thread_rx));
+            let mut renderer_openxr = pollster::block_on(RendererOpenXR::new(xr));
 
             renderer_openxr.set_world(self.home_world.clone());
 
             self.openxr_renderer = Some(renderer_openxr);
         } else {
             println!("Initializing XRManager has failed :C");
+        }
 
-            let attributes = WindowAttributes::default()
-                .with_title(self.title.clone())
-                .with_window_icon(self.icon.clone());
-            let window = Arc::new(event_loop.create_window(attributes).unwrap());
+        let attributes = WindowAttributes::default()
+            .with_title(self.title.clone())
+            .with_window_icon(self.icon.clone());
+        let window = Arc::new(event_loop.create_window(attributes).unwrap());
 
-            let mut renderer = pollster::block_on(RendererWindowed::new(
-                &window,
-                data_thread_tx,
-                avatar_thread_rx,
-            ));
+        let mut renderer = pollster::block_on(RendererWindowed::new(&window));
 
-            self.depth_texture = Some(renderer.init.device.create_texture(
-                &wgpu::TextureDescriptor {
+        self.depth_texture = Some(
+            renderer
+                .init
+                .device
+                .create_texture(&wgpu::TextureDescriptor {
                     size: wgpu::Extent3d {
                         width: renderer.init.config.width,
                         height: renderer.init.config.height,
@@ -116,16 +120,15 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                     label: None,
                     view_formats: &[],
-                },
-            ));
+                }),
+        );
 
-            self.window_size = (renderer.init.size.width, renderer.init.size.height);
+        self.window_size = (renderer.init.size.width, renderer.init.size.height);
 
-            renderer.set_world(self.home_world.clone());
+        renderer.set_world(self.home_world.clone());
 
-            self.windowed_renderer = Some(renderer);
-            self.window = Some(window);
-        }
+        self.windowed_renderer = Some(renderer);
+        self.window = Some(window);
 
         self.render_start_time = std::time::Instant::now();
     }
@@ -339,10 +342,15 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
             WindowEvent::RedrawRequested => {
                 let now = std::time::Instant::now();
                 let dt = now - self.render_start_time;
+                self.render_start_time = now;
 
+                let frame_time = dt.as_secs_f32();
+
+                let engine = self.engine.as_mut().unwrap();
                 let renderer = self.windowed_renderer.as_mut().unwrap();
 
-                renderer.update(dt, self.keys, self.mouse_movement, self.menu_tablet_state);
+                engine.update(self.mouse_movement, self.keys, frame_time);
+                renderer.update(frame_time, self.menu_tablet_state, &engine.player);
 
                 if self.menu_tablet_state == 2 {
                     self.menu_tablet_state = 1;

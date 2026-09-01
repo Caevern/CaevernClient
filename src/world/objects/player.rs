@@ -9,7 +9,8 @@ pub struct Player {
 
     pub is_grounded: bool,
     pub walking_speed: f32,
-    pub jump_force: f32
+    pub jump_force: f32,
+    pub sensitivity: f32,
 }
 impl Player {
     pub fn new() -> Self {
@@ -19,8 +20,9 @@ impl Player {
             forces: Vector3::new(0.0, 0.0, 0.0),
 
             is_grounded: true,
-            walking_speed: 0.25,
-            jump_force: 0.3
+            walking_speed: 10.0,
+            jump_force: 5.0,
+            sensitivity: 0.5,
         }
     }
 

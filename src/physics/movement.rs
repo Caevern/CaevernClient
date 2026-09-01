@@ -3,15 +3,22 @@ use cgmath::*;
 use crate::world::objects::player::Player;
 
 pub fn get_camera_rotation(player: &Player, mouse: [f32; 2], frame_time: f32) -> (f32, f32) {
-    let mut rotation_x = player.get_camera_transform().rotation.x + mouse[1] * (frame_time * 0.02);
-    rotation_x = rotation_x.clamp(-std::f32::consts::FRAC_PI_2 / 1.01, std::f32::consts::FRAC_PI_2 / 1.01);
-    let rotation_y = player.get_camera_transform().rotation.y - mouse[0] * (frame_time * 0.02);
+    let mut rotation_x =
+        player.get_camera_transform().rotation.x + mouse[1] * (frame_time * player.sensitivity);
+    rotation_x = rotation_x.clamp(
+        -std::f32::consts::FRAC_PI_2 / 1.01,
+        std::f32::consts::FRAC_PI_2 / 1.01,
+    );
+    let rotation_y =
+        player.get_camera_transform().rotation.y - mouse[0] * (frame_time * player.sensitivity);
     (rotation_x, rotation_y)
 }
 
 pub fn get_camera_movement(
-    player: &mut Player, keys: [bool; 6],
-    forward: Vector3<f32>, frame_time: f32
+    player: &mut Player,
+    keys: [bool; 6],
+    forward: Vector3<f32>,
+    frame_time: f32,
 ) -> Vector3<f32> {
     let mut forward_x = forward[0];
     let mut forward_z = forward[2];
@@ -26,7 +33,8 @@ pub fn get_camera_movement(
         player.camera.rotation.y.sin(),
         0.0,
         -player.camera.rotation.y.cos(),
-    ).normalize();
+    )
+    .normalize();
 
     let mut walking_force = Vector3::new(0.0, 0.0, 0.0);
 
