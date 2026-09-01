@@ -3,12 +3,8 @@ use std::collections::{HashMap, HashSet};
 use cgmath::Vector3;
 
 use crate::{
-    renderer::{transform::Transform, vertex::create_vertices_skinned},
-    world::{
-        material::Material,
-        object::{Object, ObjectType},
-        parsers::fbx_parser::parse,
-        scene::load_scene,
+    renderer::{transform::Transform, vertex::create_vertices_skinned}, world::{
+        material::Material, object::{Object, ObjectType}, parsers::{cae_parser::parse_cae, fbx_parser::parse}, scene::load_scene,
     },
 };
 
@@ -54,6 +50,20 @@ impl World {
     }
 
     pub fn load_world(&mut self, path: &str) {
+        if path.ends_with(".json") {
+            self.load_from_json(path);
+        } else if path.ends_with(".cae") {
+            self.load_from_cae(path);
+        } else {
+            println!("Unsupported file type: {}", path);
+        }
+    }
+
+    fn load_from_cae(&mut self, path: &str) {
+        let _ = parse_cae(path);
+    }
+
+    fn load_from_json(&mut self, path: &str) {
         let scene = load_scene(path);
         if let Ok(scene) = scene {
             let mut static_world_object = Object::create(ObjectType::StaticMesh, Vec::new());
