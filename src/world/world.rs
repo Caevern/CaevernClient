@@ -60,7 +60,11 @@ impl World {
     }
 
     fn load_from_cae(&mut self, path: &str) {
-        let _ = parse_cae(path);
+        let objects = parse_cae(path);
+
+        for object in objects {
+            self.add_object(object);
+        }
     }
 
     fn load_from_json(&mut self, path: &str) {
