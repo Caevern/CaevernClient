@@ -1,5 +1,4 @@
 use ash::vk::{self, Handle};
-use wgpu::BackendOptions;
 use wgpu_hal::Instance;
 
 pub struct XRManager {

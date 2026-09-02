@@ -1,12 +1,11 @@
-use std::{collections::HashMap, println};
-use std::io::Cursor;
 use rust_embed::RustEmbed;
+use std::io::Cursor;
 use std::io::{self, Read};
+use std::{collections::HashMap, println};
 
 use crate::renderer::vertex::create_vertices_skinned;
 use crate::renderer::{skinned_vertex::SkinnedVertex, transform::Transform};
 use crate::world::object::{Object, ObjectType};
-use crate::world::scene::Scene;
 
 #[derive(RustEmbed)]
 #[folder = "assets/"]
@@ -37,12 +36,17 @@ fn read_vec3<R: Read>(reader: &mut R) -> [f32; 3] {
 fn read_string<R: Read>(reader: &mut R) -> String {
     let string_length = read_u32(reader).expect("Failed to read string length") as usize;
     let mut bytes = vec![0u8; string_length];
-    reader.read_exact(&mut bytes).expect("Failed to read string");
+    reader
+        .read_exact(&mut bytes)
+        .expect("Failed to read string");
 
-    String::from_utf8(bytes.into_iter().map(|b| b.to_ascii_lowercase()).collect()).expect("Failed to create string")
+    String::from_utf8(bytes.into_iter().map(|b| b.to_ascii_lowercase()).collect())
+        .expect("Failed to create string")
 }
 
-fn read_mesh<R: Read>(mut reader: &mut R, i: u32) -> (
+fn read_mesh<R: Read>(
+    mut reader: &mut R,
+) -> (
     Vec<SkinnedVertex>,
     Vec<[i8; 3]>,
     Vec<[f32; 3]>,
@@ -59,7 +63,8 @@ fn read_mesh<R: Read>(mut reader: &mut R, i: u32) -> (
     }
     println!("vertex_count: {vertex_count}");
 
-    let triangle_index_count = read_u32(&mut reader).expect("Failed to read triangle count") as usize;
+    let triangle_index_count =
+        read_u32(&mut reader).expect("Failed to read triangle count") as usize;
     let mut indices = vec![0u32; triangle_index_count as usize];
     for i in 0..triangle_index_count {
         let index = read_u32(&mut reader).expect("Failed to read triangle index");
@@ -68,7 +73,13 @@ fn read_mesh<R: Read>(mut reader: &mut R, i: u32) -> (
     let triangle_count = triangle_index_count / 3;
     println!("triangle_count: {triangle_count}");
 
-    let mut mesh_data = (Vec::new(), Vec::new(), Vec::new(), Vec::new(), String::new());
+    let mut mesh_data = (
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        String::new(),
+    );
 
     for i in 0..triangle_index_count {
         let vertex_index = indices[i];
@@ -89,13 +100,20 @@ fn read_mesh<R: Read>(mut reader: &mut R, i: u32) -> (
     mesh_data
 }
 
-fn read_object<R: Read>(mut reader: &mut R, i: u32, meshes: &HashMap<String, (
-    Vec<SkinnedVertex>,
-    Vec<[i8; 3]>,
-    Vec<[f32; 3]>,
-    Vec<[f32; 2]>,
-    String,
-)>) -> (
+fn read_object<R: Read>(
+    mut reader: &mut R,
+    i: u32,
+    meshes: &HashMap<
+        String,
+        (
+            Vec<SkinnedVertex>,
+            Vec<[i8; 3]>,
+            Vec<[f32; 3]>,
+            Vec<[f32; 2]>,
+            String,
+        ),
+    >,
+) -> (
     Vec<SkinnedVertex>,
     Vec<[i8; 3]>,
     Vec<[f32; 3]>,
@@ -109,7 +127,8 @@ fn read_object<R: Read>(mut reader: &mut R, i: u32, meshes: &HashMap<String, (
         let mut mesh = mesh_data.clone();
 
         let mesh_position = read_vec3(&mut reader);
-        let mesh_rotation = read_vec3(&mut reader);
+        // TODO: implement rotation for sub meshes
+        let _mesh_rotation = read_vec3(&mut reader);
         let mesh_scale = read_vec3(&mut reader);
 
         for vertex in &mut mesh.0 {
@@ -118,12 +137,30 @@ fn read_object<R: Read>(mut reader: &mut R, i: u32, meshes: &HashMap<String, (
             vertex.position[2] = vertex.position[2] * mesh_scale[2] + mesh_position[2];
         }
 
-        return mesh
+        return mesh;
     }
-    (Vec::new(), Vec::new(), Vec::new(), Vec::new(), String::new())
+    (
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        String::new(),
+    )
 }
 
-fn read_object_data<R: Read>(mut reader: &mut R, meshes_found: &HashMap<String, (Vec<SkinnedVertex>, Vec<[i8; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, String)>) -> (
+fn read_object_data<R: Read>(
+    mut reader: &mut R,
+    meshes_found: &HashMap<
+        String,
+        (
+            Vec<SkinnedVertex>,
+            Vec<[i8; 3]>,
+            Vec<[f32; 3]>,
+            Vec<[f32; 2]>,
+            String,
+        ),
+    >,
+) -> (
     Vec<(
         Vec<SkinnedVertex>,
         Vec<[i8; 3]>,
@@ -143,7 +180,19 @@ fn read_object_data<R: Read>(mut reader: &mut R, meshes_found: &HashMap<String, 
     (meshes, HashMap::new())
 }
 
-fn create_object<R: Read>(mut reader: &mut R, meshes: &HashMap<String, (Vec<SkinnedVertex>, Vec<[i8; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, String)>) -> Object {
+fn create_object<R: Read>(
+    mut reader: &mut R,
+    meshes: &HashMap<
+        String,
+        (
+            Vec<SkinnedVertex>,
+            Vec<[i8; 3]>,
+            Vec<[f32; 3]>,
+            Vec<[f32; 2]>,
+            String,
+        ),
+    >,
+) -> Object {
     let object_name = read_string(&mut reader);
     println!("object_name: {object_name}");
 
@@ -155,20 +204,24 @@ fn create_object<R: Read>(mut reader: &mut R, meshes: &HashMap<String, (Vec<Skin
 
     let mut object = Object::create(ObjectType::Mesh, create_vertices_skinned(&mesh_data.0));
     object.set_position(object_position[0], object_position[1], object_position[2]);
-    object.set_rotation(object_rotation[0] * 0.0174532925, object_rotation[1] * 0.0174532925, object_rotation[2] * 0.0174532925);
+    object.set_rotation(
+        object_rotation[0] * 0.0174532925,
+        object_rotation[1] * 0.0174532925,
+        object_rotation[2] * 0.0174532925,
+    );
     object.set_scale(object_scale[0], object_scale[1], object_scale[2]);
 
     object
 }
 
-pub fn parse_cae(
-    path: &str
-) -> Vec<Object> {
+pub fn parse_cae(path: &str) -> Vec<Object> {
     let data = Assets::get(path).expect("Failed to get asset").data;
     let mut reader = Cursor::new(data);
 
     let mut header = [0u8; 4];
-    reader.read_exact(&mut header).expect("Failed to read header");
+    reader
+        .read_exact(&mut header)
+        .expect("Failed to read header");
 
     if &header != b"CAEV" {
         panic!("Not a Caevern file!");
@@ -186,7 +239,7 @@ pub fn parse_cae(
         let mesh_name = format!("{}@{}", original_name, i);
         println!("mesh_name: {mesh_name}");
 
-        let mesh = read_mesh(&mut reader, i);
+        let mesh = read_mesh(&mut reader);
         meshes.insert(mesh_name, mesh);
     }
 

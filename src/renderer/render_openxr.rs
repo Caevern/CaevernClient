@@ -5,8 +5,6 @@ use std::{f32, println};
 
 use crate::ALLOCATOR;
 use crate::interract::raycast::raycast_grab;
-use crate::physics::gravity::apply_gravity;
-use crate::physics::movement::{get_camera_movement, get_camera_rotation};
 use crate::renderer::buffers::bind_group_layout::create_bind_group_layout;
 use crate::renderer::buffers::displacement_buffer::create_buffer_displacement;
 use crate::renderer::buffers::uniform_buffers::{
@@ -61,7 +59,6 @@ pub struct RendererOpenXR {
     font_maps: HashMap<String, HashMap<String, (f32, f32, f32, f32, f32)>>,
 
     world: World,
-    current_camera: usize,
 }
 impl RendererOpenXR {
     pub async fn new(init: XRManager) -> Self {
@@ -162,7 +159,6 @@ impl RendererOpenXR {
             font_maps,
 
             world: World::new(),
-            current_camera: 0,
         }
     }
 
