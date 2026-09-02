@@ -49,20 +49,13 @@ fn read_mesh<R: Read>(mut reader: &mut R, i: u32) -> (
     Vec<[f32; 2]>,
     String,
 ) {
-    let mesh_name = read_string(&mut reader);
-    println!("mesh {i}: {mesh_name}");
-
-    let mesh_position = read_vec3(&mut reader);
-    let mesh_rotation = read_vec3(&mut reader);
-    let mesh_scale = read_vec3(&mut reader);
-
     let vertex_count = read_u32(&mut reader).expect("Failed to read vertex count") as usize;
     let mut vertices = vec![(0f32, 0f32, 0f32); vertex_count as usize];
     for i in 0..vertex_count {
         let x = read_f32(&mut reader).expect("Failed to read vertex x");
         let y = read_f32(&mut reader).expect("Failed to read vertex y");
         let z = read_f32(&mut reader).expect("Failed to read vertex z");
-        vertices[i] = (x * mesh_scale[0] + mesh_position[0], y * mesh_scale[1] + mesh_position[1], z * mesh_scale[2] + mesh_position[2]);
+        vertices[i] = (x, y, z);
     }
     println!("vertex_count: {vertex_count}");
 
@@ -96,7 +89,41 @@ fn read_mesh<R: Read>(mut reader: &mut R, i: u32) -> (
     mesh_data
 }
 
-fn read_object_data<R: Read>(mut reader: &mut R) -> (
+fn read_object<R: Read>(mut reader: &mut R, i: u32, meshes: &HashMap<String, (
+    Vec<SkinnedVertex>,
+    Vec<[i8; 3]>,
+    Vec<[f32; 3]>,
+    Vec<[f32; 2]>,
+    String,
+)>) -> (
+    Vec<SkinnedVertex>,
+    Vec<[i8; 3]>,
+    Vec<[f32; 3]>,
+    Vec<[f32; 2]>,
+    String,
+) {
+    let mesh_name = read_string(&mut reader);
+    println!("mesh {i}: {mesh_name}");
+
+    if let Some(mesh_data) = meshes.get(&mesh_name) {
+        let mut mesh = mesh_data.clone();
+
+        let mesh_position = read_vec3(&mut reader);
+        let mesh_rotation = read_vec3(&mut reader);
+        let mesh_scale = read_vec3(&mut reader);
+
+        for vertex in &mut mesh.0 {
+            vertex.position[0] = vertex.position[0] * mesh_scale[0] + mesh_position[0];
+            vertex.position[1] = vertex.position[1] * mesh_scale[1] + mesh_position[1];
+            vertex.position[2] = vertex.position[2] * mesh_scale[2] + mesh_position[2];
+        }
+
+        return mesh
+    }
+    (Vec::new(), Vec::new(), Vec::new(), Vec::new(), String::new())
+}
+
+fn read_object_data<R: Read>(mut reader: &mut R, meshes_found: &HashMap<String, (Vec<SkinnedVertex>, Vec<[i8; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, String)>) -> (
     Vec<(
         Vec<SkinnedVertex>,
         Vec<[i8; 3]>,
@@ -107,17 +134,16 @@ fn read_object_data<R: Read>(mut reader: &mut R) -> (
     HashMap<i64, (usize, Transform, String, i64, usize)>,
 ) {
     let mesh_count = read_u32(&mut reader).expect("Failed to read mesh count");
-
     let mut meshes = Vec::new();
     for j in 0..mesh_count {
-        let mesh = read_mesh(&mut reader, j);
+        let mesh = read_object(&mut reader, j, meshes_found);
         meshes.push(mesh);
     }
 
     (meshes, HashMap::new())
 }
 
-fn create_object<R: Read>(mut reader: &mut R) -> Object {
+fn create_object<R: Read>(mut reader: &mut R, meshes: &HashMap<String, (Vec<SkinnedVertex>, Vec<[i8; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, String)>) -> Object {
     let object_name = read_string(&mut reader);
     println!("object_name: {object_name}");
 
@@ -125,7 +151,7 @@ fn create_object<R: Read>(mut reader: &mut R) -> Object {
     let object_rotation = read_vec3(&mut reader);
     let object_scale = read_vec3(&mut reader);
 
-    let mesh_data = read_object_data(reader);
+    let mesh_data = read_object_data(reader, meshes);
 
     let mut object = Object::create(ObjectType::Mesh, create_vertices_skinned(&mesh_data.0));
     object.set_position(object_position[0], object_position[1], object_position[2]);
@@ -152,12 +178,24 @@ pub fn parse_cae(
     let version = read_u32(&mut reader).expect("Failed to read version");
     println!("version: {version}");
 
+    let mesh_count = read_u32(&mut reader).expect("Failed to read mesh count");
+    println!("\nmesh_count: {mesh_count}");
+    let mut meshes = HashMap::new();
+    for i in 0..mesh_count {
+        let original_name = read_string(&mut reader);
+        let mesh_name = format!("{}@{}", original_name, i);
+        println!("mesh_name: {mesh_name}");
+
+        let mesh = read_mesh(&mut reader, i);
+        meshes.insert(mesh_name, mesh);
+    }
+
     let object_count = read_u32(&mut reader).expect("Failed to read object count");
-    println!("object_count: {object_count}\n");
+    println!("\nobject_count: {object_count}");
 
     let mut objects = Vec::new();
     for _ in 0..object_count {
-        let object = create_object(&mut reader);
+        let object = create_object(&mut reader, &meshes);
         objects.push(object);
     }
 

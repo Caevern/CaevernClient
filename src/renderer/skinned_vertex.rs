@@ -1,3 +1,4 @@
+#[derive(Clone, Copy)]
 pub struct SkinnedVertex {
     pub position: [f32; 3],
     pub bone_ids: [u32; 4],
