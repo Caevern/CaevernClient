@@ -18,6 +18,10 @@ pub fn register_default_textures(
         "textures/displacement.png".to_string(),
         TextureObject::create("textures/displacement.png", &device),
     );
+    textures.insert(
+        "textures/white.png".to_string(),
+        TextureObject::create("textures/white.png", &device),
+    );
 
     textures.insert(
         "fonts/NotoSansJP.ttf".to_string(),

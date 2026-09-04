@@ -114,6 +114,7 @@ fn read_object<R: Read>(
             String,
         ),
     >,
+    color: (f32, f32, f32),
 ) -> (
     Vec<SkinnedVertex>,
     Vec<[i8; 3]>,
@@ -136,6 +137,11 @@ fn read_object<R: Read>(
             vertex.position[0] = vertex.position[0] * mesh_scale[0] + mesh_position[0];
             vertex.position[1] = vertex.position[1] * mesh_scale[1] + mesh_position[1];
             vertex.position[2] = vertex.position[2] * mesh_scale[2] + mesh_position[2];
+        }
+        for color_vert in &mut mesh.2 {
+            color_vert[0] = color.0;
+            color_vert[1] = color.1;
+            color_vert[2] = color.2;
         }
 
         return mesh;
@@ -161,6 +167,7 @@ fn read_object_data<R: Read>(
             String,
         ),
     >,
+    color: (f32, f32, f32),
 ) -> (
     Vec<(
         Vec<SkinnedVertex>,
@@ -174,7 +181,7 @@ fn read_object_data<R: Read>(
     let mesh_count = read_u32(&mut reader).expect("Failed to read mesh count");
     let mut meshes = Vec::new();
     for j in 0..mesh_count {
-        let mesh = read_object(&mut reader, j, meshes_found);
+        let mesh = read_object(&mut reader, j, meshes_found, color);
         meshes.push(mesh);
     }
 
@@ -205,7 +212,18 @@ fn create_object<R: Read>(
     //let material = Material::from_texture(&material_name);
     println!("material_name: {material_name}");
 
-    let mesh_data = read_object_data(reader, meshes);
+    let mut color = (1.0, 1.0, 1.0);
+
+    if material_name != "missing" {
+        let r = read_f32(&mut reader).expect("Failed to read r");
+        let g = read_f32(&mut reader).expect("Failed to read g");
+        let b = read_f32(&mut reader).expect("Failed to read b");
+        let _ = read_f32(&mut reader).expect("Failed to read a");
+
+        color = (r, g, b);
+    }
+
+    let mesh_data = read_object_data(reader, meshes, color);
 
     let mut object = Object::create(ObjectType::Mesh, create_vertices_skinned(&mesh_data.0));
     object.set_position(object_position[0], object_position[1], object_position[2]);
@@ -215,7 +233,7 @@ fn create_object<R: Read>(
         object_rotation[2] * 0.0174532925,
     );
     object.set_scale(object_scale[0], object_scale[1], object_scale[2]);
-    object.set_default_texture("textures/displacement.png");
+    object.set_default_texture("textures/white.png");
     //object.add_material(material, "default".to_string());
 
     object
