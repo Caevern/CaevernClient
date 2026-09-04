@@ -5,6 +5,7 @@ use std::{collections::HashMap, println};
 
 use crate::renderer::vertex::create_vertices_skinned;
 use crate::renderer::{skinned_vertex::SkinnedVertex, transform::Transform};
+use crate::world::material::Material;
 use crate::world::object::{Object, ObjectType};
 
 #[derive(RustEmbed)]
@@ -144,7 +145,7 @@ fn read_object<R: Read>(
         Vec::new(),
         Vec::new(),
         Vec::new(),
-        String::new(),
+        "default".to_string(),
     )
 }
 
@@ -200,6 +201,10 @@ fn create_object<R: Read>(
     let object_rotation = read_vec3(&mut reader);
     let object_scale = read_vec3(&mut reader);
 
+    let material_name = read_string(&mut reader);
+    //let material = Material::from_texture(&material_name);
+    println!("material_name: {material_name}");
+
     let mesh_data = read_object_data(reader, meshes);
 
     let mut object = Object::create(ObjectType::Mesh, create_vertices_skinned(&mesh_data.0));
@@ -210,6 +215,8 @@ fn create_object<R: Read>(
         object_rotation[2] * 0.0174532925,
     );
     object.set_scale(object_scale[0], object_scale[1], object_scale[2]);
+    object.set_default_texture("textures/displacement.png");
+    //object.add_material(material, "default".to_string());
 
     object
 }

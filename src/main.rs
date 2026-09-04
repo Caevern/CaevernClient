@@ -47,7 +47,7 @@ fn main() {
     camera.set_rotation(0.0, -45.0, 0.0);
     world.add_object(camera);
 
-    world.load_world("worlds/scene.cae");
+    world.load_world("worlds/scene2.cae");
 
     //let tablet = cube::create_cube((0.0, 0.0, 0.0), (0.5, 0.4, 0.01));
     let tablet = parse(
