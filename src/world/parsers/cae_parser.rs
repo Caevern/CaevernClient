@@ -56,7 +56,7 @@ fn read_mesh<R: Read>(
     mut reader: &mut R,
 ) -> (
     Vec<SkinnedVertex>,
-    Vec<[i8; 3]>,
+    Vec<[f32; 3]>,
     Vec<[f32; 3]>,
     Vec<[f32; 2]>,
     String,
@@ -84,11 +84,21 @@ fn read_mesh<R: Read>(
     let uv_count = read_u32(&mut reader).expect("Failed to read uv count") as usize;
     let mut uvs = vec![(0f32, 0f32); uv_count as usize];
     for i in 0..uv_count {
-        let x = read_f32(&mut reader).expect("Failed to read uv x");
-        let y = read_f32(&mut reader).expect("Failed to read uv y");
+        let x = read_f32(&mut reader).expect("Failed to read uv x").rem_euclid(1.0);
+        let y = read_f32(&mut reader).expect("Failed to read uv y").rem_euclid(1.0);
         uvs[i] = (x, y);
     }
     println!("uv_count: {uv_count}");
+
+    let normals_count = read_u32(&mut reader).expect("Failed to read normals count") as usize;
+    let mut normals = vec![(0f32, 0f32, 0f32); normals_count as usize];
+    for i in 0..normals_count {
+        let x = read_f32(&mut reader).expect("Failed to read normals x");
+        let y = read_f32(&mut reader).expect("Failed to read normals y");
+        let z = read_f32(&mut reader).expect("Failed to read normals z");
+        normals[i] = (x, y, z);
+    }
+    println!("normals_count: {normals_count}");
 
     let mut mesh_data = (
         Vec::new(),
@@ -102,6 +112,7 @@ fn read_mesh<R: Read>(
         let vertex_index = indices[i];
         let vertex = vertices[vertex_index as usize];
         let uv = uvs[vertex_index as usize];
+        let normal = normals[vertex_index as usize];
 
         let skinned_vertex = SkinnedVertex {
             position: [vertex.0, vertex.1, vertex.2],
@@ -110,7 +121,7 @@ fn read_mesh<R: Read>(
         };
 
         mesh_data.0.push(skinned_vertex);
-        mesh_data.1.push([0, 1, 0]);
+        mesh_data.1.push([normal.0, normal.1, normal.2]);
         mesh_data.2.push([1.0, 1.0, 1.0]);
         mesh_data.3.push([uv.0, uv.1]);
     }
@@ -125,17 +136,17 @@ fn read_object<R: Read>(
         String,
         (
             Vec<SkinnedVertex>,
-            Vec<[i8; 3]>,
+            Vec<[f32; 3]>,
             Vec<[f32; 3]>,
             Vec<[f32; 2]>,
             String,
         ),
     >,
     materials: &HashMap<String, Material>,
-    color: (f32, f32, f32),
+    _color: (f32, f32, f32),
 ) -> (
     Vec<SkinnedVertex>,
-    Vec<[i8; 3]>,
+    Vec<[f32; 3]>,
     Vec<[f32; 3]>,
     Vec<[f32; 2]>,
     String,
@@ -187,7 +198,7 @@ fn read_object_data<R: Read>(
         String,
         (
             Vec<SkinnedVertex>,
-            Vec<[i8; 3]>,
+            Vec<[f32; 3]>,
             Vec<[f32; 3]>,
             Vec<[f32; 2]>,
             String,
@@ -198,7 +209,7 @@ fn read_object_data<R: Read>(
 ) -> (
     Vec<(
         Vec<SkinnedVertex>,
-        Vec<[i8; 3]>,
+        Vec<[f32; 3]>,
         Vec<[f32; 3]>,
         Vec<[f32; 2]>,
         String,
@@ -221,7 +232,7 @@ fn create_object<R: Read>(
         String,
         (
             Vec<SkinnedVertex>,
-            Vec<[i8; 3]>,
+            Vec<[f32; 3]>,
             Vec<[f32; 3]>,
             Vec<[f32; 2]>,
             String,

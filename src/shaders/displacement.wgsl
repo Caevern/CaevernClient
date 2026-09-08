@@ -29,7 +29,7 @@ struct Output {
 
 @vertex
 fn vs_main(
-    @location(0) pos: vec4<f32>, @location(1) normal: vec4<f32>, 
+    @location(0) pos: vec4<f32>, @location(1) normal: vec4<f32>,
     @location(2) color: vec4<f32>, @location(3) uv: vec4<f32>,
     @location(4) bone_index: vec4<f32>, @location(5) bone_weight: vec4<f32>
     ) -> Output {
@@ -72,10 +72,10 @@ struct LightUniforms {
 @fragment
 fn fs_main(@location(0) v_position: vec4<f32>, @location(1) v_normal: vec4<f32>, @location(2) v_color: vec4<f32>, @location(3) v_uv: vec4<f32>) ->  @location(0) vec4<f32> {
     let N:vec3<f32> = normalize(v_normal.xyz);
-    //let L:vec3<f32> = normalize(frag_uniforms.light_position.xyz - v_position.xyz);
-    let L:vec3<f32> = normalize(vec3(0.5, 1.0, 0.5));
-    let V:vec3<f32> = normalize(frag_uniforms.eye_position.xyz - v_position.xyz);
-    let H:vec3<f32> = normalize(L + V);
+    let L:vec3<f32> = normalize(vec3(1.0, 1.0, 1.0));
+
+    let diffuse: f32 = max(dot(N, L), 0.5);
+
     let texture_color: vec4<f32> = textureSample(texture, texture_sampler, v_uv.xy);
 
     let fog_color: vec3<f32> = vec3(0.2, 0.247, 0.314);
@@ -84,7 +84,7 @@ fn fs_main(@location(0) v_position: vec4<f32>, @location(1) v_normal: vec4<f32>,
     let distance: f32 = length(v_position.xyz - frag_uniforms.eye_position.xyz);
     let fog_factor: f32 = clamp((fog_end - distance) / (fog_end - fog_start), 0.0, 1.0);
 
-    let rgb_effect: vec3<f32> = texture_color.rgb * v_color.rgb;
+    let rgb_effect: vec3<f32> = texture_color.rgb * v_color.rgb * diffuse;
     let alpha:f32 = texture_color.a * v_color.a;
     let final_color: vec4<f32> = vec4(rgb_effect, alpha);
 

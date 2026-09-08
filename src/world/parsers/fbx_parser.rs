@@ -558,7 +558,7 @@ pub fn parse(
 ) -> (
     Vec<(
         Vec<SkinnedVertex>,
-        Vec<[i8; 3]>,
+        Vec<[f32; 3]>,
         Vec<[f32; 3]>,
         Vec<[f32; 2]>,
         String,
@@ -572,7 +572,7 @@ pub fn parse(
 
     let mut mesh_data: Vec<(
         Vec<SkinnedVertex>,
-        Vec<[i8; 3]>,
+        Vec<[f32; 3]>,
         Vec<[f32; 3]>,
         Vec<[f32; 2]>,
         String,
@@ -849,7 +849,7 @@ pub fn parse(
                     mesh.uv[tri[3] * 2] as f32,
                     1.0 - mesh.uv[tri[3] * 2 + 1] as f32,
                 ]);
-                mesh_data[mesh_data_index].1.push([0, 1, 0]);
+                mesh_data[mesh_data_index].1.push([0.0, 1.0, 0.0]);
                 mesh_data[mesh_data_index].2.push([1.0, 1.0, 1.0]);
 
                 let mut v = [
@@ -893,7 +893,7 @@ pub fn parse(
                     mesh.uv[tri[4] * 2] as f32,
                     1.0 - mesh.uv[tri[4] * 2 + 1] as f32,
                 ]);
-                mesh_data[mesh_data_index].1.push([0, 1, 0]);
+                mesh_data[mesh_data_index].1.push([0.0, 1.0, 0.0]);
                 mesh_data[mesh_data_index].2.push([1.0, 1.0, 1.0]);
 
                 let mut v = [
@@ -937,7 +937,7 @@ pub fn parse(
                     mesh.uv[tri[5] * 2] as f32,
                     1.0 - mesh.uv[tri[5] * 2 + 1] as f32,
                 ]);
-                mesh_data[mesh_data_index].1.push([0, 1, 0]);
+                mesh_data[mesh_data_index].1.push([0.0, 1.0, 0.0]);
                 mesh_data[mesh_data_index].2.push([1.0, 1.0, 1.0]);
             }
 
