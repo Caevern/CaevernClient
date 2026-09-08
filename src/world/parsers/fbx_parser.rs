@@ -7,6 +7,7 @@ use std::io::{BufReader, Cursor};
 
 use crate::renderer::skinned_vertex::SkinnedVertex;
 use crate::renderer::transform;
+use crate::world::parsers::transforms::{rotate_x, rotate_y, rotate_z};
 
 #[derive(RustEmbed)]
 #[folder = "assets/"]
@@ -90,21 +91,6 @@ struct Cluster {
     indices: Vec<i32>,
     weights: Vec<f64>,
     bone_id: i64,
-}
-
-fn rotate_x(v: [f32; 3], angle: f32) -> [f32; 3] {
-    let (s, c) = angle.sin_cos();
-    [v[0], v[1] * c - v[2] * s, v[1] * s + v[2] * c]
-}
-
-fn rotate_y(v: [f32; 3], angle: f32) -> [f32; 3] {
-    let (s, c) = angle.sin_cos();
-    [v[0] * c + v[2] * s, v[1], -v[0] * s + v[2] * c]
-}
-
-fn rotate_z(v: [f32; 3], angle: f32) -> [f32; 3] {
-    let (s, c) = angle.sin_cos();
-    [v[0] * c - v[1] * s, v[0] * s + v[1] * c, v[2]]
 }
 
 fn get_id(node: &Node) -> Option<i64> {

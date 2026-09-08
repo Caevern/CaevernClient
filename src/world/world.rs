@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, println};
 
 use cgmath::Vector3;
 
@@ -12,6 +12,7 @@ use crate::{
 pub struct World {
     pub objects: Vec<Object>,
     pub textures: HashSet<String>,
+    pub images: HashMap<String, image::DynamicImage>,
     cameras: Vec<Object>,
 }
 impl World {
@@ -19,6 +20,7 @@ impl World {
         Self {
             objects: Vec::new(),
             textures: HashSet::new(),
+            images: HashMap::new(),
             cameras: Vec::new(),
         }
     }
@@ -48,6 +50,9 @@ impl World {
     pub fn get_textures(&self) -> &HashSet<String> {
         &self.textures
     }
+    pub fn get_images(&self) -> &HashMap<String, image::DynamicImage> {
+        &self.images
+    }
 
     pub fn load_world(&mut self, path: &str) {
         if path.ends_with(".json") {
@@ -62,8 +67,14 @@ impl World {
     fn load_from_cae(&mut self, path: &str) {
         let objects = parse_cae(path);
 
-        for object in objects {
+        for object in objects.0 {
             self.add_object(object);
+        }
+
+        for (name, material) in objects.1 {
+            if let Some(image) = material.image {
+                self.images.insert(name, image);
+            }
         }
     }
 

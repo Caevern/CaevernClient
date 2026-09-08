@@ -41,7 +41,7 @@ impl TextureObject {
         }
     }
 
-    pub fn load_from_dynamic_image(img: DynamicImage, device: &wgpu::Device) -> Self {
+    pub fn from_image(img: &DynamicImage, device: &wgpu::Device) -> Self {
         let texture_rgba = img.to_rgba8().to_vec();
         let (width, height) = img.dimensions();
         let texture_size = wgpu::Extent3d {

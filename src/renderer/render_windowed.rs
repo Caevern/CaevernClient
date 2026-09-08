@@ -931,6 +931,12 @@ impl<'window> RendererWindowed<'window> {
                 TextureObject::create(texture, &self.init.device),
             );
         }
+        for (name, image) in self.world.get_images() {
+            self.textures.insert(
+                name.to_string(),
+                TextureObject::from_image(image, &self.init.device),
+            );
+        }
 
         for object in self.world.get_objects().iter().enumerate() {
             let meshes = object.1.get_vertices();
@@ -1047,7 +1053,17 @@ impl<'window> RendererWindowed<'window> {
                 );
 
                 let texture_object;
-                if let Some(texture) = self.textures.get(material_found_texture) {
+                if material_found_texture == "Image" {
+                    if let Some(texture) = self.textures.get(material_string.as_str()) {
+                        texture_object = texture;
+                    } else if let Some(texture) = self.textures.get("textures/white.png") {
+                        texture_object = texture;
+                    } else {
+                        continue;
+                    }
+                } else if let Some(texture) = self.textures.get(material_found_texture) {
+                    texture_object = texture;
+                } else if let Some(texture) = self.textures.get("textures/missing.png") {
                     texture_object = texture;
                 } else {
                     continue;

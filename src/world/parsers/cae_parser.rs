@@ -7,6 +7,7 @@ use crate::renderer::vertex::create_vertices_skinned;
 use crate::renderer::{skinned_vertex::SkinnedVertex, transform::Transform};
 use crate::world::material::Material;
 use crate::world::object::{Object, ObjectType};
+use crate::world::parsers::transforms::{rotate_x, rotate_y, rotate_z};
 
 #[derive(RustEmbed)]
 #[folder = "assets/"]
@@ -24,6 +25,12 @@ fn read_f32<R: Read>(reader: &mut R) -> io::Result<f32> {
     reader.read_exact(&mut bytes)?;
 
     Ok(f32::from_le_bytes(bytes))
+}
+
+fn read_bool<R: Read>(reader: &mut R) -> io::Result<bool> {
+    let mut byte = [0u8; 1];
+    reader.read_exact(&mut byte)?;
+    Ok(byte[0] != 0)
 }
 
 fn read_vec3<R: Read>(reader: &mut R) -> [f32; 3] {
@@ -74,6 +81,15 @@ fn read_mesh<R: Read>(
     let triangle_count = triangle_index_count / 3;
     println!("triangle_count: {triangle_count}");
 
+    let uv_count = read_u32(&mut reader).expect("Failed to read uv count") as usize;
+    let mut uvs = vec![(0f32, 0f32); uv_count as usize];
+    for i in 0..uv_count {
+        let x = read_f32(&mut reader).expect("Failed to read uv x");
+        let y = read_f32(&mut reader).expect("Failed to read uv y");
+        uvs[i] = (x, y);
+    }
+    println!("uv_count: {uv_count}");
+
     let mut mesh_data = (
         Vec::new(),
         Vec::new(),
@@ -85,6 +101,7 @@ fn read_mesh<R: Read>(
     for i in 0..triangle_index_count {
         let vertex_index = indices[i];
         let vertex = vertices[vertex_index as usize];
+        let uv = uvs[vertex_index as usize];
 
         let skinned_vertex = SkinnedVertex {
             position: [vertex.0, vertex.1, vertex.2],
@@ -95,7 +112,7 @@ fn read_mesh<R: Read>(
         mesh_data.0.push(skinned_vertex);
         mesh_data.1.push([0, 1, 0]);
         mesh_data.2.push([1.0, 1.0, 1.0]);
-        mesh_data.3.push([0.0, 0.0]);
+        mesh_data.3.push([uv.0, uv.1]);
     }
 
     mesh_data
@@ -114,6 +131,7 @@ fn read_object<R: Read>(
             String,
         ),
     >,
+    materials: &HashMap<String, Material>,
     color: (f32, f32, f32),
 ) -> (
     Vec<SkinnedVertex>,
@@ -129,19 +147,27 @@ fn read_object<R: Read>(
         let mut mesh = mesh_data.clone();
 
         let mesh_position = read_vec3(&mut reader);
-        // TODO: implement rotation for sub meshes
-        let _mesh_rotation = read_vec3(&mut reader);
+        let mesh_rotation = read_vec3(&mut reader);
         let mesh_scale = read_vec3(&mut reader);
 
         for vertex in &mut mesh.0 {
+            vertex.position = rotate_x(vertex.position, mesh_rotation[0] * 0.0174532925);
+            vertex.position = rotate_y(vertex.position, mesh_rotation[1] * 0.0174532925);
+            vertex.position = rotate_z(vertex.position, mesh_rotation[2] * 0.0174532925);
+
             vertex.position[0] = vertex.position[0] * mesh_scale[0] + mesh_position[0];
             vertex.position[1] = vertex.position[1] * mesh_scale[1] + mesh_position[1];
             vertex.position[2] = vertex.position[2] * mesh_scale[2] + mesh_position[2];
         }
+
+        let material_name = read_string(&mut reader);
+        let material = materials.get(&material_name).expect("Material doesn't exist");
+        mesh.4 = material_name;
+
         for color_vert in &mut mesh.2 {
-            color_vert[0] = color.0;
-            color_vert[1] = color.1;
-            color_vert[2] = color.2;
+            color_vert[0] = material.color.0;
+            color_vert[1] = material.color.1;
+            color_vert[2] = material.color.2;
         }
 
         return mesh;
@@ -167,6 +193,7 @@ fn read_object_data<R: Read>(
             String,
         ),
     >,
+    materials: &HashMap<String, Material>,
     color: (f32, f32, f32),
 ) -> (
     Vec<(
@@ -181,7 +208,7 @@ fn read_object_data<R: Read>(
     let mesh_count = read_u32(&mut reader).expect("Failed to read mesh count");
     let mut meshes = Vec::new();
     for j in 0..mesh_count {
-        let mesh = read_object(&mut reader, j, meshes_found, color);
+        let mesh = read_object(&mut reader, j, meshes_found, materials, color);
         meshes.push(mesh);
     }
 
@@ -200,6 +227,7 @@ fn create_object<R: Read>(
             String,
         ),
     >,
+    materials: &HashMap<String, Material>,
 ) -> Object {
     let object_name = read_string(&mut reader);
     println!("object_name: {object_name}");
@@ -223,7 +251,7 @@ fn create_object<R: Read>(
         color = (r, g, b);
     }
 
-    let mesh_data = read_object_data(reader, meshes, color);
+    let mesh_data = read_object_data(reader, meshes, materials, color);
 
     let mut object = Object::create(ObjectType::Mesh, create_vertices_skinned(&mesh_data.0));
     object.set_position(object_position[0], object_position[1], object_position[2]);
@@ -233,13 +261,13 @@ fn create_object<R: Read>(
         object_rotation[2] * 0.0174532925,
     );
     object.set_scale(object_scale[0], object_scale[1], object_scale[2]);
-    object.set_default_texture("textures/white.png");
+    object.set_default_texture("Image");
     //object.add_material(material, "default".to_string());
 
     object
 }
 
-pub fn parse_cae(path: &str) -> Vec<Object> {
+pub fn parse_cae(path: &str) -> (Vec<Object>, HashMap<String, Material>) {
     let data = Assets::get(path).expect("Failed to get asset").data;
     let mut reader = Cursor::new(data);
 
@@ -268,16 +296,50 @@ pub fn parse_cae(path: &str) -> Vec<Object> {
         meshes.insert(mesh_name, mesh);
     }
 
+    let material_count = read_u32(&mut reader).expect("Failed to read material count");
+    println!("\nmaterial_count: {material_count}");
+
+    let mut materials = HashMap::new();
+    for _ in 0..material_count {
+        let material_name = read_string(&mut reader);
+        println!("{}", material_name);
+
+        let r = read_f32(&mut reader).expect("Failed to read r");
+        let g = read_f32(&mut reader).expect("Failed to read g");
+        let b = read_f32(&mut reader).expect("Failed to read b");
+        let _ = read_f32(&mut reader).expect("Failed to read a");
+
+        let color = (r, g, b);
+
+        let mut material_object = Material::from_color(color);
+
+        let texture_exists = read_bool(&mut reader).expect("Failed to read texture_exists");
+        if texture_exists {
+            let texture_length = read_u32(&mut reader).expect("Failed to read texture_length");
+            let mut texture_data = vec![0u8; texture_length as usize];
+            reader
+                .read_exact(&mut texture_data)
+                .expect("Failed to read texture data");
+
+            let image = image::load_from_memory(&texture_data)
+                .expect("Failed to decode texture");
+
+            material_object.set_image(Some(image));
+        }
+
+        materials.insert(material_name, material_object);
+    }
+
     let object_count = read_u32(&mut reader).expect("Failed to read object count");
     println!("\nobject_count: {object_count}");
 
     let mut objects = Vec::new();
     for _ in 0..object_count {
-        let object = create_object(&mut reader, &meshes);
+        let object = create_object(&mut reader, &meshes, &materials);
         objects.push(object);
     }
 
     println!("\n----------------- LOADED CAEVERN FILE ------------------");
 
-    objects
+    (objects, materials)
 }

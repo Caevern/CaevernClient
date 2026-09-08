@@ -50,6 +50,8 @@ impl Object {
             Material {
                 texture: "textures/missing.png".to_string(),
                 displacement: "".to_string(),
+                color: (1.0, 1.0, 1.0),
+                image: None,
             },
         );
         Self {
@@ -99,6 +101,8 @@ impl Object {
             Material {
                 texture: texture.to_string(),
                 displacement: "".to_string(),
+                color: (1.0, 1.0, 1.0),
+                image: None,
             },
         );
     }
