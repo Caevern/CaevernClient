@@ -10,7 +10,16 @@ use rtc::{
     },
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, println, sync::Arc, thread, time::Duration};
+use std::{
+    collections::VecDeque,
+    println,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread,
+    time::Duration,
+};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio_tungstenite::connect_async;
 use tungstenite::Message;
@@ -150,8 +159,8 @@ pub fn start_speaker(mut rx: Receiver<Vec<f32>>) -> cpal::Stream {
     stream
 }
 
-pub async fn start_voice_handler(user_id: u32) {
-    let (mut socket, _) = connect_async("ws://localhost:42142/ws/voice")
+pub async fn start_voice_handler(user_id: u32, mic_state_arc: Arc<AtomicBool>) {
+    let (mut socket, _) = connect_async("wss://caevernserver.onrender.com/ws/voice")
         .await
         .expect("Can't connect");
     println!("Connected to websocket /ws/voice");
@@ -251,6 +260,7 @@ pub async fn start_voice_handler(user_id: u32) {
         .expect("Failed to send voice offer");
 
     thread::spawn(move || {
+        let mic_state = mic_state_arc.clone();
         let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
 
         runtime.block_on(async {
@@ -269,27 +279,29 @@ pub async fn start_voice_handler(user_id: u32) {
                 while buffer.len() >= 960 {
                     let frame: Vec<f32> = buffer.drain(..960).collect();
 
-                    let mut encoded = vec![0u8; 1500];
+                    if !mic_state.load(Ordering::Relaxed) {
+                        let mut encoded = vec![0u8; 1500];
 
-                    let len = encoder
-                        .encode_float(&frame, &mut encoded)
-                        .expect("Failed to encode Opus");
+                        let len = encoder
+                            .encode_float(&frame, &mut encoded)
+                            .expect("Failed to encode Opus");
 
-                    encoded.truncate(len);
+                        encoded.truncate(len);
 
-                    audio_track
-                        .write_sample(
-                            ssrc,
-                            111,
-                            &Sample {
-                                data: encoded.into(),
-                                duration: Duration::from_millis(20),
-                                ..Default::default()
-                            },
-                            &[],
-                        )
-                        .await
-                        .expect("Failed to write audio sample");
+                        audio_track
+                            .write_sample(
+                                ssrc,
+                                111,
+                                &Sample {
+                                    data: encoded.into(),
+                                    duration: Duration::from_millis(20),
+                                    ..Default::default()
+                                },
+                                &[],
+                            )
+                            .await
+                            .expect("Failed to write audio sample");
+                    }
                 }
             }
         });

@@ -1,5 +1,7 @@
 use std::println;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::thread;
 
@@ -48,6 +50,7 @@ pub struct GameWindow<'window> {
     pub keys: [bool; 6],
     pub mouse_movement: [f32; 2],
 
+    pub muted: Arc<AtomicBool>,
     pub mouse_locked: bool,
     pub use_confined: bool,
 
@@ -65,18 +68,20 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
         self.engine = Some(Engine::new(data_thread_tx, avatar_thread_rx));
 
-        if let Ok((socket, _)) = connect("ws://localhost:42142/ws/user") {
+        println!("Starting webserver connection");
+        if let Ok((socket, _)) = connect("wss://caevernserver.onrender.com/ws/user") {
             let (socket, user_id) = authenticate_user(socket);
             println!("User ID: {}", user_id);
 
             start_user_handler(socket, data_thread_rx, avatar_thread_tx, user_id);
 
+            let muted = Arc::clone(&self.muted);
             thread::spawn(move || {
                 let runtime =
                     tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
 
                 runtime.block_on(async {
-                    start_voice_handler(user_id).await;
+                    start_voice_handler(user_id, muted).await;
                 });
             });
         } else {
@@ -232,6 +237,9 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     PhysicalKey::Code(KeyCode::KeyD) => {
                         self.keys[3] = true;
                     }
+                    PhysicalKey::Code(KeyCode::KeyV) => {
+                        self.muted.store(false, Ordering::Relaxed);
+                    }
                     PhysicalKey::Code(KeyCode::Space) => {
                         self.keys[4] = true;
                     }
@@ -331,6 +339,9 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     }
                     PhysicalKey::Code(KeyCode::KeyD) => {
                         self.keys[3] = false;
+                    }
+                    PhysicalKey::Code(KeyCode::KeyV) => {
+                        self.muted.store(true, Ordering::Relaxed);
                     }
                     PhysicalKey::Code(KeyCode::Space) => {
                         self.keys[4] = false;

@@ -15,6 +15,7 @@ pub struct Player {
     pub gravity: f32,
 
     pub sensitivity: f32,
+    pub muted: bool,
 }
 impl Player {
     pub fn new() -> Self {
@@ -31,6 +32,7 @@ impl Player {
             gravity: 30.0,
 
             sensitivity: 0.35,
+            muted: false,
         }
     }
 

@@ -1,3 +1,6 @@
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+
 use winit::event_loop::EventLoop;
 
 use crate::renderer::game_window::GameWindow;
@@ -26,6 +29,7 @@ pub fn start_engine(world: World) {
         keys: [false; 6],
         mouse_movement: [0.0; 2],
 
+        muted: Arc::new(AtomicBool::new(true)),
         mouse_locked: false,
         use_confined: false,
 
