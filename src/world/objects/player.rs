@@ -23,14 +23,14 @@ impl Player {
             camera: Transform::zero(),
             forces: Vector3::new(0.0, 0.0, 0.0),
 
-            height: 2.0,
+            height: 1.6,
 
             is_grounded: true,
-            walking_speed: 7.5,
-            jump_force: 5.0,
+            walking_speed: 3.5,
+            jump_force: 4.0,
             gravity: 30.0,
 
-            sensitivity: 0.5,
+            sensitivity: 0.35,
         }
     }
 
