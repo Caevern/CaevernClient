@@ -1,9 +1,9 @@
 use crate::world::objects::player::Player;
 
 pub fn check_grounded(player: &mut Player) {
-    player.is_grounded = player.camera.position.y <= 4.0;
-    if player.camera.position.y < 4.0 {
-        player.camera.position.y = 4.0;
+    player.is_grounded = player.camera.position.y <= player.height;
+    if player.camera.position.y < player.height {
+        player.camera.position.y = player.height;
     }
 }
 

@@ -7,6 +7,8 @@ pub struct Player {
     pub camera: Transform,
     pub forces: Vector3<f32>,
 
+    pub height: f32,
+
     pub is_grounded: bool,
     pub walking_speed: f32,
     pub jump_force: f32,
@@ -20,6 +22,8 @@ impl Player {
             transform: Transform::zero(),
             camera: Transform::zero(),
             forces: Vector3::new(0.0, 0.0, 0.0),
+
+            height: 2.0,
 
             is_grounded: true,
             walking_speed: 7.5,
