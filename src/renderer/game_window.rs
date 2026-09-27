@@ -69,7 +69,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         self.engine = Some(Engine::new(data_thread_tx, avatar_thread_rx));
 
         println!("Starting webserver connection");
-        if let Ok((socket, _)) = connect("wss://caevernserver.onrender.com/ws/user") {
+        if let Ok((socket, _)) = connect("ws://178.128.158.197:5000/ws/user") {
             let (socket, user_id) = authenticate_user(socket);
             println!("User ID: {}", user_id);
 
