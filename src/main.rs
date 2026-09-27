@@ -25,8 +25,6 @@ use crate::world::{object::ObjectType, parsers::fbx_parser::parse};
 static ALLOCATOR: Cap<alloc::System> = Cap::new(alloc::System, usize::max_value());
 
 fn main() {
-    let _ = load_module("assets/modules/caevern_example_module.wasm");
-
     let mut world = world::world::create_world();
 
     let skybox = parse(
@@ -129,6 +127,8 @@ fn main() {
     ram_label_object.set_default_texture("fonts/NotoSansJP.ttf");
     ram_label_object.set_tag("ram_label");
     world.add_object(ram_label_object);
+
+    let _ = load_module("assets/modules/caevern_example_module.wasm");
 
     println!(
         "Memory after startup: {} MB",
