@@ -4,12 +4,11 @@ use tokio::net::TcpStream;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tungstenite::Message;
 use std::{
-    collections::HashMap, f32, println, sync::mpsc::{Receiver, Sender}, thread,
+    collections::HashMap, f32, println, sync::mpsc::{Receiver, Sender},
 };
 
 use crate::{
-    network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate},
-    renderer::transform::Transform,
+    network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate::{self, SendUserPosition}}, renderer::transform::Transform,
 };
 
 pub async fn start_user_handler(
@@ -27,6 +26,10 @@ pub async fn start_user_handler(
                     UserUpdate::SendUserPosition(_) => {
                         while let Ok(newer_job) = data_thread_rx.try_recv() {
                             job = newer_job;
+                            match job {
+                                UserUpdate::SendUserPosition(_) => (),
+                                _ => break,
+                            }
                         }
                     }
                     _ => (),

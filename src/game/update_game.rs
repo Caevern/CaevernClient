@@ -90,7 +90,7 @@ impl Engine {
                 position: player_position.into(),
                 rotation: Vector3::new(
                     -self.player.camera.rotation.x,
-                    self.player.camera.rotation.y + 1.57079633,
+                    -self.player.camera.rotation.y + 1.57079633,
                     -self.player.camera.rotation.z,
                 ),
                 scale: Vector3::new(1.0, 1.0, 1.0),
