@@ -2,6 +2,7 @@
 
 pub mod game;
 pub mod interract;
+pub mod modules;
 pub mod network;
 pub mod physics;
 pub mod renderer;
@@ -14,6 +15,7 @@ use cgmath::Vector3;
 use std::alloc;
 use world::object::Object;
 
+use crate::modules::load_module::load_module;
 use crate::renderer::transform::Transform;
 use crate::setup::fonts::load_font_uvs;
 use crate::world::objects::text;
@@ -23,6 +25,8 @@ use crate::world::{object::ObjectType, parsers::fbx_parser::parse};
 static ALLOCATOR: Cap<alloc::System> = Cap::new(alloc::System, usize::max_value());
 
 fn main() {
+    let _ = load_module("assets/modules/caevern_example_module.wasm");
+
     let mut world = world::world::create_world();
 
     let skybox = parse(

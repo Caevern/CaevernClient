@@ -6,6 +6,7 @@ version = 4
 name = "Caevern"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "ash",
  "async-trait",
  "bytemuck",
