@@ -6,6 +6,7 @@ use std::{f32, println};
 use winit::window::Window;
 
 use crate::ALLOCATOR;
+use crate::game::update_game::Engine;
 use crate::interract::raycast::raycast_grab;
 use crate::renderer::buffers::bind_group_layout::create_bind_group_layout;
 use crate::renderer::buffers::displacement_buffer::create_buffer_displacement;
@@ -20,7 +21,6 @@ use crate::renderer::vertex::Vertex;
 use crate::renderer::{init_wgpu, transform, transforms, vertex};
 use crate::setup::fonts::load_font_uvs;
 use crate::world::object::{Object, ObjectType};
-use crate::world::objects::player::{self, Player};
 use crate::world::objects::text;
 use crate::world::world::World;
 
@@ -41,7 +41,6 @@ pub struct RendererWindowed<'window> {
     pipeline_displacement_bones: wgpu::RenderPipeline,
 
     frame: usize,
-    previous_frame_time: std::time::Instant,
 
     vertex_buffers: Vec<Vec<wgpu::Buffer>>,
     uniform_bind_groups: Vec<Vec<wgpu::BindGroup>>,
@@ -143,7 +142,6 @@ impl<'window> RendererWindowed<'window> {
             pipeline_displacement_bones,
 
             frame: 0,
-            previous_frame_time: std::time::Instant::now(),
 
             vertex_buffers: Vec::new(),
             uniform_bind_groups: Vec::new(),
@@ -177,7 +175,8 @@ impl<'window> RendererWindowed<'window> {
         }
     }
 
-    pub fn update(&mut self, frame_time: f32, menu_tablet_state: usize, player: &Player) {
+    pub fn update(&mut self, frame_time: f32, menu_tablet_state: usize, engine: &mut Engine) {
+        let player = &engine.player;
         let forward = Vector3::new(
             player.camera.rotation.y.cos() * player.camera.rotation.x.cos(),
             player.camera.rotation.x.sin(),

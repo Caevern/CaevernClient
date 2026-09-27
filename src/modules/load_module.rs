@@ -1,4 +1,4 @@
-use wasmtime::{Engine, Instance, Linker, Module, Store};
+use wasmtime::{Engine, Linker, Module, Store};
 
 use crate::modules::{api::game_log::game_log, module};
 

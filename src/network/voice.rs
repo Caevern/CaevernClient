@@ -132,6 +132,10 @@ pub fn start_speaker(mut rx: Receiver<Vec<f32>>) -> cpal::Stream {
         .default_output_device()
         .expect("No output device found");
 
+    println!("Host: {}", host.id().name());
+    for host_id in cpal::available_hosts() {
+        println!("{host_id:?}");
+    }
     println!("Speaker: {}", device.description().unwrap().name());
 
     let supported = device
@@ -293,14 +297,12 @@ pub async fn start_voice_handler(user_id: u32, mic_state_arc: Arc<AtomicBool>) {
         .local_description()
         .await
         .expect("Missing local description");
-    println!("OFFER SDP:\n{}", description.sdp);
 
     let signal = VoiceSignal::Offer {
         sdp: description.sdp,
     };
 
     let text = serde_json::to_string(&signal).expect("Failed to serialize voice offer");
-    println!("{}", text);
 
     socket
         .send(Message::Text(text.into()))

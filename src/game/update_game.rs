@@ -7,26 +7,23 @@ use std::{
 use cgmath::{InnerSpace, Vector3};
 
 use crate::{
-    network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate},
-    physics::{
+    network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate}, physics::{
         gravity::apply_gravity,
         movement::{get_camera_movement, get_camera_rotation},
-    },
-    renderer::{
+    }, renderer::{
         transform::Transform,
         vertex::{Vertex, create_vertices_skinned},
-    },
-    world::{
-        material::Material,
-        object::{Object, ObjectType},
-        objects::{player::Player, skeleton::create_skeleton},
-        parsers::fbx_parser::parse,
+    }, world::{
+        material::Material, object::{Object, ObjectType}, objects::{player::Player, skeleton::create_skeleton}, parsers::fbx_parser::parse, world::World,
     },
 };
 
 pub struct Engine {
     // player
     pub player: Player,
+
+    // world
+    pub world: World,
 
     // fallback model
     fallback_vertices: Vec<(Vec<Vertex>, String)>,
@@ -41,6 +38,7 @@ impl Engine {
     pub fn new(
         data_thread_tx: Sender<UserUpdate>,
         avatar_thread_rx: Receiver<AvatarUpdate>,
+        world: World,
     ) -> Self {
         let model_parsed = parse("models/fallback.fbx", Transform::zero());
         let fallback_vertices = create_vertices_skinned(&model_parsed.0);
@@ -56,6 +54,7 @@ impl Engine {
             fallback_skeleton,
             data_thread_tx,
             avatar_thread_rx,
+            world,
         }
     }
 
@@ -135,9 +134,9 @@ impl Engine {
                         "DressMaterial".to_string(),
                     );
 
-                    /*let object_id = self.world.get_objects().len();
+                    let object_id = self.world.get_objects().len();
 
-                    self.create_rendered_object(&object);
+                    /*self.create_rendered_object(&object);
                     self.world.add_object(object);
 
                     self.bones[object_id][self.fallback_skeleton["head"]]

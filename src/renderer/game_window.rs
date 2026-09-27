@@ -66,7 +66,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         let (data_thread_tx, data_thread_rx) = mpsc::channel::<UserUpdate>();
         let (avatar_thread_tx, avatar_thread_rx) = mpsc::channel::<AvatarUpdate>();
 
-        self.engine = Some(Engine::new(data_thread_tx, avatar_thread_rx));
+        self.engine = Some(Engine::new(data_thread_tx, avatar_thread_rx, self.home_world.clone()));
 
         println!("Starting webserver connection");
         if let Ok((socket, _)) = connect("ws://178.128.158.197:5000/ws/user") {
@@ -361,7 +361,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 let renderer = self.windowed_renderer.as_mut().unwrap();
 
                 engine.update(self.mouse_movement, self.keys, frame_time);
-                renderer.update(frame_time, self.menu_tablet_state, &engine.player);
+                renderer.update(frame_time, self.menu_tablet_state, engine);
 
                 if self.menu_tablet_state == 2 {
                     self.menu_tablet_state = 1;
