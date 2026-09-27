@@ -5,7 +5,8 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::thread;
 
-use tungstenite::connect;
+use tokio::io::AsyncWriteExt;
+use tokio_tungstenite::connect_async;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalPosition;
 use winit::event::DeviceEvent;
@@ -66,27 +67,25 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         let (data_thread_tx, data_thread_rx) = mpsc::channel::<UserUpdate>();
         let (avatar_thread_tx, avatar_thread_rx) = mpsc::channel::<AvatarUpdate>();
 
-        self.engine = Some(Engine::new(data_thread_tx, avatar_thread_rx, self.home_world.clone()));
+        self.engine = Some(Engine::new(data_thread_tx.clone(), avatar_thread_rx, self.home_world.clone()));
 
-        println!("Starting webserver connection");
-        if let Ok((socket, _)) = connect("ws://178.128.158.197:5000/ws/user") {
-            let (socket, user_id) = authenticate_user(socket);
-            println!("User ID: {}", user_id);
+        let muted = Arc::clone(&self.muted);
+        thread::spawn(move || {
+            println!("Starting webserver connection");
 
-            start_user_handler(socket, data_thread_rx, avatar_thread_tx, user_id);
+            let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
+            runtime.block_on(async {
+                if let Ok((socket, _)) = connect_async("ws://178.128.158.197:5000/ws/user").await {
+                    let (socket, user_id) = authenticate_user(socket).await;
+                    println!("User ID: {}", user_id);
 
-            let muted = Arc::clone(&self.muted);
-            thread::spawn(move || {
-                let runtime =
-                    tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
-
-                runtime.block_on(async {
+                    start_user_handler(socket, data_thread_rx, avatar_thread_tx, user_id).await;
                     start_voice_handler(user_id, muted).await;
-                });
+                } else {
+                    println!("Failed to connect to websocket /ws/user, not connected to any server");
+                }
             });
-        } else {
-            println!("Failed to connect to websocket /ws/user, not connected to any server");
-        }
+        });
 
         if let Ok(xr) = XRManager::new() {
             println!("STARTED XRManager!!!");
@@ -131,6 +130,9 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         self.window_size = (renderer.init.size.width, renderer.init.size.height);
 
         renderer.set_world(self.home_world.clone());
+        data_thread_tx
+            .send(UserUpdate::SendReadySignal)
+            .expect("Sending user ready signal failed :C");
 
         self.windowed_renderer = Some(renderer);
         self.window = Some(window);
@@ -360,7 +362,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 let engine = self.engine.as_mut().unwrap();
                 let renderer = self.windowed_renderer.as_mut().unwrap();
 
-                engine.update(self.mouse_movement, self.keys, frame_time);
+                engine.update(self.mouse_movement, self.keys, frame_time, &mut renderer.buffer_collection, &renderer.init.device, &renderer.init.queue);
                 renderer.update(frame_time, self.menu_tablet_state, engine);
 
                 if self.menu_tablet_state == 2 {

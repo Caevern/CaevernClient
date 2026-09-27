@@ -13,6 +13,7 @@ use crate::renderer::buffers::uniform_buffers::{
 };
 use crate::renderer::default_elements::register_default_textures;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
+use crate::renderer::shader_type::ShaderType;
 use crate::renderer::texture_object::TextureObject;
 use crate::renderer::transforms::create_transforms;
 use crate::renderer::vertex::Vertex;
@@ -22,12 +23,6 @@ use crate::world::object::{Object, ObjectType};
 use crate::world::objects::text;
 use crate::world::world::World;
 use crate::xr::xr_manager::XRManager;
-
-#[derive(PartialEq)]
-pub enum ShaderType {
-    Displacement,
-    DisplacementBones,
-}
 
 #[derive(RustEmbed)]
 #[folder = "assets/"]
@@ -56,8 +51,6 @@ pub struct RendererOpenXR {
 
     textures: HashMap<String, TextureObject>,
     font_maps: HashMap<String, HashMap<String, (f32, f32, f32, f32, f32)>>,
-
-    world: World,
 }
 impl RendererOpenXR {
     pub async fn new(init: XRManager) -> Self {
@@ -155,8 +148,6 @@ impl RendererOpenXR {
 
             textures,
             font_maps,
-
-            world: World::new(),
         }
     }
 
@@ -170,8 +161,8 @@ impl RendererOpenXR {
         .normalize();
 
         if menu_tablet_state == 2 {
-            for i in 0..self.world.get_objects().len() {
-                let object_type = self.world.get_objects()[i].get_object_type();
+            for i in 0..engine.world.get_objects().len() {
+                let object_type = engine.world.get_objects()[i].get_object_type();
                 if object_type == ObjectType::TabletMenu
                     || object_type == ObjectType::TabletMenuButton
                 {
@@ -206,8 +197,8 @@ impl RendererOpenXR {
                 }
             }
         } else if menu_tablet_state == 3 {
-            for i in 0..self.world.get_objects().len() {
-                let object_type = self.world.get_objects()[i].get_object_type();
+            for i in 0..engine.world.get_objects().len() {
+                let object_type = engine.world.get_objects()[i].get_object_type();
                 if object_type == ObjectType::TabletMenu
                     || object_type == ObjectType::TabletMenuButton
                 {
@@ -239,8 +230,8 @@ impl RendererOpenXR {
             }
         }
 
-        for i in 0..self.world.get_objects().len() {
-            if self.world.get_object(i).get_object_type() == ObjectType::Skybox {
+        for i in 0..engine.world.get_objects().len() {
+            if engine.world.get_object(i).get_object_type() == ObjectType::Skybox {
                 let model_mat = transforms::create_transforms(
                     [
                         player.camera.position.x,
@@ -270,19 +261,19 @@ impl RendererOpenXR {
                     64,
                     bytemuck::cast_slice(normal_ref),
                 );
-            } else if self.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
+            } else if engine.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
                 if self.frame < 60 {
-                    let skeleton = self.world.get_object(i).get_skeleton();
+                    let skeleton = engine.world.get_object(i).get_skeleton();
                     //self.bones[i][skeleton["head"]].0.rotation.x = -player.camera.rotation.x;
                     //self.bones[i][skeleton["arm_right"]].0.rotation.z = -player.camera.rotation.x;
                     /*self.bones[i][skeleton["head"]].0.rotation.y =
                     -player.camera.rotation.y - 1.57079633;*/
                     // TODO: make the local character have this dissabled by default.
                     self.bones[i][skeleton["neck"]].0.scale = [0.0, 0.0, 0.0].into();
-                    self.update_bone(i, skeleton["head"]);
+                    self.update_bone(&engine.world, i, skeleton["head"]);
                 }
 
-                let object = self.world.get_object(i);
+                let object = engine.world.get_object(i);
                 let position = [
                     object.get_position().x + player.camera.position.x
                         - player.camera.rotation.y.cos() * 0.1,
@@ -420,9 +411,9 @@ impl RendererOpenXR {
         }*/
 
         if self.frame % 20 == 1 {
-            for i in 0..self.world.get_objects().len() {
-                if self.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
-                    self.update_bones(i);
+            for i in 0..engine.world.get_objects().len() {
+                if engine.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
+                    self.update_bones(&engine.world, i);
                 }
             }
         }
@@ -430,13 +421,13 @@ impl RendererOpenXR {
         // update skybox positions
         if self.frame % 10 == 0 {
             let grabbable_object_index =
-                raycast_grab(self.world.get_objects(), player.camera.position, forward, 5);
+                raycast_grab(engine.world.get_objects(), player.camera.position, forward, 5);
 
             if grabbable_object_index > 0 {
-                let y_rotation = self.world.get_objects()[grabbable_object_index]
+                let y_rotation = engine.world.get_objects()[grabbable_object_index]
                     .get_rotation()
                     .y;
-                self.world.objects[grabbable_object_index].set_rotation_y(y_rotation + 0.1);
+                engine.world.objects[grabbable_object_index].set_rotation_y(y_rotation + 0.1);
                 let model_mat = transforms::create_transforms(
                     [0.0, 0.0, 0.0],
                     [0.0, y_rotation + 0.1, 0.0],
@@ -490,7 +481,7 @@ impl RendererOpenXR {
 
         // update ingame fps label when menu tablet is enabled
         if menu_tablet_state == 1 && self.frame % 60 == 0 {
-            for (index, object) in self.world.get_objects().iter().enumerate() {
+            for (index, object) in engine.world.get_objects().iter().enumerate() {
                 match object.get_tag() {
                     "fps_label" => {
                         let fps_label = text::create_plane_with_text(
@@ -557,7 +548,7 @@ impl RendererOpenXR {
     }
 
     // TODO: Update the bones in hiarchy, this keeps updating O(n)
-    pub fn update_bone(&mut self, object_index: usize, affected_bone: usize) {
+    pub fn update_bone(&mut self, world: &World, object_index: usize, affected_bone: usize) {
         for (bone_index, bone) in self.bones[object_index].iter().enumerate() {
             let mut bone_position =
                 Vector3::new(bone.1.position.x, bone.1.position.y, bone.1.position.z);
@@ -601,7 +592,7 @@ impl RendererOpenXR {
                     bone.0.position.x,
                     bone.0.position.y
                         + bone_position.y
-                            * self.world.get_object(object_index).get_scale().y
+                            * world.get_object(object_index).get_scale().y
                             * 150.0,
                     bone.0.rotation.z,
                 ],
@@ -659,7 +650,7 @@ impl RendererOpenXR {
             let bind_global = create_transforms(
                 [
                     0.0,
-                    bone_position.y * self.world.get_object(object_index).get_scale().y * 150.0,
+                    bone_position.y * world.get_object(object_index).get_scale().y * 150.0,
                     0.0,
                 ],
                 [0.0, 0.0, 0.0],
@@ -678,7 +669,7 @@ impl RendererOpenXR {
     }
 
     // TODO: Update the bones in hiarchy, this keeps updating O(n)
-    pub fn update_bones(&mut self, object_index: usize) {
+    pub fn update_bones(&mut self, world: &World, object_index: usize) {
         for (bone_index, bone) in self.bones[object_index].iter().enumerate() {
             let mut bone_position =
                 Vector3::new(bone.1.position.x, bone.1.position.y, bone.1.position.z);
@@ -709,7 +700,7 @@ impl RendererOpenXR {
                     bone.0.position.x,
                     bone.0.position.y
                         + bone_position.y
-                            * self.world.get_object(object_index).get_scale().y
+                            * world.get_object(object_index).get_scale().y
                             * 150.0,
                     bone.0.rotation.z,
                 ],
@@ -767,7 +758,7 @@ impl RendererOpenXR {
             let bind_global = create_transforms(
                 [
                     0.0,
-                    bone_position.y * self.world.get_object(object_index).get_scale().y * 150.0,
+                    bone_position.y * world.get_object(object_index).get_scale().y * 150.0,
                     0.0,
                 ],
                 [0.0, 0.0, 0.0],
@@ -786,8 +777,8 @@ impl RendererOpenXR {
     }
 
     // TODO: Use this in the set world to reduce duplicate code
-    pub fn create_rendered_object(&mut self, object: &Object) {
-        for texture in self.world.get_textures() {
+    pub fn create_rendered_object(&mut self, world: &World, object: &Object) {
+        for texture in world.get_textures() {
             if self.textures.contains_key(&texture.to_string()) {
                 continue;
             }
@@ -994,20 +985,18 @@ impl RendererOpenXR {
     }
 
     pub fn set_world(&mut self, world: World) {
-        self.world = world;
-
         self.vertex_buffers.clear();
         self.uniform_bind_groups.clear();
         self.num_vertices.clear();
 
-        for texture in self.world.get_textures() {
+        for texture in world.get_textures() {
             self.textures.insert(
                 texture.to_string(),
                 TextureObject::create(texture, &self.init.device),
             );
         }
 
-        for object in self.world.get_objects().iter().enumerate() {
+        for object in world.get_objects().iter().enumerate() {
             let meshes = object.1.get_vertices();
             let materials = object.1.get_materials();
             let mut bones: Vec<[[f32; 4]; 4]> = Vec::new();
@@ -1204,10 +1193,6 @@ impl RendererOpenXR {
             }
 
             self.model_uniform_buffers.push(model_uniform_buffer);
-        }
-
-        for object in self.world.objects.iter_mut() {
-            object.clear_vertices();
         }
 
         /*self.data_thread_tx
