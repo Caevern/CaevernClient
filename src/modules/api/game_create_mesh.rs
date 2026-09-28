@@ -62,8 +62,8 @@ pub fn game_create_mesh(
 
         let skinned_vertex = Vertex {
             position: vertex,
-            normal: [0.0, 0.0, 0.0, 1.0],
-            color: [1.0, 0.0, 0.0, 1.0],
+            normal: [0.0, 1.0, 0.0, 1.0],
+            color: [1.0, 0.0, 1.0, 1.0],
             uv: [0.0, 0.0, 0.0, 0.0],
             bone_ids: [0.0, 0.0, 0.0, 0.0],
             bone_weights: [0.0, 0.0, 0.0, 0.0],
