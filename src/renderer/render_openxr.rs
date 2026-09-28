@@ -162,7 +162,7 @@ impl RendererOpenXR {
 
         if menu_tablet_state == 2 {
             for i in 0..engine.world.get_objects().len() {
-                let object_type = engine.world.get_objects()[i].get_object_type();
+                let object_type = engine.world.get_object(i).get_object_type();
                 if object_type == ObjectType::TabletMenu
                     || object_type == ObjectType::TabletMenuButton
                 {
@@ -198,7 +198,7 @@ impl RendererOpenXR {
             }
         } else if menu_tablet_state == 3 {
             for i in 0..engine.world.get_objects().len() {
-                let object_type = engine.world.get_objects()[i].get_object_type();
+                let object_type = engine.world.get_object(i).get_object_type();
                 if object_type == ObjectType::TabletMenu
                     || object_type == ObjectType::TabletMenuButton
                 {
@@ -420,14 +420,23 @@ impl RendererOpenXR {
 
         // update skybox positions
         if self.frame % 10 == 0 {
-            let grabbable_object_index =
-                raycast_grab(engine.world.get_objects(), player.camera.position, forward, 5);
+            let grabbable_object_index = raycast_grab(
+                engine.world.get_objects(),
+                player.camera.position,
+                forward,
+                5,
+            );
 
             if grabbable_object_index > 0 {
-                let y_rotation = engine.world.get_objects()[grabbable_object_index]
+                let y_rotation = engine
+                    .world
+                    .get_object(grabbable_object_index)
                     .get_rotation()
                     .y;
-                engine.world.objects[grabbable_object_index].set_rotation_y(y_rotation + 0.1);
+                engine
+                    .world
+                    .get_object_mut(grabbable_object_index)
+                    .set_rotation_y(y_rotation + 0.1);
                 let model_mat = transforms::create_transforms(
                     [0.0, 0.0, 0.0],
                     [0.0, y_rotation + 0.1, 0.0],
@@ -481,7 +490,7 @@ impl RendererOpenXR {
 
         // update ingame fps label when menu tablet is enabled
         if menu_tablet_state == 1 && self.frame % 60 == 0 {
-            for (index, object) in engine.world.get_objects().iter().enumerate() {
+            for (index, object) in engine.world.get_objects() {
                 match object.get_tag() {
                     "fps_label" => {
                         let fps_label = text::create_plane_with_text(
@@ -493,7 +502,7 @@ impl RendererOpenXR {
                         );
                         let meshes = vertex::create_vertices(&fps_label);
                         for (vertices, _) in meshes {
-                            self.num_vertices[index] = vec![vertices.len() as u32];
+                            self.num_vertices[*index] = vec![vertices.len() as u32];
                             let vertex_buffer =
                                 self.init.device.create_buffer(&wgpu::BufferDescriptor {
                                     label: Some("Vertex Buffer"),
@@ -502,9 +511,9 @@ impl RendererOpenXR {
                                         | wgpu::BufferUsages::COPY_DST,
                                     mapped_at_creation: false,
                                 });
-                            self.vertex_buffers[index] = vec![vertex_buffer];
+                            self.vertex_buffers[*index] = vec![vertex_buffer];
                             self.init.queue.write_buffer(
-                                &self.vertex_buffers[index][0],
+                                &self.vertex_buffers[*index][0],
                                 0,
                                 bytemuck::cast_slice(&vertices),
                             );
@@ -520,7 +529,7 @@ impl RendererOpenXR {
                         );
                         let meshes = vertex::create_vertices(&ram_label);
                         for (vertices, _) in meshes {
-                            self.num_vertices[index] = vec![vertices.len() as u32];
+                            self.num_vertices[*index] = vec![vertices.len() as u32];
                             let vertex_buffer =
                                 self.init.device.create_buffer(&wgpu::BufferDescriptor {
                                     label: Some("Vertex Buffer"),
@@ -529,9 +538,9 @@ impl RendererOpenXR {
                                         | wgpu::BufferUsages::COPY_DST,
                                     mapped_at_creation: false,
                                 });
-                            self.vertex_buffers[index] = vec![vertex_buffer];
+                            self.vertex_buffers[*index] = vec![vertex_buffer];
                             self.init.queue.write_buffer(
-                                &self.vertex_buffers[index][0],
+                                &self.vertex_buffers[*index][0],
                                 0,
                                 bytemuck::cast_slice(&vertices),
                             );
@@ -591,9 +600,7 @@ impl RendererOpenXR {
                 [
                     bone.0.position.x,
                     bone.0.position.y
-                        + bone_position.y
-                            * world.get_object(object_index).get_scale().y
-                            * 150.0,
+                        + bone_position.y * world.get_object(object_index).get_scale().y * 150.0,
                     bone.0.rotation.z,
                 ],
                 bone.0.rotation.into(),
@@ -699,9 +706,7 @@ impl RendererOpenXR {
                 [
                     bone.0.position.x,
                     bone.0.position.y
-                        + bone_position.y
-                            * world.get_object(object_index).get_scale().y
-                            * 150.0,
+                        + bone_position.y * world.get_object(object_index).get_scale().y * 150.0,
                     bone.0.rotation.z,
                 ],
                 bone.0.rotation.into(),
@@ -996,18 +1001,18 @@ impl RendererOpenXR {
             );
         }
 
-        for object in world.get_objects().iter().enumerate() {
-            let meshes = object.1.get_vertices();
-            let materials = object.1.get_materials();
+        for (object_index, object) in world.get_objects() {
+            let meshes = object.get_vertices();
+            let materials = object.get_materials();
             let mut bones: Vec<[[f32; 4]; 4]> = Vec::new();
             self.vertex_buffers.push(Vec::new());
             self.uniform_bind_groups.push(Vec::new());
             self.num_vertices.push(Vec::new());
 
-            let bone_transforms = object.1.get_bones();
+            let bone_transforms = object.get_bones();
             self.final_marices.push(Vec::new());
             for _ in 0..bone_transforms.len() {
-                self.final_marices[object.0].push([
+                self.final_marices[*object_index].push([
                     [0.0, 0.0, 0.0, 0.0],
                     [0.0, 0.0, 0.0, 0.0],
                     [0.0, 0.0, 0.0, 0.0],
@@ -1029,7 +1034,7 @@ impl RendererOpenXR {
 
             let bone_buffer;
             if bones.len() > 0 {
-                println!("{}", object.0);
+                println!("{}", object_index);
                 self.shader_type.push(ShaderType::DisplacementBones);
                 bone_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor {
                     label: Some("Bone Buffer"),
@@ -1062,19 +1067,19 @@ impl RendererOpenXR {
 
             let model_mat = transforms::create_transforms(
                 [
-                    object.1.get_position().x,
-                    object.1.get_position().y,
-                    object.1.get_position().z,
+                    object.get_position().x,
+                    object.get_position().y,
+                    object.get_position().z,
                 ],
                 [
-                    object.1.get_rotation().x,
-                    object.1.get_rotation().y,
-                    object.1.get_rotation().z,
+                    object.get_rotation().x,
+                    object.get_rotation().y,
+                    object.get_rotation().z,
                 ],
                 [
-                    object.1.get_scale().x,
-                    object.1.get_scale().y,
-                    object.1.get_scale().z,
+                    object.get_scale().x,
+                    object.get_scale().y,
+                    object.get_scale().z,
                 ],
             );
             let normal_mat = (model_mat.invert().unwrap()).transpose();
@@ -1139,7 +1144,7 @@ impl RendererOpenXR {
                         &self.vertex_uniform_buffer,
                         &self.fragment_uniform_buffer,
                         &model_uniform_buffer,
-                        &self.bone_buffers[object.0],
+                        &self.bone_buffers[*object_index],
                         &texture_displacement.texture,
                         texture_displacement.texture_size,
                         &texture_displacement.texture_rgba,
@@ -1163,7 +1168,7 @@ impl RendererOpenXR {
                             &self.vertex_uniform_buffer,
                             &self.fragment_uniform_buffer,
                             &model_uniform_buffer,
-                            &self.bone_buffers[object.0],
+                            &self.bone_buffers[*object_index],
                             &texture_displacement.texture,
                             texture_displacement.texture_size,
                             &texture_displacement.texture_rgba,
@@ -1181,12 +1186,13 @@ impl RendererOpenXR {
                     }
                 }
 
-                self.vertex_buffers[object.0].push(vertex_buffer);
-                self.uniform_bind_groups[object.0].push(uniform_bind_group);
+                self.vertex_buffers[*object_index].push(vertex_buffer);
+                self.uniform_bind_groups[*object_index].push(uniform_bind_group);
 
-                self.num_vertices[object.0].push(vertices.len() as u32);
+                self.num_vertices[*object_index].push(vertices.len() as u32);
                 self.init.queue.write_buffer(
-                    &self.vertex_buffers[object.0][self.vertex_buffers[object.0].len() - 1],
+                    &self.vertex_buffers[*object_index]
+                        [self.vertex_buffers[*object_index].len() - 1],
                     0,
                     bytemuck::cast_slice(vertices),
                 );
@@ -1200,7 +1206,7 @@ impl RendererOpenXR {
         .expect("Sending user ready signal failed :C");*/
     }
 
-    pub fn render(&mut self, depth_texture: &wgpu::Texture) -> Result<(), ()> {
+    pub fn render(&mut self, _depth_texture: &wgpu::Texture) -> Result<(), ()> {
         /*let output = match self.init.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => frame,
             wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,

@@ -67,7 +67,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         let (data_thread_tx, data_thread_rx) = mpsc::channel::<UserUpdate>();
         let (avatar_thread_tx, avatar_thread_rx) = mpsc::channel::<AvatarUpdate>();
 
-        self.engine = Some(Engine::new(data_thread_tx.clone(), avatar_thread_rx, self.home_world.clone()));
+        self.engine = Some(Engine::new(data_thread_tx.clone(), avatar_thread_rx));
 
         let muted = Arc::clone(&self.muted);
         thread::spawn(move || {
@@ -82,7 +82,9 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     start_user_handler(socket, data_thread_rx, avatar_thread_tx, user_id).await;
                     start_voice_handler(user_id, muted).await;
                 } else {
-                    println!("Failed to connect to websocket /ws/user, not connected to any server");
+                    println!(
+                        "Failed to connect to websocket /ws/user, not connected to any server"
+                    );
                 }
             });
         });
@@ -129,7 +131,14 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
         self.window_size = (renderer.init.size.width, renderer.init.size.height);
 
-        renderer.set_world(self.home_world.clone());
+        //renderer.set_world(self.home_world.clone());
+        self.engine.as_mut().unwrap().set_world(
+            self.home_world.clone(),
+            &mut renderer.buffer_collection,
+            &renderer.init.device,
+            &renderer.init.queue,
+        );
+
         data_thread_tx
             .send(UserUpdate::SendReadySignal)
             .expect("Sending user ready signal failed :C");
@@ -362,7 +371,14 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 let engine = self.engine.as_mut().unwrap();
                 let renderer = self.windowed_renderer.as_mut().unwrap();
 
-                engine.update(self.mouse_movement, self.keys, frame_time, &mut renderer.buffer_collection, &renderer.init.device, &renderer.init.queue);
+                engine.update(
+                    self.mouse_movement,
+                    self.keys,
+                    frame_time,
+                    &mut renderer.buffer_collection,
+                    &renderer.init.device,
+                    &renderer.init.queue,
+                );
                 renderer.update(frame_time, self.menu_tablet_state, engine);
 
                 if self.menu_tablet_state == 2 {

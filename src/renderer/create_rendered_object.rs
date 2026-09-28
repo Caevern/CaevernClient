@@ -1,24 +1,35 @@
+use std::collections::HashSet;
+
+use cgmath::Matrix;
 use cgmath::Matrix4;
 use cgmath::SquareMatrix;
-use cgmath::Matrix;
 
+use crate::renderer::buffer_bindings::BufferBindings;
+use crate::renderer::buffer_collection::BufferCollection;
 use crate::renderer::buffers::displacement_buffer::create_buffer_displacement;
 use crate::renderer::shader_type::ShaderType;
 use crate::renderer::texture_object::TextureObject;
 use crate::renderer::transforms;
-use crate::world::{object::Object, world::World};
-use crate::renderer::buffer_collection::BufferCollection;
+use crate::world::object::Object;
 
-pub fn create_rendered_object(world: &World, object: &Object, buffer_collection: &mut BufferCollection, device: &wgpu::Device, queue: &wgpu::Queue) {
-    for texture in world.get_textures() {
-        if buffer_collection.textures.contains_key(&texture.to_string()) {
+pub fn create_rendered_object(
+    textures: &HashSet<String>,
+    object: &mut Object,
+    buffer_collection: &mut BufferCollection,
+    device: &wgpu::Device,
+    queue: &wgpu::Queue,
+) {
+    for texture in textures {
+        if buffer_collection
+            .textures
+            .contains_key(&texture.to_string())
+        {
             continue;
         }
 
-        buffer_collection.textures.insert(
-            texture.to_string(),
-            TextureObject::create(texture, device),
-        );
+        buffer_collection
+            .textures
+            .insert(texture.to_string(), TextureObject::create(texture, device));
     }
 
     let meshes = object.get_vertices();
@@ -28,12 +39,16 @@ pub fn create_rendered_object(world: &World, object: &Object, buffer_collection:
     buffer_collection.uniform_bind_groups.push(Vec::new());
     buffer_collection.num_vertices.push(Vec::new());
 
-    let object_id = buffer_collection.vertex_buffers.len() - 1;
+    let vertex_buffer_index = buffer_collection.vertex_buffers.len() - 1;
+    let uniform_bind_group_index = buffer_collection.uniform_bind_groups.len() - 1;
+    let num_vertices_index = buffer_collection.num_vertices.len() - 1;
 
     let bone_transforms = object.get_bones();
     buffer_collection.final_matrices.push(Vec::new());
+
+    let final_matrices_index = buffer_collection.final_matrices.len() - 1;
     for _ in 0..bone_transforms.len() {
-        buffer_collection.final_matrices[object_id].push([
+        buffer_collection.final_matrices[final_matrices_index].push([
             [0.0, 0.0, 0.0, 0.0],
             [0.0, 0.0, 0.0, 0.0],
             [0.0, 0.0, 0.0, 0.0],
@@ -41,6 +56,8 @@ pub fn create_rendered_object(world: &World, object: &Object, buffer_collection:
         ]);
     }
     buffer_collection.bones.push(bone_transforms.clone());
+
+    let bones_index = buffer_collection.bones.len() - 1;
 
     for bone in bone_transforms {
         bones.push(
@@ -55,8 +72,9 @@ pub fn create_rendered_object(world: &World, object: &Object, buffer_collection:
 
     let bone_buffer;
     if bones.len() > 0 {
-        println!("{}", object_id);
-        buffer_collection.shader_type.push(ShaderType::DisplacementBones);
+        buffer_collection
+            .shader_type
+            .push(ShaderType::DisplacementBones);
         bone_buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("Bone Buffer"),
             size: (bones.len() * std::mem::size_of::<Matrix4<f32>>()) as u64,
@@ -74,15 +92,19 @@ pub fn create_rendered_object(world: &World, object: &Object, buffer_collection:
         });
     }
 
+    let bone_buffer_index = buffer_collection.bone_buffers.len();
+    let shader_type_index = buffer_collection.shader_type.len() - 1;
+
     buffer_collection.bone_buffers.push(bone_buffer);
 
-    let model_uniform_buffer: wgpu::Buffer =
-        device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("Vertex Uniform Buffer"),
-            size: 128,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
+    let model_uniform_buffer: wgpu::Buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Vertex Uniform Buffer"),
+        size: 128,
+        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
+    let model_uniform_buffer_index = buffer_collection.model_uniform_buffers.len();
 
     let model_mat = transforms::create_transforms(
         [
@@ -110,8 +132,7 @@ pub fn create_rendered_object(world: &World, object: &Object, buffer_collection:
 
     for (vertices, material_name) in meshes {
         let material_found;
-        let bytes_filtered: Vec<u8> =
-            material_name.bytes().filter(|c| c > &(31 as u8)).collect();
+        let bytes_filtered: Vec<u8> = material_name.bytes().filter(|c| c > &(31 as u8)).collect();
         let material_string = String::from_utf8(bytes_filtered).unwrap();
 
         if let Some(material) = materials.get(&material_string) {
@@ -137,7 +158,9 @@ pub fn create_rendered_object(world: &World, object: &Object, buffer_collection:
 
         let texture_object_displacement;
         if let Some(texture_displacement_name) = material_found_displacement {
-            if let Some(texture_displacement) = buffer_collection.textures.get(texture_displacement_name) {
+            if let Some(texture_displacement) =
+                buffer_collection.textures.get(texture_displacement_name)
+            {
                 texture_object_displacement = Some(texture_displacement);
             } else {
                 texture_object_displacement = None;
@@ -156,7 +179,7 @@ pub fn create_rendered_object(world: &World, object: &Object, buffer_collection:
                 &buffer_collection.vertex_uniform_buffer,
                 &buffer_collection.fragment_uniform_buffer,
                 &model_uniform_buffer,
-                &buffer_collection.bone_buffers[object_id],
+                &buffer_collection.bone_buffers[bone_buffer_index],
                 &texture_displacement.texture,
                 texture_displacement.texture_size,
                 &texture_displacement.texture_rgba,
@@ -170,7 +193,9 @@ pub fn create_rendered_object(world: &World, object: &Object, buffer_collection:
                 vertices.len(),
             );
         } else {
-            if let Some(texture_displacement) = buffer_collection.textures.get("textures/displacement.png") {
+            if let Some(texture_displacement) =
+                buffer_collection.textures.get("textures/displacement.png")
+            {
                 (uniform_bind_group, vertex_buffer) = create_buffer_displacement(
                     &queue,
                     &device,
@@ -178,7 +203,7 @@ pub fn create_rendered_object(world: &World, object: &Object, buffer_collection:
                     &buffer_collection.vertex_uniform_buffer,
                     &buffer_collection.fragment_uniform_buffer,
                     &model_uniform_buffer,
-                    &buffer_collection.bone_buffers[object_id],
+                    &buffer_collection.bone_buffers[bone_buffer_index],
                     &texture_displacement.texture,
                     texture_displacement.texture_size,
                     &texture_displacement.texture_rgba,
@@ -196,16 +221,31 @@ pub fn create_rendered_object(world: &World, object: &Object, buffer_collection:
             }
         }
 
-        buffer_collection.vertex_buffers[object_id].push(vertex_buffer);
-        buffer_collection.uniform_bind_groups[object_id].push(uniform_bind_group);
+        buffer_collection.vertex_buffers[vertex_buffer_index].push(vertex_buffer);
+        buffer_collection.uniform_bind_groups[uniform_bind_group_index].push(uniform_bind_group);
 
-        buffer_collection.num_vertices[object_id].push(vertices.len() as u32);
+        buffer_collection.num_vertices[num_vertices_index].push(vertices.len() as u32);
         queue.write_buffer(
-            &buffer_collection.vertex_buffers[object_id][buffer_collection.vertex_buffers[object_id].len() - 1],
+            &buffer_collection.vertex_buffers[vertex_buffer_index]
+                [buffer_collection.vertex_buffers[vertex_buffer_index].len() - 1],
             0,
             bytemuck::cast_slice(vertices),
         );
     }
 
-    buffer_collection.model_uniform_buffers.push(model_uniform_buffer);
+    buffer_collection
+        .model_uniform_buffers
+        .push(model_uniform_buffer);
+
+    let updated_buffer_bindings_object = BufferBindings {
+        vertex_buffer: vertex_buffer_index,
+        uniform_bind_group: uniform_bind_group_index,
+        num_vertices: num_vertices_index,
+        final_matrices: final_matrices_index,
+        bones: bones_index,
+        bone_buffer: bone_buffer_index,
+        shader_type: shader_type_index,
+        model_uniform_buffer: model_uniform_buffer_index,
+    };
+    object.buffer_bindings = updated_buffer_bindings_object;
 }

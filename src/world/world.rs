@@ -1,16 +1,23 @@
-use std::{collections::{HashMap, HashSet}, println};
+use std::{
+    collections::{HashMap, HashSet},
+    println,
+};
 
 use cgmath::Vector3;
 
 use crate::{
-    renderer::{transform::Transform, vertex::create_vertices_skinned}, world::{
-        material::Material, object::{Object, ObjectType}, parsers::{cae_parser::parse_cae, fbx_parser::parse}, scene::load_scene,
+    renderer::{transform::Transform, vertex::create_vertices_skinned},
+    world::{
+        material::Material,
+        object::{Object, ObjectType},
+        parsers::{cae_parser::parse_cae, fbx_parser::parse},
+        scene::load_scene,
     },
 };
 
 #[derive(Clone)]
 pub struct World {
-    pub objects: Vec<Object>,
+    pub objects: HashMap<usize, Object>,
     pub textures: HashSet<String>,
     pub images: HashMap<String, image::DynamicImage>,
     cameras: Vec<Object>,
@@ -18,7 +25,7 @@ pub struct World {
 impl World {
     pub fn new() -> Self {
         Self {
-            objects: Vec::new(),
+            objects: HashMap::new(),
             textures: HashSet::new(),
             images: HashMap::new(),
             cameras: Vec::new(),
@@ -29,14 +36,26 @@ impl World {
         if object.get_object_type() == ObjectType::Camera {
             self.cameras.push(object);
         } else {
-            self.objects.push(object);
+            self.objects.insert(self.get_free_object_id(), object);
         }
     }
 
-    pub fn get_object(&self, index: usize) -> &Object {
-        &self.objects[index]
+    pub fn get_free_object_id(&self) -> usize {
+        self.objects.len()
     }
-    pub fn get_objects(&self) -> &Vec<Object> {
+
+    pub fn get_object(&self, index: usize) -> &Object {
+        &self
+            .objects
+            .get(&index)
+            .expect("Object doesn't exist at this index")
+    }
+    pub fn get_object_mut(&mut self, index: usize) -> &mut Object {
+        self.objects
+            .get_mut(&index)
+            .expect("Object doesn't exist at this index")
+    }
+    pub fn get_objects(&self) -> &HashMap<usize, Object> {
         &self.objects
     }
 

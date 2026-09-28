@@ -1,22 +1,36 @@
-use cgmath::Vector3;
-use cgmath::SquareMatrix;
 use cgmath::Matrix;
+use cgmath::SquareMatrix;
+use cgmath::Vector3;
 
-use crate::{renderer::{buffer_collection::BufferCollection, transforms::create_transforms}, world::world::World};
+use crate::renderer::buffer_bindings::BufferBindings;
+use crate::{
+    renderer::{buffer_collection::BufferCollection, transforms::create_transforms},
+    world::world::World,
+};
 
-pub fn update_bones(world: &World, object_index: usize, buffer_collection: &mut BufferCollection, queue: &wgpu::Queue) {
-    for (bone_index, bone) in buffer_collection.bones[object_index].iter().enumerate() {
+pub fn update_bones(
+    world: &World,
+    object_index: usize,
+    buffer_bindings: BufferBindings,
+    buffer_collection: &mut BufferCollection,
+    queue: &wgpu::Queue,
+) {
+    for (bone_index, bone) in buffer_collection.bones[buffer_bindings.bones]
+        .iter()
+        .enumerate()
+    {
         let mut bone_position =
             Vector3::new(bone.1.position.x, bone.1.position.y, bone.1.position.z);
 
         if bone.2 != -1 {
             let mut current_parent = bone.2;
-            for _ in 0..buffer_collection.bones[object_index].len() {
+            for _ in 0..buffer_collection.bones[buffer_bindings.bones].len() {
                 if current_parent == -1 {
                     break;
                 }
 
-                let current_parent_bone = buffer_collection.bones[object_index][current_parent as usize];
+                let current_parent_bone =
+                    buffer_collection.bones[buffer_bindings.bones][current_parent as usize];
 
                 if current_parent_bone.2 != -1 {
                     bone_position.x += current_parent_bone.1.position.x;
@@ -34,9 +48,7 @@ pub fn update_bones(world: &World, object_index: usize, buffer_collection: &mut 
             [
                 bone.0.position.x,
                 bone.0.position.y
-                    + bone_position.y
-                        * world.get_object(object_index).get_scale().y
-                        * 150.0,
+                    + bone_position.y * world.get_object(object_index).get_scale().y * 150.0,
                 bone.0.rotation.z,
             ],
             bone.0.rotation.into(),
@@ -45,12 +57,13 @@ pub fn update_bones(world: &World, object_index: usize, buffer_collection: &mut 
 
         if bone.2 != -1 {
             let mut current_parent = bone.2;
-            for _ in 0..buffer_collection.bones[object_index].len() {
+            for _ in 0..buffer_collection.bones[buffer_bindings.bones].len() {
                 if current_parent == -1 {
                     break;
                 }
 
-                let current_parent_bone = buffer_collection.bones[object_index][current_parent as usize];
+                let current_parent_bone =
+                    buffer_collection.bones[buffer_bindings.bones][current_parent as usize];
 
                 let parent_matrix = create_transforms(
                     current_parent_bone.0.position.into(),
@@ -102,11 +115,12 @@ pub fn update_bones(world: &World, object_index: usize, buffer_collection: &mut 
         let inverse_bind = bind_global.invert().expect("BIND DOESN'T EXIST");
 
         let final_matrix = global_matrix * inverse_bind;
-        buffer_collection.final_matrices[object_index][bone_index] = final_matrix.into();
+        buffer_collection.final_matrices[buffer_bindings.final_matrices][bone_index] =
+            final_matrix.into();
     }
     queue.write_buffer(
-        &buffer_collection.bone_buffers[object_index],
+        &buffer_collection.bone_buffers[buffer_bindings.bone_buffer],
         0,
-        bytemuck::cast_slice(&buffer_collection.final_matrices[object_index]),
+        bytemuck::cast_slice(&buffer_collection.final_matrices[buffer_bindings.final_matrices]),
     );
 }

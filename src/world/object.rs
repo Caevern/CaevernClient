@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use cgmath::Vector3;
 
 use crate::{
-    renderer::{transform::Transform, vertex::Vertex},
+    renderer::{buffer_bindings::BufferBindings, transform::Transform, vertex::Vertex},
     world::material::Material,
 };
 
@@ -41,6 +41,7 @@ pub struct Object {
     skeleton: HashMap<String, usize>,
     movable: bool,
     tag: String,
+    pub buffer_bindings: BufferBindings,
 }
 impl Object {
     pub fn create(object_type: ObjectType, meshes: Vec<(Vec<Vertex>, String)>) -> Self {
@@ -63,6 +64,7 @@ impl Object {
             skeleton: HashMap::new(),
             movable: false,
             tag: "unnamed".to_string(),
+            buffer_bindings: BufferBindings::empty(),
         }
     }
 

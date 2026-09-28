@@ -50,7 +50,7 @@ fn main() {
     world.add_object(camera);
 
     //world.load_world("worlds/scene3.cae");
-    world.load_world("worlds/test.json");
+    world.load_world("worlds/home.json");
 
     //let tablet = cube::create_cube((0.0, 0.0, 0.0), (0.5, 0.4, 0.01));
     let tablet = parse(

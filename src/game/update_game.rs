@@ -4,16 +4,31 @@ use std::{
     sync::mpsc::{Receiver, Sender},
 };
 
-use cgmath::{InnerSpace, Vector3, SquareMatrix, Matrix};
+use cgmath::{InnerSpace, Matrix, SquareMatrix, Vector3};
 
 use crate::{
-    game::{update_bone::update_bone, update_bones::update_bones}, network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate::{self, UpdateAvatarId}}, physics::{
+    game::{update_bone::update_bone, update_bones::update_bones},
+    network::{
+        avatar_updates::AvatarUpdate,
+        user_updates::UserUpdate::{self, UpdateAvatarId},
+    },
+    physics::{
         gravity::apply_gravity,
         movement::{get_camera_movement, get_camera_rotation},
-    }, renderer::{
-        buffer_collection::BufferCollection, create_rendered_object::create_rendered_object, transform::Transform, transforms::create_transforms, vertex::{Vertex, create_vertices_skinned},
-    }, world::{
-        material::Material, object::{Object, ObjectType}, objects::{player::Player, skeleton::create_skeleton}, parsers::fbx_parser::parse, world::World,
+    },
+    renderer::{
+        buffer_collection::BufferCollection,
+        create_rendered_object::create_rendered_object,
+        transform::Transform,
+        transforms::create_transforms,
+        vertex::{Vertex, create_vertices_skinned},
+    },
+    world::{
+        material::Material,
+        object::{Object, ObjectType},
+        objects::{player::Player, skeleton::create_skeleton},
+        parsers::fbx_parser::parse,
+        world::World,
     },
 };
 
@@ -37,7 +52,6 @@ impl Engine {
     pub fn new(
         data_thread_tx: Sender<UserUpdate>,
         avatar_thread_rx: Receiver<AvatarUpdate>,
-        world: World,
     ) -> Self {
         let model_parsed = parse("models/fallback.fbx", Transform::zero());
         let fallback_vertices = create_vertices_skinned(&model_parsed.0);
@@ -53,13 +67,18 @@ impl Engine {
             fallback_skeleton,
             data_thread_tx,
             avatar_thread_rx,
-            world,
+            world: World::new(),
         }
     }
 
     pub fn update(
-        &mut self, mouse: [f32; 2], keys: [bool; 6], frame_time: f32,
-        buffer_collection: &mut BufferCollection, device: &wgpu::Device, queue: &wgpu::Queue
+        &mut self,
+        mouse: [f32; 2],
+        keys: [bool; 6],
+        frame_time: f32,
+        buffer_collection: &mut BufferCollection,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
     ) {
         let updated_camera_rotation = get_camera_rotation(&self.player, mouse, frame_time);
         self.player.camera.rotation.x = updated_camera_rotation.0;
@@ -99,7 +118,28 @@ impl Engine {
         self.check_avatar_thread(buffer_collection, device, queue);
     }
 
-    fn check_avatar_thread(&mut self, buffer_collection: &mut BufferCollection, device: &wgpu::Device, queue: &wgpu::Queue) {
+    pub fn set_world(
+        &mut self,
+        world: World,
+        buffer_collection: &mut BufferCollection,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) {
+        self.world = world;
+
+        let textures = self.world.get_textures().clone();
+        for object_index in 0..self.world.objects.len() {
+            let mut object = self.world.objects.get_mut(&object_index).unwrap();
+            create_rendered_object(&textures, &mut object, buffer_collection, device, queue);
+        }
+    }
+
+    fn check_avatar_thread(
+        &mut self,
+        buffer_collection: &mut BufferCollection,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) {
         if let Ok(avatar_update) = self.avatar_thread_rx.try_recv() {
             match avatar_update {
                 AvatarUpdate::RegisterUser(transform, id) => {
@@ -135,20 +175,40 @@ impl Engine {
                         Material::from_texture("textures/CG_Dress_Base_color.png"),
                         "DressMaterial".to_string(),
                     );
-                    self.world.textures.insert("textures/CG_Body_Base_color.png".to_string());
-                    self.world.textures.insert("textures/CG_Hairs_Base_color.png".to_string());
-                    self.world.textures.insert("textures/CG_Dress_Base_color.png".to_string());
+                    self.world
+                        .textures
+                        .insert("textures/CG_Body_Base_color.png".to_string());
+                    self.world
+                        .textures
+                        .insert("textures/CG_Hairs_Base_color.png".to_string());
+                    self.world
+                        .textures
+                        .insert("textures/CG_Dress_Base_color.png".to_string());
 
                     let object_id = self.world.get_objects().len();
 
-                    create_rendered_object(&self.world, &object, buffer_collection, device, queue);
+                    create_rendered_object(
+                        &self.world.get_textures(),
+                        &mut object,
+                        buffer_collection,
+                        device,
+                        queue,
+                    );
 
-                    self.world.add_object(object);
-
-                    buffer_collection.bones[object_id][self.fallback_skeleton["head"]]
+                    buffer_collection.bones[object.buffer_bindings.bones]
+                        [self.fallback_skeleton["head"]]
                         .0
                         .rotation = [transform.rotation.x, 0.0, transform.rotation.z].into();
-                    update_bones(&self.world, object_id, buffer_collection, queue);
+
+                    let buffer_bindings = object.buffer_bindings;
+                    self.world.add_object(object);
+                    update_bones(
+                        &self.world,
+                        object_id,
+                        buffer_bindings,
+                        buffer_collection,
+                        queue,
+                    );
 
                     self.data_thread_tx
                         .send(UpdateAvatarId(id, object_id))
@@ -157,12 +217,21 @@ impl Engine {
                         );
                 }
                 AvatarUpdate::SetUserPosition(transform, object_id) => {
-                    buffer_collection.bones[object_id][self.fallback_skeleton["head"]]
+                    let object = self.world.get_object(object_id);
+
+                    buffer_collection.bones[object.buffer_bindings.bones]
+                        [self.fallback_skeleton["head"]]
                         .0
                         .rotation = [transform.rotation.x, 0.0, transform.rotation.z].into();
-                    update_bone(&self.world, object_id, self.fallback_skeleton["head"], buffer_collection, queue);
+                    update_bone(
+                        &self.world,
+                        object_id,
+                        object.buffer_bindings,
+                        self.fallback_skeleton["head"],
+                        buffer_collection,
+                        queue,
+                    );
 
-                    let object = self.world.get_object(object_id);
                     let position = [
                         transform.position.x,
                         transform.position.y - 0.2,
@@ -170,23 +239,22 @@ impl Engine {
                     ];
                     let rotation = [0.0, transform.rotation.y + f32::consts::PI, 0.0];
 
-                    let model_mat = create_transforms(
-                        position,
-                        rotation,
-                        object.get_scale().into(),
-                    );
+                    let model_mat =
+                        create_transforms(position, rotation, object.get_scale().into());
                     let normal_mat = (model_mat.invert().unwrap()).transpose();
 
                     let model_ref: &[f32; 16] = model_mat.as_ref();
                     let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
                     queue.write_buffer(
-                        &buffer_collection.model_uniform_buffers[object_id],
+                        &buffer_collection.model_uniform_buffers
+                            [object.buffer_bindings.model_uniform_buffer],
                         0,
                         bytemuck::cast_slice(model_ref),
                     );
                     queue.write_buffer(
-                        &buffer_collection.model_uniform_buffers[object_id],
+                        &buffer_collection.model_uniform_buffers
+                            [object.buffer_bindings.model_uniform_buffer],
                         64,
                         bytemuck::cast_slice(normal_ref),
                     );

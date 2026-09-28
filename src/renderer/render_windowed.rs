@@ -10,6 +10,7 @@ use crate::game::update_bone::update_bone;
 use crate::game::update_bones::update_bones;
 use crate::game::update_game::Engine;
 use crate::interract::raycast::raycast_grab;
+use crate::renderer::buffer_bindings::BufferBindings;
 use crate::renderer::buffer_collection::BufferCollection;
 use crate::renderer::buffers::bind_group_layout::create_bind_group_layout;
 use crate::renderer::buffers::displacement_buffer::create_buffer_displacement;
@@ -171,8 +172,10 @@ impl<'window> RendererWindowed<'window> {
         .normalize();
 
         if menu_tablet_state == 2 {
-            for i in 0..engine.world.get_objects().len() {
-                let object_type = engine.world.get_objects()[i].get_object_type();
+            let objects = engine.world.get_objects();
+            for object_index in 0..objects.len() {
+                let object = engine.world.get_object(object_index);
+                let object_type = object.get_object_type();
                 if object_type == ObjectType::TabletMenu
                     || object_type == ObjectType::TabletMenuButton
                 {
@@ -195,20 +198,24 @@ impl<'window> RendererWindowed<'window> {
                     let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
                     self.init.queue.write_buffer(
-                        &self.buffer_collection.model_uniform_buffers[i],
+                        &self.buffer_collection.model_uniform_buffers
+                            [object.buffer_bindings.model_uniform_buffer],
                         0,
                         bytemuck::cast_slice(model_ref),
                     );
                     self.init.queue.write_buffer(
-                        &self.buffer_collection.model_uniform_buffers[i],
+                        &self.buffer_collection.model_uniform_buffers
+                            [object.buffer_bindings.model_uniform_buffer],
                         64,
                         bytemuck::cast_slice(normal_ref),
                     );
                 }
             }
         } else if menu_tablet_state == 3 {
-            for i in 0..engine.world.get_objects().len() {
-                let object_type = engine.world.get_objects()[i].get_object_type();
+            let objects = engine.world.get_objects();
+            for object_index in 0..objects.len() {
+                let object = engine.world.get_object(object_index);
+                let object_type = object.get_object_type();
                 if object_type == ObjectType::TabletMenu
                     || object_type == ObjectType::TabletMenuButton
                 {
@@ -227,12 +234,14 @@ impl<'window> RendererWindowed<'window> {
                     let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
                     self.init.queue.write_buffer(
-                        &self.buffer_collection.model_uniform_buffers[i],
+                        &self.buffer_collection.model_uniform_buffers
+                            [object.buffer_bindings.model_uniform_buffer],
                         0,
                         bytemuck::cast_slice(model_ref),
                     );
                     self.init.queue.write_buffer(
-                        &self.buffer_collection.model_uniform_buffers[i],
+                        &self.buffer_collection.model_uniform_buffers
+                            [object.buffer_bindings.model_uniform_buffer],
                         64,
                         bytemuck::cast_slice(normal_ref),
                     );
@@ -240,8 +249,9 @@ impl<'window> RendererWindowed<'window> {
             }
         }
 
-        for i in 0..engine.world.get_objects().len() {
-            if engine.world.get_object(i).get_object_type() == ObjectType::Skybox {
+        for object_index in 0..engine.world.get_objects().len() {
+            let object = engine.world.get_object(object_index);
+            if object.get_object_type() == ObjectType::Skybox {
                 let model_mat = transforms::create_transforms(
                     [
                         player.camera.position.x,
@@ -262,28 +272,38 @@ impl<'window> RendererWindowed<'window> {
                     bytemuck::cast_slice(eye_position),
                 );
                 self.init.queue.write_buffer(
-                    &self.buffer_collection.model_uniform_buffers[i],
+                    &self.buffer_collection.model_uniform_buffers
+                        [object.buffer_bindings.model_uniform_buffer],
                     0,
                     bytemuck::cast_slice(model_ref),
                 );
                 self.init.queue.write_buffer(
-                    &self.buffer_collection.model_uniform_buffers[i],
+                    &self.buffer_collection.model_uniform_buffers
+                        [object.buffer_bindings.model_uniform_buffer],
                     64,
                     bytemuck::cast_slice(normal_ref),
                 );
-            } else if engine.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
+            } else if object.get_object_type() == ObjectType::SkinnedMesh {
                 if self.frame < 60 {
-                    let skeleton = engine.world.get_object(i).get_skeleton();
+                    let skeleton = object.get_skeleton();
                     //self.bones[i][skeleton["head"]].0.rotation.x = -player.camera.rotation.x;
                     //self.bones[i][skeleton["arm_right"]].0.rotation.z = -player.camera.rotation.x;
                     /*self.bones[i][skeleton["head"]].0.rotation.y =
                     -player.camera.rotation.y - 1.57079633;*/
                     // TODO: make the local character have this dissabled by default.
-                    self.buffer_collection.bones[i][skeleton["neck"]].0.scale = [0.0, 0.0, 0.0].into();
-                    update_bone(&engine.world, i, skeleton["head"], &mut self.buffer_collection, &self.init.queue);
+                    self.buffer_collection.bones[object.buffer_bindings.bones][skeleton["neck"]]
+                        .0
+                        .scale = [0.0, 0.0, 0.0].into();
+                    update_bone(
+                        &engine.world,
+                        object_index,
+                        object.buffer_bindings,
+                        skeleton["head"],
+                        &mut self.buffer_collection,
+                        &self.init.queue,
+                    );
                 }
 
-                let object = engine.world.get_object(i);
                 let position = [
                     object.get_position().x + player.camera.position.x
                         - player.camera.rotation.y.cos() * 0.1,
@@ -297,18 +317,6 @@ impl<'window> RendererWindowed<'window> {
                     object.get_rotation().z,
                 ];
 
-                /*let _ = self
-                .data_thread_tx
-                .send(UserUpdate::SendUserPosition(Transform {
-                    position: position.into(),
-                    rotation: Vector3::new(
-                        -player.camera.rotation.x,
-                        rotation[1],
-                        -player.camera.rotation.z,
-                    ),
-                    scale: Vector3::new(1.0, 1.0, 1.0),
-                }));*/
-
                 let model_mat =
                     transforms::create_transforms(position, rotation, object.get_scale().into());
                 let normal_mat = (model_mat.invert().unwrap()).transpose();
@@ -317,12 +325,14 @@ impl<'window> RendererWindowed<'window> {
                 let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
                 self.init.queue.write_buffer(
-                    &self.buffer_collection.model_uniform_buffers[i],
+                    &self.buffer_collection.model_uniform_buffers
+                        [object.buffer_bindings.model_uniform_buffer],
                     0,
                     bytemuck::cast_slice(model_ref),
                 );
                 self.init.queue.write_buffer(
-                    &self.buffer_collection.model_uniform_buffers[i],
+                    &self.buffer_collection.model_uniform_buffers
+                        [object.buffer_bindings.model_uniform_buffer],
                     64,
                     bytemuck::cast_slice(normal_ref),
                 );
@@ -330,23 +340,33 @@ impl<'window> RendererWindowed<'window> {
         }
 
         if self.frame % 20 == 1 {
-            for i in 0..engine.world.get_objects().len() {
-                if engine.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
-                    update_bones(&engine.world, i, &mut self.buffer_collection, &self.init.queue);
+            for object_index in 0..engine.world.get_objects().len() {
+                let object = engine.world.get_object(object_index);
+                if object.get_object_type() == ObjectType::SkinnedMesh {
+                    update_bones(
+                        &engine.world,
+                        object_index,
+                        object.buffer_bindings,
+                        &mut self.buffer_collection,
+                        &self.init.queue,
+                    );
                 }
             }
         }
 
         // update skybox positions
         if self.frame % 10 == 0 {
-            let grabbable_object_index =
-                raycast_grab(engine.world.get_objects(), player.camera.position, forward, 5);
+            let grabbable_object_index = raycast_grab(
+                engine.world.get_objects(),
+                player.camera.position,
+                forward,
+                5,
+            );
 
             if grabbable_object_index > 0 {
-                let y_rotation = engine.world.get_objects()[grabbable_object_index]
-                    .get_rotation()
-                    .y;
-                engine.world.objects[grabbable_object_index].set_rotation_y(y_rotation + 0.1);
+                let grabbable_object = engine.world.get_object_mut(grabbable_object_index);
+                let y_rotation = grabbable_object.get_rotation().y;
+                grabbable_object.set_rotation_y(y_rotation + 0.1);
                 let model_mat = transforms::create_transforms(
                     [0.0, 0.0, 0.0],
                     [0.0, y_rotation + 0.1, 0.0],
@@ -363,12 +383,14 @@ impl<'window> RendererWindowed<'window> {
                     bytemuck::cast_slice(eye_position),
                 );
                 self.init.queue.write_buffer(
-                    &self.buffer_collection.model_uniform_buffers[grabbable_object_index],
+                    &self.buffer_collection.model_uniform_buffers
+                        [grabbable_object.buffer_bindings.model_uniform_buffer],
                     0,
                     bytemuck::cast_slice(model_ref),
                 );
                 self.init.queue.write_buffer(
-                    &self.buffer_collection.model_uniform_buffers[grabbable_object_index],
+                    &self.buffer_collection.model_uniform_buffers
+                        [grabbable_object.buffer_bindings.model_uniform_buffer],
                     64,
                     bytemuck::cast_slice(normal_ref),
                 );
@@ -400,7 +422,7 @@ impl<'window> RendererWindowed<'window> {
 
         // update ingame fps label when menu tablet is enabled
         if menu_tablet_state == 1 && self.frame % 60 == 0 {
-            for (index, object) in engine.world.get_objects().iter().enumerate() {
+            for (_, object) in engine.world.get_objects() {
                 match object.get_tag() {
                     "fps_label" => {
                         let fps_label = text::create_plane_with_text(
@@ -412,7 +434,8 @@ impl<'window> RendererWindowed<'window> {
                         );
                         let meshes = vertex::create_vertices(&fps_label);
                         for (vertices, _) in meshes {
-                            self.buffer_collection.num_vertices[index] = vec![vertices.len() as u32];
+                            self.buffer_collection.num_vertices
+                                [object.buffer_bindings.num_vertices] = vec![vertices.len() as u32];
                             let vertex_buffer =
                                 self.init.device.create_buffer(&wgpu::BufferDescriptor {
                                     label: Some("Vertex Buffer"),
@@ -421,9 +444,11 @@ impl<'window> RendererWindowed<'window> {
                                         | wgpu::BufferUsages::COPY_DST,
                                     mapped_at_creation: false,
                                 });
-                            self.buffer_collection.vertex_buffers[index] = vec![vertex_buffer];
+                            self.buffer_collection.vertex_buffers
+                                [object.buffer_bindings.vertex_buffer] = vec![vertex_buffer];
                             self.init.queue.write_buffer(
-                                &self.buffer_collection.vertex_buffers[index][0],
+                                &self.buffer_collection.vertex_buffers
+                                    [object.buffer_bindings.vertex_buffer][0],
                                 0,
                                 bytemuck::cast_slice(&vertices),
                             );
@@ -439,7 +464,8 @@ impl<'window> RendererWindowed<'window> {
                         );
                         let meshes = vertex::create_vertices(&ram_label);
                         for (vertices, _) in meshes {
-                            self.buffer_collection.num_vertices[index] = vec![vertices.len() as u32];
+                            self.buffer_collection.num_vertices
+                                [object.buffer_bindings.num_vertices] = vec![vertices.len() as u32];
                             let vertex_buffer =
                                 self.init.device.create_buffer(&wgpu::BufferDescriptor {
                                     label: Some("Vertex Buffer"),
@@ -448,9 +474,11 @@ impl<'window> RendererWindowed<'window> {
                                         | wgpu::BufferUsages::COPY_DST,
                                     mapped_at_creation: false,
                                 });
-                            self.buffer_collection.vertex_buffers[index] = vec![vertex_buffer];
+                            self.buffer_collection.vertex_buffers
+                                [object.buffer_bindings.vertex_buffer] = vec![vertex_buffer];
                             self.init.queue.write_buffer(
-                                &self.buffer_collection.vertex_buffers[index][0],
+                                &self.buffer_collection.vertex_buffers
+                                    [object.buffer_bindings.vertex_buffer][0],
                                 0,
                                 bytemuck::cast_slice(&vertices),
                             );
@@ -464,234 +492,6 @@ impl<'window> RendererWindowed<'window> {
         }
 
         self.frame += 1;
-    }
-
-    pub fn set_world(&mut self, world: World) {
-        self.buffer_collection.vertex_buffers.clear();
-        self.buffer_collection.uniform_bind_groups.clear();
-        self.buffer_collection.num_vertices.clear();
-
-        for texture in world.get_textures() {
-            self.buffer_collection.textures.insert(
-                texture.to_string(),
-                TextureObject::create(texture, &self.init.device),
-            );
-        }
-        for (name, image) in world.get_images() {
-            self.buffer_collection.textures.insert(
-                name.to_string(),
-                TextureObject::from_image(image, &self.init.device),
-            );
-        }
-
-        for object in world.get_objects().iter().enumerate() {
-            let meshes = object.1.get_vertices();
-            let materials = object.1.get_materials();
-            let mut bones: Vec<[[f32; 4]; 4]> = Vec::new();
-            self.buffer_collection.vertex_buffers.push(Vec::new());
-            self.buffer_collection.uniform_bind_groups.push(Vec::new());
-            self.buffer_collection.num_vertices.push(Vec::new());
-
-            let bone_transforms = object.1.get_bones();
-            self.buffer_collection.final_matrices.push(Vec::new());
-            for _ in 0..bone_transforms.len() {
-                self.buffer_collection.final_matrices[object.0].push([
-                    [0.0, 0.0, 0.0, 0.0],
-                    [0.0, 0.0, 0.0, 0.0],
-                    [0.0, 0.0, 0.0, 0.0],
-                    [0.0, 0.0, 0.0, 0.0],
-                ]);
-            }
-            self.buffer_collection.bones.push(bone_transforms.clone());
-
-            for bone in bone_transforms {
-                bones.push(
-                    transforms::create_transforms(
-                        bone.0.position.into(),
-                        bone.0.rotation.into(),
-                        bone.0.scale.into(),
-                    )
-                    .into(),
-                );
-            }
-
-            let bone_buffer;
-            if bones.len() > 0 {
-                println!("{}", object.0);
-                self.buffer_collection.shader_type.push(ShaderType::DisplacementBones);
-                bone_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("Bone Buffer"),
-                    size: (bones.len() * std::mem::size_of::<Matrix4<f32>>()) as u64,
-                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                });
-                self.init
-                    .queue
-                    .write_buffer(&bone_buffer, 0, bytemuck::cast_slice(&bones));
-            } else {
-                self.buffer_collection.shader_type.push(ShaderType::Displacement);
-                bone_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("Bone Buffer"),
-                    size: 16,
-                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                });
-            }
-
-            self.buffer_collection.bone_buffers.push(bone_buffer);
-
-            let model_uniform_buffer: wgpu::Buffer =
-                self.init.device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("Vertex Uniform Buffer"),
-                    size: 128,
-                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                });
-
-            let model_mat = transforms::create_transforms(
-                [
-                    object.1.get_position().x,
-                    object.1.get_position().y,
-                    object.1.get_position().z,
-                ],
-                [
-                    object.1.get_rotation().x,
-                    object.1.get_rotation().y,
-                    object.1.get_rotation().z,
-                ],
-                [
-                    object.1.get_scale().x,
-                    object.1.get_scale().y,
-                    object.1.get_scale().z,
-                ],
-            );
-            let normal_mat = (model_mat.invert().unwrap()).transpose();
-
-            let model_ref: &[f32; 16] = model_mat.as_ref();
-            let normal_ref: &[f32; 16] = normal_mat.as_ref();
-            self.init
-                .queue
-                .write_buffer(&model_uniform_buffer, 0, bytemuck::cast_slice(model_ref));
-            self.init.queue.write_buffer(
-                &model_uniform_buffer,
-                64,
-                bytemuck::cast_slice(normal_ref),
-            );
-
-            for (vertices, material_name) in meshes {
-                let material_found;
-                let bytes_filtered: Vec<u8> =
-                    material_name.bytes().filter(|c| c > &(31 as u8)).collect();
-                let material_string = String::from_utf8(bytes_filtered).unwrap();
-
-                if let Some(material) = materials.get(&material_string) {
-                    material_found = material;
-                } else {
-                    material_found = &materials.get("default").unwrap();
-                }
-
-                let material_found_texture = material_found.get_texture();
-                let material_found_displacement = material_found.get_displacement();
-
-                println!(
-                    "loading: {} from: {}",
-                    material_found_texture, material_string
-                );
-
-                let texture_object;
-                if material_found_texture == "Image" {
-                    if let Some(texture) = self.buffer_collection.textures.get(material_string.as_str()) {
-                        texture_object = texture;
-                    } else if let Some(texture) = self.buffer_collection.textures.get("textures/white.png") {
-                        texture_object = texture;
-                    } else {
-                        continue;
-                    }
-                } else if let Some(texture) = self.buffer_collection.textures.get(material_found_texture) {
-                    texture_object = texture;
-                } else if let Some(texture) = self.buffer_collection.textures.get("textures/missing.png") {
-                    texture_object = texture;
-                } else {
-                    continue;
-                }
-
-                let texture_object_displacement;
-                if let Some(texture_displacement_name) = material_found_displacement {
-                    if let Some(texture_displacement) = self.buffer_collection.textures.get(texture_displacement_name)
-                    {
-                        texture_object_displacement = Some(texture_displacement);
-                    } else {
-                        texture_object_displacement = None;
-                    }
-                } else {
-                    texture_object_displacement = None;
-                }
-
-                let uniform_bind_group;
-                let vertex_buffer;
-                if let Some(texture_displacement) = texture_object_displacement {
-                    (uniform_bind_group, vertex_buffer) = create_buffer_displacement(
-                        &self.init.queue,
-                        &self.init.device,
-                        &self.buffer_collection.uniform_bind_group_layout,
-                        &self.buffer_collection.vertex_uniform_buffer,
-                        &self.buffer_collection.fragment_uniform_buffer,
-                        &model_uniform_buffer,
-                        &self.buffer_collection.bone_buffers[object.0],
-                        &texture_displacement.texture,
-                        texture_displacement.texture_size,
-                        &texture_displacement.texture_rgba,
-                        texture_displacement.texture_width,
-                        texture_displacement.texture_height,
-                        &texture_object.texture,
-                        texture_object.texture_size,
-                        &texture_object.texture_rgba,
-                        texture_object.texture_width,
-                        texture_object.texture_height,
-                        vertices.len(),
-                    );
-                } else {
-                    if let Some(texture_displacement) =
-                        self.buffer_collection.textures.get("textures/displacement.png")
-                    {
-                        (uniform_bind_group, vertex_buffer) = create_buffer_displacement(
-                            &self.init.queue,
-                            &self.init.device,
-                            &self.buffer_collection.uniform_bind_group_layout,
-                            &self.buffer_collection.vertex_uniform_buffer,
-                            &self.buffer_collection.fragment_uniform_buffer,
-                            &model_uniform_buffer,
-                            &self.buffer_collection.bone_buffers[object.0],
-                            &texture_displacement.texture,
-                            texture_displacement.texture_size,
-                            &texture_displacement.texture_rgba,
-                            texture_displacement.texture_width,
-                            texture_displacement.texture_height,
-                            &texture_object.texture,
-                            texture_object.texture_size,
-                            &texture_object.texture_rgba,
-                            texture_object.texture_width,
-                            texture_object.texture_height,
-                            vertices.len(),
-                        );
-                    } else {
-                        continue;
-                    }
-                }
-
-                self.buffer_collection.vertex_buffers[object.0].push(vertex_buffer);
-                self.buffer_collection.uniform_bind_groups[object.0].push(uniform_bind_group);
-
-                self.buffer_collection.num_vertices[object.0].push(vertices.len() as u32);
-                self.init.queue.write_buffer(
-                    &self.buffer_collection.vertex_buffers[object.0][self.buffer_collection.vertex_buffers[object.0].len() - 1],
-                    0,
-                    bytemuck::cast_slice(vertices),
-                );
-            }
-
-            self.buffer_collection.model_uniform_buffers.push(model_uniform_buffer);
-        }
     }
 
     pub fn render(&mut self, depth_texture: &wgpu::Texture) -> Result<(), ()> {
@@ -780,8 +580,15 @@ impl<'window> RendererWindowed<'window> {
                 }
 
                 for i in 0..self.buffer_collection.vertex_buffers[mesh].len() {
-                    render_pass.set_vertex_buffer(0, self.buffer_collection.vertex_buffers[mesh][i].slice(..));
-                    render_pass.set_bind_group(0, &self.buffer_collection.uniform_bind_groups[mesh][i], &[]);
+                    render_pass.set_vertex_buffer(
+                        0,
+                        self.buffer_collection.vertex_buffers[mesh][i].slice(..),
+                    );
+                    render_pass.set_bind_group(
+                        0,
+                        &self.buffer_collection.uniform_bind_groups[mesh][i],
+                        &[],
+                    );
                     render_pass.draw(0..self.buffer_collection.num_vertices[mesh][i], 0..1);
                 }
             }
