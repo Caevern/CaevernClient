@@ -8,7 +8,7 @@ pub fn game_create_mesh(
     vertices_len: u32,
     indices_ptr: u32,
     indices_len: u32,
-) {
+) -> u32 {
     let memory = match caller
         .get_export("memory")
         .and_then(|export| export.into_memory())
@@ -16,7 +16,7 @@ pub fn game_create_mesh(
         Some(memory) => memory,
         None => {
             eprintln!("[MOD] No memory export");
-            return;
+            return 0;
         }
     };
 
@@ -72,4 +72,6 @@ pub fn game_create_mesh(
     }
 
     println!("Created mesh, firing callback");
+
+    return 1;
 }
