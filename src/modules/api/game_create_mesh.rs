@@ -1,6 +1,14 @@
 use wasmtime::Caller;
 
-pub fn game_create_mesh(mut caller: Caller<'_, ()>, vertices_ptr: u32, vertices_len: u32, indices_ptr: u32, indices_len: u32) {
+use crate::renderer::vertex::Vertex;
+
+pub fn game_create_mesh(
+    mut caller: Caller<'_, ()>,
+    vertices_ptr: u32,
+    vertices_len: u32,
+    indices_ptr: u32,
+    indices_len: u32,
+) {
     let memory = match caller
         .get_export("memory")
         .and_then(|export| export.into_memory())
@@ -37,4 +45,31 @@ pub fn game_create_mesh(mut caller: Caller<'_, ()>, vertices_ptr: u32, vertices_
 
     println!("[MOD] vertices: {vertices:?}");
     println!("[MOD] indices: {indices:?}");
+
+    let mut mesh = Vec::new();
+    for index in &indices {
+        if *index as usize >= vertices.len() {
+            continue;
+        }
+
+        let vertex_index = *index as usize * 3;
+        let vertex = [
+            vertices[vertex_index],
+            vertices[vertex_index + 1],
+            vertices[vertex_index + 2],
+            0.0,
+        ];
+
+        let skinned_vertex = Vertex {
+            position: vertex,
+            normal: [0.0, 0.0, 0.0, 1.0],
+            color: [1.0, 0.0, 0.0, 1.0],
+            uv: [0.0, 0.0, 0.0, 0.0],
+            bone_ids: [0.0, 0.0, 0.0, 0.0],
+            bone_weights: [0.0, 0.0, 0.0, 0.0],
+        };
+        mesh.push(skinned_vertex);
+    }
+
+    println!("Created mesh, firing callback");
 }
