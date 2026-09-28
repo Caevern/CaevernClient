@@ -1,6 +1,6 @@
 use wasmtime::{Engine, Linker, Module, Store};
 
-use crate::modules::{api::game_log::game_log, module};
+use crate::modules::{api::{game_create_mesh::game_create_mesh, game_log::game_log}, module};
 
 pub fn load_module(path: &str) -> module::Module {
     let engine = Engine::default();
@@ -9,6 +9,9 @@ pub fn load_module(path: &str) -> module::Module {
     let mut linker = Linker::new(&engine);
     linker
         .func_wrap("env", "log", game_log)
+        .expect("Failed to add function");
+    linker
+        .func_wrap("env", "create_mesh", game_create_mesh)
         .expect("Failed to add function");
 
     let mut store = Store::new(&engine, ());
