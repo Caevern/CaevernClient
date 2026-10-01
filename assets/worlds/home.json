@@ -6,7 +6,7 @@
     "objects": [
         {
             "is_static": true, "reference": "models/base.fbx",
-            "texture": "textures/brick.jpg", "transform": {"position": [0, 1.5, 0], "scale": [0.01, 0.005, 0.01]}
+            "texture": "textures/brick.jpg", "transform": {"position": [0, -0.5, 0], "scale": [0.01, 0.005, 0.01]}
         },
         {
             "is_static": true, "reference": "models/table.fbx",

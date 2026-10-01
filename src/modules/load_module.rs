@@ -1,8 +1,10 @@
+use std::{cell::RefCell, rc::Rc};
+
 use wasmtime::{Engine, Linker, Module, Store};
 
-use crate::modules::{api::{game_create_mesh::game_create_mesh, game_log::game_log}, module};
+use crate::{modules::{api::{game_create_mesh::game_create_mesh, game_log::game_log}, module}, world::world::World};
 
-pub fn load_module(path: &str) -> module::Module {
+pub fn load_module(path: &str, world_rc: Rc<RefCell<World>>) -> module::Module {
     let engine = Engine::default();
     let module = Module::from_file(&engine, path).expect("Failed to load module");
 
@@ -14,7 +16,7 @@ pub fn load_module(path: &str) -> module::Module {
         .func_wrap("env", "create_mesh", game_create_mesh)
         .expect("Failed to add function");
 
-    let mut store = Store::new(&engine, ());
+    let mut store = Store::new(&engine, world_rc);
     let instance = linker
         .instantiate(&mut store, &module)
         .expect("Failed to instantiate module");

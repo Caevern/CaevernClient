@@ -128,8 +128,8 @@ fn main() {
     ram_label_object.set_tag("ram_label");
     world.add_object(ram_label_object);
 
-    let _ = load_module("assets/modules/caevern_example_module.wasm");
-    let _ = load_module("assets/modules/caevern_polydural.wasm");
+    //let _ = load_module("assets/modules/caevern_example_module.wasm", &mut world);
+    //let _ = load_module("assets/modules/caevern_polydural.wasm", &mut world);
 
     println!(
         "Memory after startup: {} MB",

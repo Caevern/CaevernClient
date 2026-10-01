@@ -152,6 +152,8 @@ impl RendererOpenXR {
     }
 
     pub fn update(&mut self, frame_time: f32, menu_tablet_state: usize, engine: &mut Engine) {
+        let mut world = engine.world_rc.borrow_mut();
+
         let player = &engine.player;
         let forward = Vector3::new(
             player.camera.rotation.y.cos() * player.camera.rotation.x.cos(),
@@ -161,8 +163,9 @@ impl RendererOpenXR {
         .normalize();
 
         if menu_tablet_state == 2 {
-            for i in 0..engine.world.get_objects().len() {
-                let object_type = engine.world.get_object(i).get_object_type();
+            for object_index in 0..world.get_objects().len() {
+                let object = world.get_object(object_index);
+                let object_type = object.get_object_type();
                 if object_type == ObjectType::TabletMenu
                     || object_type == ObjectType::TabletMenuButton
                 {
@@ -185,20 +188,21 @@ impl RendererOpenXR {
                     let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
                     self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[i],
+                        &self.model_uniform_buffers[object_index],
                         0,
                         bytemuck::cast_slice(model_ref),
                     );
                     self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[i],
+                        &self.model_uniform_buffers[object_index],
                         64,
                         bytemuck::cast_slice(normal_ref),
                     );
                 }
             }
         } else if menu_tablet_state == 3 {
-            for i in 0..engine.world.get_objects().len() {
-                let object_type = engine.world.get_object(i).get_object_type();
+            for object_index in 0..world.get_objects().len() {
+                let object = world.get_object(object_index);
+                let object_type = object.get_object_type();
                 if object_type == ObjectType::TabletMenu
                     || object_type == ObjectType::TabletMenuButton
                 {
@@ -217,12 +221,12 @@ impl RendererOpenXR {
                     let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
                     self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[i],
+                        &self.model_uniform_buffers[object_index],
                         0,
                         bytemuck::cast_slice(model_ref),
                     );
                     self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[i],
+                        &self.model_uniform_buffers[object_index],
                         64,
                         bytemuck::cast_slice(normal_ref),
                     );
@@ -230,8 +234,8 @@ impl RendererOpenXR {
             }
         }
 
-        for i in 0..engine.world.get_objects().len() {
-            if engine.world.get_object(i).get_object_type() == ObjectType::Skybox {
+        for i in 0..world.get_objects().len() {
+            if world.get_object(i).get_object_type() == ObjectType::Skybox {
                 let model_mat = transforms::create_transforms(
                     [
                         player.camera.position.x,
@@ -261,19 +265,19 @@ impl RendererOpenXR {
                     64,
                     bytemuck::cast_slice(normal_ref),
                 );
-            } else if engine.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
+            } else if world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
                 if self.frame < 60 {
-                    let skeleton = engine.world.get_object(i).get_skeleton();
+                    let skeleton = world.get_object(i).get_skeleton();
                     //self.bones[i][skeleton["head"]].0.rotation.x = -player.camera.rotation.x;
                     //self.bones[i][skeleton["arm_right"]].0.rotation.z = -player.camera.rotation.x;
                     /*self.bones[i][skeleton["head"]].0.rotation.y =
                     -player.camera.rotation.y - 1.57079633;*/
                     // TODO: make the local character have this dissabled by default.
                     self.bones[i][skeleton["neck"]].0.scale = [0.0, 0.0, 0.0].into();
-                    self.update_bone(&engine.world, i, skeleton["head"]);
+                    self.update_bone(&world, i, skeleton["head"]);
                 }
 
-                let object = engine.world.get_object(i);
+                let object = world.get_object(i);
                 let position = [
                     object.get_position().x + player.camera.position.x
                         - player.camera.rotation.y.cos() * 0.1,
@@ -411,32 +415,23 @@ impl RendererOpenXR {
         }*/
 
         if self.frame % 20 == 1 {
-            for i in 0..engine.world.get_objects().len() {
-                if engine.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
-                    self.update_bones(&engine.world, i);
+            for i in 0..world.get_objects().len() {
+                if world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
+                    self.update_bones(&world, i);
                 }
             }
         }
 
         // update skybox positions
         if self.frame % 10 == 0 {
-            let grabbable_object_index = raycast_grab(
-                engine.world.get_objects(),
-                player.camera.position,
-                forward,
-                5,
-            );
+            let grabbable_object_index =
+                raycast_grab(world.get_objects(), player.camera.position, forward, 5);
 
             if grabbable_object_index > 0 {
-                let y_rotation = engine
-                    .world
-                    .get_object(grabbable_object_index)
+                let y_rotation = world.get_objects()[&grabbable_object_index]
                     .get_rotation()
                     .y;
-                engine
-                    .world
-                    .get_object_mut(grabbable_object_index)
-                    .set_rotation_y(y_rotation + 0.1);
+                //world.objects[&grabbable_object_index].set_rotation_y(y_rotation + 0.1);
                 let model_mat = transforms::create_transforms(
                     [0.0, 0.0, 0.0],
                     [0.0, y_rotation + 0.1, 0.0],
@@ -490,7 +485,7 @@ impl RendererOpenXR {
 
         // update ingame fps label when menu tablet is enabled
         if menu_tablet_state == 1 && self.frame % 60 == 0 {
-            for (index, object) in engine.world.get_objects() {
+            for (index, object) in world.get_objects() {
                 match object.get_tag() {
                     "fps_label" => {
                         let fps_label = text::create_plane_with_text(

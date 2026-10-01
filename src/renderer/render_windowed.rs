@@ -163,6 +163,8 @@ impl<'window> RendererWindowed<'window> {
     }
 
     pub fn update(&mut self, frame_time: f32, menu_tablet_state: usize, engine: &mut Engine) {
+        let mut world = engine.world_rc.borrow_mut();
+
         let player = &engine.player;
         let forward = Vector3::new(
             player.camera.rotation.y.cos() * player.camera.rotation.x.cos(),
@@ -172,9 +174,8 @@ impl<'window> RendererWindowed<'window> {
         .normalize();
 
         if menu_tablet_state == 2 {
-            let objects = engine.world.get_objects();
-            for object_index in 0..objects.len() {
-                let object = engine.world.get_object(object_index);
+            for object_index in 0..world.get_objects().len() {
+                let object = world.get_object(object_index);
                 let object_type = object.get_object_type();
                 if object_type == ObjectType::TabletMenu
                     || object_type == ObjectType::TabletMenuButton
@@ -212,9 +213,8 @@ impl<'window> RendererWindowed<'window> {
                 }
             }
         } else if menu_tablet_state == 3 {
-            let objects = engine.world.get_objects();
-            for object_index in 0..objects.len() {
-                let object = engine.world.get_object(object_index);
+            for object_index in 0..world.get_objects().len() {
+                let object = world.get_object(object_index);
                 let object_type = object.get_object_type();
                 if object_type == ObjectType::TabletMenu
                     || object_type == ObjectType::TabletMenuButton
@@ -249,9 +249,10 @@ impl<'window> RendererWindowed<'window> {
             }
         }
 
-        for object_index in 0..engine.world.get_objects().len() {
-            let object = engine.world.get_object(object_index);
-            if object.get_object_type() == ObjectType::Skybox {
+        for object_index in 0..world.get_objects().len() {
+            let object = world.get_object(object_index);
+            let object_type = object.get_object_type();
+            if object_type == ObjectType::Skybox {
                 let model_mat = transforms::create_transforms(
                     [
                         player.camera.position.x,
@@ -283,7 +284,7 @@ impl<'window> RendererWindowed<'window> {
                     64,
                     bytemuck::cast_slice(normal_ref),
                 );
-            } else if object.get_object_type() == ObjectType::SkinnedMesh {
+            } else if object_type == ObjectType::SkinnedMesh {
                 if self.frame < 60 {
                     let skeleton = object.get_skeleton();
                     //self.bones[i][skeleton["head"]].0.rotation.x = -player.camera.rotation.x;
@@ -295,7 +296,7 @@ impl<'window> RendererWindowed<'window> {
                         .0
                         .scale = [0.0, 0.0, 0.0].into();
                     update_bone(
-                        &engine.world,
+                        &world,
                         object_index,
                         object.buffer_bindings,
                         skeleton["head"],
@@ -340,11 +341,11 @@ impl<'window> RendererWindowed<'window> {
         }
 
         if self.frame % 20 == 1 {
-            for object_index in 0..engine.world.get_objects().len() {
-                let object = engine.world.get_object(object_index);
+            for object_index in 0..world.get_objects().len() {
+                let object = world.get_object(object_index);
                 if object.get_object_type() == ObjectType::SkinnedMesh {
                     update_bones(
-                        &engine.world,
+                        &world,
                         object_index,
                         object.buffer_bindings,
                         &mut self.buffer_collection,
@@ -357,14 +358,14 @@ impl<'window> RendererWindowed<'window> {
         // update skybox positions
         if self.frame % 10 == 0 {
             let grabbable_object_index = raycast_grab(
-                engine.world.get_objects(),
+                world.get_objects(),
                 player.camera.position,
                 forward,
                 5,
             );
 
             if grabbable_object_index > 0 {
-                let grabbable_object = engine.world.get_object_mut(grabbable_object_index);
+                let grabbable_object = world.get_object_mut(grabbable_object_index);
                 let y_rotation = grabbable_object.get_rotation().y;
                 grabbable_object.set_rotation_y(y_rotation + 0.1);
                 let model_mat = transforms::create_transforms(
@@ -422,7 +423,7 @@ impl<'window> RendererWindowed<'window> {
 
         // update ingame fps label when menu tablet is enabled
         if menu_tablet_state == 1 && self.frame % 60 == 0 {
-            for (_, object) in engine.world.get_objects() {
+            for (_, object) in world.get_objects() {
                 match object.get_tag() {
                     "fps_label" => {
                         let fps_label = text::create_plane_with_text(

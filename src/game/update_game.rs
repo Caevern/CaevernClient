@@ -1,29 +1,23 @@
 use std::{
-    collections::HashMap,
-    f32,
-    sync::mpsc::{Receiver, Sender},
+    cell::RefCell, collections::HashMap, f32, rc::Rc, sync::mpsc::{Receiver, Sender},
 };
 
 use cgmath::{InnerSpace, Matrix, SquareMatrix, Vector3};
 
 use crate::{
-    game::{update_bone::update_bone, update_bones::update_bones},
-    network::{
+    game::{update_bone::update_bone, update_bones::update_bones}, modules::load_module::load_module, network::{
         avatar_updates::AvatarUpdate,
         user_updates::UserUpdate::{self, UpdateAvatarId},
-    },
-    physics::{
+    }, physics::{
         gravity::apply_gravity,
         movement::{get_camera_movement, get_camera_rotation},
-    },
-    renderer::{
+    }, renderer::{
         buffer_collection::BufferCollection,
         create_rendered_object::create_rendered_object,
         transform::Transform,
         transforms::create_transforms,
         vertex::{Vertex, create_vertices_skinned},
-    },
-    world::{
+    }, world::{
         material::Material,
         object::{Object, ObjectType},
         objects::{player::Player, skeleton::create_skeleton},
@@ -37,7 +31,7 @@ pub struct Engine {
     pub player: Player,
 
     // world
-    pub world: World,
+    pub world_rc: Rc<RefCell<World>>,
 
     // fallback model
     fallback_vertices: Vec<(Vec<Vertex>, String)>,
@@ -51,7 +45,7 @@ pub struct Engine {
 impl Engine {
     pub fn new(
         data_thread_tx: Sender<UserUpdate>,
-        avatar_thread_rx: Receiver<AvatarUpdate>,
+        avatar_thread_rx: Receiver<AvatarUpdate>
     ) -> Self {
         let model_parsed = parse("models/fallback.fbx", Transform::zero());
         let fallback_vertices = create_vertices_skinned(&model_parsed.0);
@@ -60,6 +54,10 @@ impl Engine {
         let bone_bindings = vec![("head".to_string(), "head.xModel")];
         let fallback_skeleton = create_skeleton(bone_bindings, &fallback_bones);
 
+        let world_rc = Rc::new(RefCell::new(
+            World::new()
+        ));
+
         Self {
             player: Player::new(),
             fallback_vertices,
@@ -67,7 +65,7 @@ impl Engine {
             fallback_skeleton,
             data_thread_tx,
             avatar_thread_rx,
-            world: World::new(),
+            world_rc,
         }
     }
 
@@ -118,18 +116,24 @@ impl Engine {
         self.check_avatar_thread(buffer_collection, device, queue);
     }
 
+    pub fn load_modules(&mut self) {
+        let _ = load_module("assets/modules/caevern_polydural.wasm", self.world_rc.clone());
+    }
+
     pub fn set_world(
         &mut self,
-        world: World,
+        new_world: World,
         buffer_collection: &mut BufferCollection,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) {
-        self.world = world;
+        *self.world_rc.borrow_mut() = new_world;
 
-        let textures = self.world.get_textures().clone();
-        for object_index in 0..self.world.objects.len() {
-            let mut object = self.world.objects.get_mut(&object_index).unwrap();
+        self.load_modules();
+        let mut world = self.world_rc.borrow_mut();
+        let textures = world.get_textures().clone();
+        for object_index in 0..world.objects.len() {
+            let mut object = world.objects.get_mut(&object_index).unwrap();
             create_rendered_object(&textures, &mut object, buffer_collection, device, queue);
         }
     }
@@ -175,20 +179,20 @@ impl Engine {
                         Material::from_texture("textures/CG_Dress_Base_color.png"),
                         "DressMaterial".to_string(),
                     );
-                    self.world
-                        .textures
+
+                    let mut world = self.world_rc.borrow_mut();
+
+                    world.textures
                         .insert("textures/CG_Body_Base_color.png".to_string());
-                    self.world
-                        .textures
+                    world.textures
                         .insert("textures/CG_Hairs_Base_color.png".to_string());
-                    self.world
-                        .textures
+                    world.textures
                         .insert("textures/CG_Dress_Base_color.png".to_string());
 
-                    let object_id = self.world.get_objects().len();
+                    let object_id = world.get_objects().len();
 
                     create_rendered_object(
-                        &self.world.get_textures(),
+                        &world.get_textures(),
                         &mut object,
                         buffer_collection,
                         device,
@@ -201,9 +205,9 @@ impl Engine {
                         .rotation = [transform.rotation.x, 0.0, transform.rotation.z].into();
 
                     let buffer_bindings = object.buffer_bindings;
-                    self.world.add_object(object);
+                    world.add_object(object);
                     update_bones(
-                        &self.world,
+                        &world,
                         object_id,
                         buffer_bindings,
                         buffer_collection,
@@ -217,14 +221,15 @@ impl Engine {
                         );
                 }
                 AvatarUpdate::SetUserPosition(transform, object_id) => {
-                    let object = self.world.get_object(object_id);
+                    let world = self.world_rc.borrow();
+                    let object = world.get_object(object_id);
 
                     buffer_collection.bones[object.buffer_bindings.bones]
                         [self.fallback_skeleton["head"]]
                         .0
                         .rotation = [transform.rotation.x, 0.0, transform.rotation.z].into();
                     update_bone(
-                        &self.world,
+                        &world,
                         object_id,
                         object.buffer_bindings,
                         self.fallback_skeleton["head"],

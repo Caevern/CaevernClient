@@ -1,9 +1,11 @@
+use std::{cell::RefCell, rc::Rc};
+
 use wasmtime::Caller;
 
-use crate::renderer::vertex::Vertex;
+use crate::{renderer::vertex::Vertex, world::{object::{Object, ObjectType}, world::World}};
 
 pub fn game_create_mesh(
-    mut caller: Caller<'_, ()>,
+    mut caller: Caller<'_, Rc<RefCell<World>>>,
     vertices_ptr: u32,
     vertices_len: u32,
     indices_ptr: u32,
@@ -43,35 +45,32 @@ pub fn game_create_mesh(
         .map(|bytes| u32::from_le_bytes(bytes.try_into().unwrap()))
         .collect();
 
-    println!("[MOD] vertices: {vertices:?}");
-    println!("[MOD] indices: {indices:?}");
+    let mut skinned_vertices: Vec<Vertex> = Vec::new();
 
-    let mut mesh = Vec::new();
     for index in &indices {
-        if *index as usize >= vertices.len() {
-            continue;
-        }
-
-        let vertex_index = *index as usize * 3;
-        let vertex = [
-            vertices[vertex_index],
-            vertices[vertex_index + 1],
-            vertices[vertex_index + 2],
-            0.0,
-        ];
-
-        let skinned_vertex = Vertex {
-            position: vertex,
-            normal: [0.0, 1.0, 0.0, 1.0],
-            color: [1.0, 0.0, 1.0, 1.0],
+        skinned_vertices.push(Vertex {
+            position: [vertices[(*index as usize) * 3], vertices[(*index as usize) * 3 + 1], vertices[(*index as usize) * 3 + 2], 0.0],
+            normal: [0.0, 1.0, 0.0, 0.0],
+            color: [1.0, 0.0, 1.0, 0.0],
             uv: [0.0, 0.0, 0.0, 0.0],
             bone_ids: [0.0, 0.0, 0.0, 0.0],
             bone_weights: [0.0, 0.0, 0.0, 0.0],
-        };
-        mesh.push(skinned_vertex);
+        });
     }
 
-    println!("Created mesh, firing callback");
+    println!("[MOD] vertices: {vertices:?}");
+    println!("[MOD] indices: {indices:?}");
+    for vertex in &skinned_vertices {
+        let position = vertex.position;
+        println!("[MOD] vertex: {position:?}");
+    }
 
-    return 1;
+    let meshes: Vec<(Vec<Vertex>, String)> = vec![(skinned_vertices, "default".to_string())];
+
+    let object = Object::create(ObjectType::Mesh, meshes);
+
+    caller.data().borrow_mut().add_object(object);
+
+    let object_id = caller.data().borrow_mut().get_objects().len() - 1;
+    return object_id as u32;
 }

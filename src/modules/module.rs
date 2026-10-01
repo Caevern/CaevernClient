@@ -1,12 +1,17 @@
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use wasmtime::Store;
 use wasmtime::TypedFunc;
 
+use crate::world::world::World;
+
 pub struct Module {
     init: TypedFunc<(), ()>,
-    store: Store<()>,
+    store: Store<Rc<RefCell<World>>>,
 }
 impl Module {
-    pub fn new(init: TypedFunc<(), ()>, store: Store<()>) -> Self {
+    pub fn new(init: TypedFunc<(), ()>, store: Store<Rc<RefCell<World>>>) -> Self {
         Self { init, store }
     }
 

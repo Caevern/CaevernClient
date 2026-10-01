@@ -5,7 +5,6 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::thread;
 
-use tokio::io::AsyncWriteExt;
 use tokio_tungstenite::connect_async;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalPosition;
