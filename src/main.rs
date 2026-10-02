@@ -50,7 +50,7 @@ fn main() {
     world.add_object(camera);
 
     //world.load_world("worlds/scene3.cae");
-    world.load_world("worlds/home.json");
+    world.load_world("worlds/test.json");
 
     //let tablet = cube::create_cube((0.0, 0.0, 0.0), (0.5, 0.4, 0.01));
     let tablet = parse(
@@ -127,9 +127,6 @@ fn main() {
     ram_label_object.set_default_texture("fonts/NotoSansJP.ttf");
     ram_label_object.set_tag("ram_label");
     world.add_object(ram_label_object);
-
-    //let _ = load_module("assets/modules/caevern_example_module.wasm", &mut world);
-    //let _ = load_module("assets/modules/caevern_polydural.wasm", &mut world);
 
     println!(
         "Memory after startup: {} MB",

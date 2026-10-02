@@ -130,6 +130,7 @@ impl Engine {
         *self.world_rc.borrow_mut() = new_world;
 
         self.load_modules();
+
         let mut world = self.world_rc.borrow_mut();
         let textures = world.get_textures().clone();
         for object_index in 0..world.objects.len() {
