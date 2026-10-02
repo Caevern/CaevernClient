@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use wasmtime::{Engine, Linker, Module, Store};
 
-use crate::{modules::{api::{game_create_mesh::game_create_mesh, game_log::game_log}, module}, world::world::World};
+use crate::{modules::{api::{game_create_mesh::game_create_mesh, game_get_time::game_get_time, game_log::game_log}, module}, world::world::World};
 
 pub fn load_module(path: &str, world_rc: Rc<RefCell<World>>) -> module::Module {
     let engine = Engine::default();
@@ -11,6 +11,9 @@ pub fn load_module(path: &str, world_rc: Rc<RefCell<World>>) -> module::Module {
     let mut linker = Linker::new(&engine);
     linker
         .func_wrap("env", "log", game_log)
+        .expect("Failed to add function");
+    linker
+        .func_wrap("env", "get_time", game_get_time)
         .expect("Failed to add function");
     linker
         .func_wrap("env", "create_mesh", game_create_mesh)
