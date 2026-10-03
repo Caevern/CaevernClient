@@ -58,10 +58,6 @@ pub fn game_create_mesh(
         });
     }
 
-    for vertex in &skinned_vertices {
-        let position = vertex.position;
-    }
-
     let meshes: Vec<(Vec<Vertex>, String)> = vec![(skinned_vertices, "default".to_string())];
 
     let mut object = Object::create(ObjectType::Mesh, meshes);
