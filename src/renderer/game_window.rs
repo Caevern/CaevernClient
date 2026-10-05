@@ -94,56 +94,56 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
             let mut renderer_openxr = pollster::block_on(RendererOpenXR::new(xr));
 
-            renderer_openxr.set_world(self.home_world.clone());
+            renderer_openxr.run_frame_loop();
 
             self.openxr_renderer = Some(renderer_openxr);
         } else {
             println!("Initializing XRManager has failed :C");
+
+            let attributes = WindowAttributes::default()
+                .with_title(self.title.clone())
+                .with_window_icon(self.icon.clone());
+            let window = Arc::new(event_loop.create_window(attributes).unwrap());
+
+            let mut renderer = pollster::block_on(RendererWindowed::new(&window));
+
+            self.depth_texture = Some(
+                renderer
+                    .init
+                    .device
+                    .create_texture(&wgpu::TextureDescriptor {
+                        size: wgpu::Extent3d {
+                            width: renderer.init.config.width,
+                            height: renderer.init.config.height,
+                            depth_or_array_layers: 1,
+                        },
+                        mip_level_count: 1,
+                        sample_count: 1,
+                        dimension: wgpu::TextureDimension::D2,
+                        format: wgpu::TextureFormat::Depth24Plus,
+                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                        label: None,
+                        view_formats: &[],
+                    }),
+            );
+
+            //renderer.set_world(self.home_world.clone());
+            self.engine.as_mut().unwrap().set_world(
+                self.home_world.clone(),
+                &mut renderer.buffer_collection,
+                &renderer.init.device,
+                &renderer.init.queue,
+            );
+
+            self.window_size = (renderer.init.size.width, renderer.init.size.height);
+
+            self.windowed_renderer = Some(renderer);
+            self.window = Some(window);
         }
-
-        let attributes = WindowAttributes::default()
-            .with_title(self.title.clone())
-            .with_window_icon(self.icon.clone());
-        let window = Arc::new(event_loop.create_window(attributes).unwrap());
-
-        let mut renderer = pollster::block_on(RendererWindowed::new(&window));
-
-        self.depth_texture = Some(
-            renderer
-                .init
-                .device
-                .create_texture(&wgpu::TextureDescriptor {
-                    size: wgpu::Extent3d {
-                        width: renderer.init.config.width,
-                        height: renderer.init.config.height,
-                        depth_or_array_layers: 1,
-                    },
-                    mip_level_count: 1,
-                    sample_count: 1,
-                    dimension: wgpu::TextureDimension::D2,
-                    format: wgpu::TextureFormat::Depth24Plus,
-                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                    label: None,
-                    view_formats: &[],
-                }),
-        );
-
-        self.window_size = (renderer.init.size.width, renderer.init.size.height);
-
-        //renderer.set_world(self.home_world.clone());
-        self.engine.as_mut().unwrap().set_world(
-            self.home_world.clone(),
-            &mut renderer.buffer_collection,
-            &renderer.init.device,
-            &renderer.init.queue,
-        );
 
         data_thread_tx
             .send(UserUpdate::SendReadySignal)
             .expect("Sending user ready signal failed :C");
-
-        self.windowed_renderer = Some(renderer);
-        self.window = Some(window);
 
         self.render_start_time = std::time::Instant::now();
     }

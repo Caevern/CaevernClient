@@ -1,15 +1,20 @@
 use ash::vk::{self, Handle};
+use openxr::ViewConfigurationType;
 use wgpu_hal::Instance;
 
 pub struct XRManager {
-    instance: openxr::Instance,
-    system: openxr::SystemId,
+    pub instance: openxr::Instance,
+    pub system: openxr::SystemId,
     pub session: openxr::Session<openxr::Vulkan>,
-    frame_waiter: openxr::FrameWaiter,
-    frame_stream: openxr::FrameStream<openxr::Vulkan>,
-    views: Vec<openxr::View>,
+    pub frame_waiter: openxr::FrameWaiter,
+    pub frame_stream: openxr::FrameStream<openxr::Vulkan>,
+    pub views: Vec<openxr::ViewConfigurationView>,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
+    pub view_config: ViewConfigurationType,
+    pub swapchains: Vec<openxr::Swapchain<openxr::Vulkan>>,
+    event_buffer: openxr::EventDataBuffer,
+    session_running: bool,
 }
 impl XRManager {
     pub fn new() -> Result<Self, openxr::sys::Result> {
@@ -257,31 +262,79 @@ impl XRManager {
             session: session,
             frame_waiter: frame_waiter,
             frame_stream: frame_stream,
-            views: Vec::new(),
+            views: views,
             device: device,
             queue: queue,
+            view_config: view_config,
+            swapchains: Vec::new(),
+            event_buffer: openxr::EventDataBuffer::new(),
+            session_running: false,
         })
     }
 
-    pub fn run_frame_loop(&mut self) -> Result<(), openxr::sys::Result> {
-        loop {
-            /*let frame_state = self.frame_waiter.wait()?;
+    pub fn get_session_running(&self) -> bool {
+        self.session_running
+    }
 
-            self.frame_stream.begin()?;
+    pub fn create_swapchains(&mut self) -> Result<(), openxr::sys::Result> {
+        let views = self.instance
+            .enumerate_view_configuration_views(
+                self.system,
+                self.view_config,
+            )?;
 
-            if frame_state.should_render {
-                // locate views
-                // acquire swapchain images
-                // render left eye
-                // render right eye
-                // release images
-            }
+        let format = vk::Format::R8G8B8A8_SRGB.as_raw();
 
-            self.frame_stream.end(
-                frame_state.predicted_display_time,
-                openxr::EnvironmentBlendMode::OPAQUE,
-                &layers,
-            )?;*/
+        for view in &views {
+            let swapchain = self.session.create_swapchain(
+                &openxr::SwapchainCreateInfo {
+                    create_flags: openxr::SwapchainCreateFlags::EMPTY,
+                    usage_flags: openxr::SwapchainUsageFlags::COLOR_ATTACHMENT,
+                    format: format as u32,
+                    sample_count: view.recommended_swapchain_sample_count,
+                    width: view.recommended_image_rect_width,
+                    height: view.recommended_image_rect_height,
+                    face_count: 1,
+                    array_size: 1,
+                    mip_count: 1,
+                },
+            )?;
+
+            self.swapchains.push(swapchain);
         }
+
+        Ok(())
+    }
+
+    pub fn poll_events(&mut self) -> Result<(), openxr::sys::Result> {
+        while let Some(event) = self.instance.poll_event(&mut self.event_buffer)? {
+            match event {
+                openxr::Event::SessionStateChanged(event) => {
+                    match event.state() {
+                        openxr::SessionState::READY => {
+                            self.session.begin(self.view_config)?;
+                            println!("XR session started");
+                            self.session_running = true;
+                            self.create_swapchains()?;
+                            println!("Swapchains created");
+                        }
+
+                        openxr::SessionState::STOPPING => {
+                            self.session.end()?;
+                            println!("XR session stopped");
+                            self.session_running = false;
+                        }
+
+                        state => {
+                            println!("XR session state: {state:?}");
+                        }
+                    }
+                }
+
+                _ => {}
+            }
+        }
+
+        Ok(())
     }
 }

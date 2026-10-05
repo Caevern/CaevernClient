@@ -10,10 +10,8 @@ use crate::game::update_bone::update_bone;
 use crate::game::update_bones::update_bones;
 use crate::game::update_game::Engine;
 use crate::interract::raycast::raycast_grab;
-use crate::renderer::buffer_bindings::BufferBindings;
 use crate::renderer::buffer_collection::BufferCollection;
 use crate::renderer::buffers::bind_group_layout::create_bind_group_layout;
-use crate::renderer::buffers::displacement_buffer::create_buffer_displacement;
 use crate::renderer::buffers::uniform_buffers::{
     create_fragment_uniform_buffer, create_vertex_uniform_buffer,
 };
@@ -21,13 +19,11 @@ use crate::renderer::default_elements::register_default_textures;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
 use crate::renderer::shader_type::ShaderType;
 use crate::renderer::texture_object::TextureObject;
-use crate::renderer::transforms::create_transforms;
 use crate::renderer::vertex::Vertex;
-use crate::renderer::{init_wgpu, transform, transforms, vertex};
+use crate::renderer::{init_wgpu, transforms, vertex};
 use crate::setup::fonts::load_font_uvs;
-use crate::world::object::{Object, ObjectType};
+use crate::world::object::ObjectType;
 use crate::world::objects::text;
-use crate::world::world::World;
 
 #[derive(RustEmbed)]
 #[folder = "assets/"]
