@@ -1,23 +1,32 @@
 use std::{
-    cell::RefCell, collections::HashMap, f32, rc::Rc, sync::mpsc::{Receiver, Sender},
+    cell::RefCell,
+    collections::HashMap,
+    f32,
+    rc::Rc,
+    sync::mpsc::{Receiver, Sender},
 };
 
 use cgmath::{InnerSpace, Matrix, SquareMatrix, Vector3};
 
 use crate::{
-    game::{update_bone::update_bone, update_bones::update_bones}, modules::load_module::load_module, network::{
+    game::{update_bone::update_bone, update_bones::update_bones},
+    modules::load_module::load_module,
+    network::{
         avatar_updates::AvatarUpdate,
         user_updates::UserUpdate::{self, UpdateAvatarId},
-    }, physics::{
+    },
+    physics::{
         gravity::apply_gravity,
         movement::{get_camera_movement, get_camera_rotation},
-    }, renderer::{
+    },
+    renderer::{
         buffer_collection::BufferCollection,
         create_rendered_object::create_rendered_object,
         transform::Transform,
         transforms::create_transforms,
         vertex::{Vertex, create_vertices_skinned},
-    }, world::{
+    },
+    world::{
         material::Material,
         object::{Object, ObjectType},
         objects::{player::Player, skeleton::create_skeleton},
@@ -45,7 +54,7 @@ pub struct Engine {
 impl Engine {
     pub fn new(
         data_thread_tx: Sender<UserUpdate>,
-        avatar_thread_rx: Receiver<AvatarUpdate>
+        avatar_thread_rx: Receiver<AvatarUpdate>,
     ) -> Self {
         let model_parsed = parse("models/fallback.fbx", Transform::zero());
         let fallback_vertices = create_vertices_skinned(&model_parsed.0);
@@ -54,9 +63,7 @@ impl Engine {
         let bone_bindings = vec![("head".to_string(), "head.xModel")];
         let fallback_skeleton = create_skeleton(bone_bindings, &fallback_bones);
 
-        let world_rc = Rc::new(RefCell::new(
-            World::new()
-        ));
+        let world_rc = Rc::new(RefCell::new(World::new()));
 
         Self {
             player: Player::new(),
@@ -117,7 +124,7 @@ impl Engine {
     }
 
     pub fn load_modules(&mut self) {
-        let _ = load_module("assets/modules/caevern_polydural.wasm", self.world_rc.clone());
+        //let _ = load_module("assets/modules/caevern_polydural.wasm", self.world_rc.clone());
     }
 
     pub fn set_world(
@@ -183,11 +190,14 @@ impl Engine {
 
                     let mut world = self.world_rc.borrow_mut();
 
-                    world.textures
+                    world
+                        .textures
                         .insert("textures/CG_Body_Base_color.png".to_string());
-                    world.textures
+                    world
+                        .textures
                         .insert("textures/CG_Hairs_Base_color.png".to_string());
-                    world.textures
+                    world
+                        .textures
                         .insert("textures/CG_Dress_Base_color.png".to_string());
 
                     let object_id = world.get_objects().len();
@@ -207,13 +217,7 @@ impl Engine {
 
                     let buffer_bindings = object.buffer_bindings;
                     world.add_object(object);
-                    update_bones(
-                        &world,
-                        object_id,
-                        buffer_bindings,
-                        buffer_collection,
-                        queue,
-                    );
+                    update_bones(&world, object_id, buffer_bindings, buffer_collection, queue);
 
                     self.data_thread_tx
                         .send(UpdateAvatarId(id, object_id))
