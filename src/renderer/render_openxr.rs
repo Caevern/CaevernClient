@@ -1,14 +1,15 @@
 use cgmath::*;
 use rust_embed::RustEmbed;
 use std::collections::HashMap;
+use std::time::Instant;
 use std::{f32, println};
+use std::ops::Deref;
 
 use crate::ALLOCATOR;
-use crate::game::update_bone::update_bone;
 use crate::game::update_game::Engine;
 use crate::interract::raycast::raycast_grab;
+use crate::renderer::buffer_collection::BufferCollection;
 use crate::renderer::buffers::bind_group_layout::create_bind_group_layout;
-use crate::renderer::buffers::displacement_buffer::create_buffer_displacement;
 use crate::renderer::buffers::uniform_buffers::{
     create_fragment_uniform_buffer, create_vertex_uniform_buffer,
 };
@@ -16,42 +17,21 @@ use crate::renderer::default_elements::register_default_textures;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
 use crate::renderer::shader_type::ShaderType;
 use crate::renderer::texture_object::TextureObject;
-use crate::renderer::transforms::create_transforms;
 use crate::renderer::vertex::Vertex;
 use crate::renderer::{transform, transforms, vertex};
 use crate::setup::fonts::load_font_uvs;
-use crate::world::object::{Object, ObjectType};
+use crate::world::object::ObjectType;
 use crate::world::objects::text;
-use crate::world::world::World;
 use crate::xr::xr_manager::XRManager;
-
-#[derive(RustEmbed)]
-#[folder = "assets/"]
-pub struct Assets;
 
 pub struct RendererOpenXR {
     pub init: XRManager,
+    pub buffer_collection: BufferCollection,
 
     pipeline_displacement: wgpu::RenderPipeline,
     pipeline_displacement_bones: wgpu::RenderPipeline,
 
     frame: usize,
-
-    vertex_buffers: Vec<Vec<wgpu::Buffer>>,
-    uniform_bind_groups: Vec<Vec<wgpu::BindGroup>>,
-    num_vertices: Vec<Vec<u32>>,
-    bone_buffers: Vec<wgpu::Buffer>,
-    bones: Vec<Vec<(transform::Transform, transform::Transform, i64, usize)>>,
-    final_marices: Vec<Vec<[[f32; 4]; 4]>>,
-    shader_type: Vec<ShaderType>,
-
-    uniform_bind_group_layout: wgpu::BindGroupLayout,
-    vertex_uniform_buffer: wgpu::Buffer,
-    model_uniform_buffers: Vec<wgpu::Buffer>,
-    fragment_uniform_buffer: wgpu::Buffer,
-
-    textures: HashMap<String, TextureObject>,
-    font_maps: HashMap<String, HashMap<String, (f32, f32, f32, f32, f32)>>,
 }
 impl RendererOpenXR {
     pub async fn new(init: XRManager) -> Self {
@@ -126,29 +106,36 @@ impl RendererOpenXR {
             load_font_uvs("fonts/NotoSansJP.ttf"),
         );
 
+        let buffer_collection = BufferCollection {
+            textures,
+            font_maps,
+
+            final_matrices: Vec::new(),
+
+            bones: Vec::new(),
+            bone_buffers: Vec::new(),
+
+            shader_type: Vec::new(),
+
+            vertex_buffers: Vec::new(),
+            uniform_bind_groups: Vec::new(),
+            num_vertices: Vec::new(),
+
+            model_uniform_buffers: Vec::new(),
+
+            uniform_bind_group_layout,
+            vertex_uniform_buffer,
+            fragment_uniform_buffer,
+        };
+
         Self {
             init,
+            buffer_collection,
 
             pipeline_displacement,
             pipeline_displacement_bones,
 
             frame: 0,
-
-            vertex_buffers: Vec::new(),
-            uniform_bind_groups: Vec::new(),
-            num_vertices: Vec::new(),
-            bone_buffers: Vec::new(),
-            bones: Vec::new(),
-            final_marices: Vec::new(),
-            shader_type: Vec::new(),
-
-            uniform_bind_group_layout,
-            vertex_uniform_buffer,
-            model_uniform_buffers: Vec::new(),
-            fragment_uniform_buffer,
-
-            textures,
-            font_maps,
         }
     }
 
@@ -189,12 +176,12 @@ impl RendererOpenXR {
                     let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
                     self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[object_index],
+                        &self.buffer_collection.model_uniform_buffers[object.buffer_bindings.model_uniform_buffer],
                         0,
                         bytemuck::cast_slice(model_ref),
                     );
                     self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[object_index],
+                        &self.buffer_collection.model_uniform_buffers[object.buffer_bindings.model_uniform_buffer],
                         64,
                         bytemuck::cast_slice(normal_ref),
                     );
@@ -222,12 +209,12 @@ impl RendererOpenXR {
                     let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
                     self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[object_index],
+                        &self.buffer_collection.model_uniform_buffers[object.buffer_bindings.model_uniform_buffer],
                         0,
                         bytemuck::cast_slice(model_ref),
                     );
                     self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[object_index],
+                        &self.buffer_collection.model_uniform_buffers[object.buffer_bindings.model_uniform_buffer],
                         64,
                         bytemuck::cast_slice(normal_ref),
                     );
@@ -235,8 +222,10 @@ impl RendererOpenXR {
             }
         }
 
-        for i in 0..world.get_objects().len() {
-            if world.get_object(i).get_object_type() == ObjectType::Skybox {
+        for object_index in 0..world.get_objects().len() {
+            let object = world.get_object(object_index);
+            let object_type = object.get_object_type();
+            if object_type == ObjectType::Skybox {
                 let model_mat = transforms::create_transforms(
                     [
                         player.camera.position.x,
@@ -252,23 +241,25 @@ impl RendererOpenXR {
                 let normal_ref: &[f32; 16] = normal_mat.as_ref();
                 let eye_position: &[f32; 3] = &player.camera.position.into();
                 self.init.queue.write_buffer(
-                    &self.fragment_uniform_buffer,
+                    &self.buffer_collection.fragment_uniform_buffer,
                     16,
                     bytemuck::cast_slice(eye_position),
                 );
                 self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[i],
+                    &self.buffer_collection.model_uniform_buffers
+                        [object.buffer_bindings.model_uniform_buffer],
                     0,
                     bytemuck::cast_slice(model_ref),
                 );
                 self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[i],
+                    &self.buffer_collection.model_uniform_buffers
+                        [object.buffer_bindings.model_uniform_buffer],
                     64,
                     bytemuck::cast_slice(normal_ref),
                 );
-            } else if world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
+            } else if object_type == ObjectType::SkinnedMesh {
                 if self.frame < 60 {
-                    let skeleton = world.get_object(i).get_skeleton();
+                    let skeleton = object.get_skeleton();
                     //self.bones[i][skeleton["head"]].0.rotation.x = -player.camera.rotation.x;
                     //self.bones[i][skeleton["arm_right"]].0.rotation.z = -player.camera.rotation.x;
                     /*self.bones[i][skeleton["head"]].0.rotation.y =
@@ -285,7 +276,6 @@ impl RendererOpenXR {
                     );*/
                 }
 
-                let object = world.get_object(i);
                 let position = [
                     object.get_position().x + player.camera.position.x
                         - player.camera.rotation.y.cos() * 0.1,
@@ -319,12 +309,12 @@ impl RendererOpenXR {
                 let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
                 self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[i],
+                    &self.buffer_collection.model_uniform_buffers[object.buffer_bindings.model_uniform_buffer],
                     0,
                     bytemuck::cast_slice(model_ref),
                 );
                 self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[i],
+                    &self.buffer_collection.model_uniform_buffers[object.buffer_bindings.model_uniform_buffer],
                     64,
                     bytemuck::cast_slice(normal_ref),
                 );
@@ -332,7 +322,7 @@ impl RendererOpenXR {
         }
 
         // update skybox positions
-        if self.frame % 10 == 0 {
+        /*if self.frame % 10 == 0 {
             let grabbable_object_index =
                 raycast_grab(world.get_objects(), player.camera.position, forward, 5);
 
@@ -367,7 +357,7 @@ impl RendererOpenXR {
                     bytemuck::cast_slice(normal_ref),
                 );
             }
-        }
+        }*/
 
         let up_direction = cgmath::Vector3::unit_y();
         let camera_position = Point3 {
@@ -387,26 +377,27 @@ impl RendererOpenXR {
         let view_projection_ref: &[f32; 16] = view_project_mat.as_ref();
 
         self.init.queue.write_buffer(
-            &self.vertex_uniform_buffer,
+            &self.buffer_collection.vertex_uniform_buffer,
             64,
             bytemuck::cast_slice(view_projection_ref),
         );
 
         // update ingame fps label when menu tablet is enabled
         if menu_tablet_state == 1 && self.frame % 60 == 0 {
-            for (index, object) in world.get_objects() {
+            for (_, object) in world.get_objects() {
                 match object.get_tag() {
                     "fps_label" => {
                         let fps_label = text::create_plane_with_text(
                             (-0.5, -0.3, -0.02),
                             (0.02, 0.02, 1.0),
-                            &self.font_maps["NotoSansJP"],
+                            &self.buffer_collection.font_maps["NotoSansJP"],
                             [1.0, 1.0, 1.0],
                             &format!("FPS: {}", (1.0 / frame_time).round()),
                         );
                         let meshes = vertex::create_vertices(&fps_label);
                         for (vertices, _) in meshes {
-                            self.num_vertices[*index] = vec![vertices.len() as u32];
+                            self.buffer_collection.num_vertices
+                                [object.buffer_bindings.num_vertices] = vec![vertices.len() as u32];
                             let vertex_buffer =
                                 self.init.device.create_buffer(&wgpu::BufferDescriptor {
                                     label: Some("Vertex Buffer"),
@@ -415,9 +406,11 @@ impl RendererOpenXR {
                                         | wgpu::BufferUsages::COPY_DST,
                                     mapped_at_creation: false,
                                 });
-                            self.vertex_buffers[*index] = vec![vertex_buffer];
+                            self.buffer_collection.vertex_buffers
+                                [object.buffer_bindings.vertex_buffer] = vec![vertex_buffer];
                             self.init.queue.write_buffer(
-                                &self.vertex_buffers[*index][0],
+                                &self.buffer_collection.vertex_buffers
+                                    [object.buffer_bindings.vertex_buffer][0],
                                 0,
                                 bytemuck::cast_slice(&vertices),
                             );
@@ -427,13 +420,14 @@ impl RendererOpenXR {
                         let ram_label = text::create_plane_with_text(
                             (-0.5, -0.2, -0.02),
                             (0.02, 0.02, 1.0),
-                            &self.font_maps["NotoSansJP"],
+                            &self.buffer_collection.font_maps["NotoSansJP"],
                             [1.0, 1.0, 1.0],
                             &format!("RAM: {:.2} MB", ALLOCATOR.allocated() as f32 / 1000000.0),
                         );
                         let meshes = vertex::create_vertices(&ram_label);
                         for (vertices, _) in meshes {
-                            self.num_vertices[*index] = vec![vertices.len() as u32];
+                            self.buffer_collection.num_vertices
+                                [object.buffer_bindings.num_vertices] = vec![vertices.len() as u32];
                             let vertex_buffer =
                                 self.init.device.create_buffer(&wgpu::BufferDescriptor {
                                     label: Some("Vertex Buffer"),
@@ -442,9 +436,11 @@ impl RendererOpenXR {
                                         | wgpu::BufferUsages::COPY_DST,
                                     mapped_at_creation: false,
                                 });
-                            self.vertex_buffers[*index] = vec![vertex_buffer];
+                            self.buffer_collection.vertex_buffers
+                                [object.buffer_bindings.vertex_buffer] = vec![vertex_buffer];
                             self.init.queue.write_buffer(
-                                &self.vertex_buffers[*index][0],
+                                &self.buffer_collection.vertex_buffers
+                                    [object.buffer_bindings.vertex_buffer][0],
                                 0,
                                 bytemuck::cast_slice(&vertices),
                             );
@@ -460,30 +456,212 @@ impl RendererOpenXR {
         self.frame += 1;
     }
 
+    // TODO: For parity, move out of this struct
+    fn render_scene(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        color_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView,
+    ) {
+        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+            label: Some("Render Pass"),
+            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                view: color_view,
+                resolve_target: None,
+                ops: wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(wgpu::Color {
+                        r: 0.2,
+                        g: 0.247,
+                        b: 0.314,
+                        a: 1.0,
+                    }),
+                    store: wgpu::StoreOp::Store,
+                },
+                depth_slice: None,
+            })],
+            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                view: depth_view,
+                depth_ops: Some(wgpu::Operations {
+                    load: wgpu::LoadOp::Clear(1.0),
+                    store: wgpu::StoreOp::Discard,
+                }),
+                stencil_ops: None,
+            }),
+            occlusion_query_set: None,
+            timestamp_writes: None,
+            multiview_mask: None,
+        });
+
+        let mut current_shader = ShaderType::Displacement;
+        render_pass.set_pipeline(&self.pipeline_displacement);
+
+        for mesh in 0..self.buffer_collection.vertex_buffers.len() {
+            let shader_type = &self.buffer_collection.shader_type[mesh];
+
+            if shader_type != &current_shader {
+                match shader_type {
+                    ShaderType::Displacement => {
+                        render_pass.set_pipeline(&self.pipeline_displacement);
+                        current_shader = ShaderType::Displacement;
+                    }
+
+                    ShaderType::DisplacementBones => {
+                        render_pass.set_pipeline(&self.pipeline_displacement_bones);
+                        current_shader = ShaderType::DisplacementBones;
+                    }
+                }
+            }
+
+            for i in 0..self.buffer_collection.vertex_buffers[mesh].len() {
+                render_pass.set_vertex_buffer(
+                    0,
+                    self.buffer_collection.vertex_buffers[mesh][i].slice(..),
+                );
+
+                render_pass.set_bind_group(
+                    0,
+                    &self.buffer_collection.uniform_bind_groups[mesh][i],
+                    &[],
+                );
+
+                render_pass.draw(
+                    0..self.buffer_collection.num_vertices[mesh][i],
+                    0..1,
+                );
+            }
+        }
+    }
+
     fn render_frame(&mut self) -> Result<(), openxr::sys::Result> {
         let frame_state = self.init.frame_waiter.wait()?;
 
         self.init.frame_stream.begin()?;
 
         if frame_state.should_render {
-            println!("Rendering frame {}", self.frame);
-        }
+            let (_view_flags, views) = self.init.session.locate_views(
+                self.init.view_config,
+                frame_state.predicted_display_time,
+                &self.init.reference_space,
+            )?;
 
-        self.init.frame_stream.end(
-            frame_state.predicted_display_time,
-            openxr::EnvironmentBlendMode::OPAQUE,
-            &[],
-        )?;
+            assert_eq!(views.len(), 2);
+
+            let left_index = self.init.swapchains[0].acquire_image()?;
+            self.init.swapchains[0].wait_image(
+                openxr::Duration::from_nanos(1_000_000_000),
+            )?;
+
+            let right_index = self.init.swapchains[1].acquire_image()?;
+            self.init.swapchains[1].wait_image(
+                openxr::Duration::from_nanos(1_000_000_000),
+            )?;
+
+            let left_view = &self.init.swapchain_views[0][left_index as usize];
+            let right_view = &self.init.swapchain_views[1][right_index as usize];
+
+            let mut encoder = self.init.device.create_command_encoder(
+                &wgpu::CommandEncoderDescriptor {
+                    label: Some("XR Render Encoder"),
+                },
+            );
+
+            self.render_scene(
+                &mut encoder,
+                left_view,
+                &self.init.depth_views[0],
+            );
+
+            self.render_scene(
+                &mut encoder,
+                right_view,
+                &self.init.depth_views[1],
+            );
+
+
+            self.init.queue.submit(Some(encoder.finish()));
+
+            self.init.swapchains[0].release_image()?;
+            self.init.swapchains[1].release_image()?;
+
+            let left_rect = openxr::Rect2Di {
+                offset: openxr::Offset2Di { x: 0, y: 0 },
+                extent: openxr::Extent2Di {
+                    width: self.init.views[0].recommended_image_rect_width as i32,
+                    height: self.init.views[0].recommended_image_rect_height as i32,
+                },
+            };
+
+            let right_rect = openxr::Rect2Di {
+                offset: openxr::Offset2Di { x: 0, y: 0 },
+                extent: openxr::Extent2Di {
+                    width: self.init.views[1].recommended_image_rect_width as i32,
+                    height: self.init.views[1].recommended_image_rect_height as i32,
+                },
+            };
+
+            let proj_views = [
+                openxr::CompositionLayerProjectionView::new()
+                    .pose(views[0].pose)
+                    .fov(views[0].fov)
+                    .sub_image(
+                        openxr::SwapchainSubImage::new()
+                            .swapchain(&self.init.swapchains[0])
+                            .image_rect(left_rect)
+                            .image_array_index(0),
+                    ),
+                openxr::CompositionLayerProjectionView::new()
+                    .pose(views[1].pose)
+                    .fov(views[1].fov)
+                    .sub_image(
+                        openxr::SwapchainSubImage::new()
+                            .swapchain(&self.init.swapchains[1])
+                            .image_rect(right_rect)
+                            .image_array_index(0),
+                    ),
+            ];
+
+            let projection_layer = openxr::CompositionLayerProjection::new()
+                .space(&self.init.reference_space)
+                .views(&proj_views);
+
+            let layer_base: &openxr::CompositionLayerBase<openxr::Vulkan> = &projection_layer;
+
+            self.init.frame_stream.end(
+                frame_state.predicted_display_time,
+                openxr::EnvironmentBlendMode::OPAQUE,
+                &[layer_base],
+            )?;
+        } else {
+            self.init.frame_stream.end(
+                frame_state.predicted_display_time,
+                openxr::EnvironmentBlendMode::OPAQUE,
+                &[],
+            )?;
+        }
 
         Ok(())
     }
 
-    pub fn run_frame_loop(&mut self) {
+    pub fn run_frame_loop(&mut self, engine: Engine) {
+        let mut engine = engine;
+
+        let mut last_frame_time = Instant::now();
+
         loop {
+            let now = Instant::now();
+            let frame_time = now.duration_since(last_frame_time).as_secs_f32();
+            last_frame_time = now;
+
             self.init.poll_events().ok();
 
+            self.update(frame_time, 0, &mut engine);
+
             if self.init.get_session_running() {
-                self.render_frame().ok();
+                if let Err(e) = self.render_frame() {
+                    eprintln!("XR Frame Error: {:?}", e);
+                }
+            } else {
+                std::thread::sleep(std::time::Duration::from_millis(10));
             }
         }
     }

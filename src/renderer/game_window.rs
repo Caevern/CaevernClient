@@ -66,8 +66,6 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         let (data_thread_tx, data_thread_rx) = mpsc::channel::<UserUpdate>();
         let (avatar_thread_tx, avatar_thread_rx) = mpsc::channel::<AvatarUpdate>();
 
-        self.engine = Some(Engine::new(data_thread_tx.clone(), avatar_thread_rx));
-
         let muted = Arc::clone(&self.muted);
         thread::spawn(move || {
             println!("Starting webserver connection");
@@ -94,11 +92,19 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
             let mut renderer_openxr = pollster::block_on(RendererOpenXR::new(xr));
 
-            renderer_openxr.run_frame_loop();
+            let mut engine = Engine::new(data_thread_tx.clone(), avatar_thread_rx);
+            engine.set_world(
+                self.home_world.clone(),
+                &mut renderer_openxr.buffer_collection,
+                &renderer_openxr.init.device,
+                &renderer_openxr.init.queue,
+            );
+
+            renderer_openxr.run_frame_loop(engine);
 
             self.openxr_renderer = Some(renderer_openxr);
         } else {
-            println!("Initializing XRManager has failed :C");
+            self.engine = Some(Engine::new(data_thread_tx.clone(), avatar_thread_rx));
 
             let attributes = WindowAttributes::default()
                 .with_title(self.title.clone())

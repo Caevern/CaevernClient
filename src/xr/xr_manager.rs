@@ -13,6 +13,11 @@ pub struct XRManager {
     pub queue: wgpu::Queue,
     pub view_config: ViewConfigurationType,
     pub swapchains: Vec<openxr::Swapchain<openxr::Vulkan>>,
+    pub swapchain_images: Vec<Vec<vk::Image>>,
+    pub swapchain_textures: Vec<Vec<wgpu::Texture>>,
+    pub swapchain_views: Vec<Vec<wgpu::TextureView>>,
+    pub depth_views: Vec<wgpu::TextureView>,
+    pub reference_space: openxr::Space,
     event_buffer: openxr::EventDataBuffer,
     session_running: bool,
 }
@@ -85,7 +90,7 @@ impl XRManager {
         let vk_app_info = vk::ApplicationInfo::default()
             .application_version(0)
             .engine_version(0)
-            .api_version(vk::make_api_version(0, 1, 1, 0));
+            .api_version(vk::make_api_version(0, 1, 2, 0));
 
         let vk_instance = unsafe {
             let vk_instance = instance
@@ -256,6 +261,11 @@ impl XRManager {
             requirements.min_api_version_supported, requirements.max_api_version_supported,
         );
 
+        let reference_space = session.create_reference_space(
+            openxr::ReferenceSpaceType::LOCAL,
+            openxr::Posef::IDENTITY,
+        )?;
+
         Ok(Self {
             instance: instance,
             system: system,
@@ -267,6 +277,11 @@ impl XRManager {
             queue: queue,
             view_config: view_config,
             swapchains: Vec::new(),
+            swapchain_images: Vec::new(),
+            swapchain_textures: Vec::new(),
+            swapchain_views: Vec::new(),
+            depth_views: Vec::new(),
+            reference_space: reference_space,
             event_buffer: openxr::EventDataBuffer::new(),
             session_running: false,
         })
@@ -276,6 +291,106 @@ impl XRManager {
         self.session_running
     }
 
+    fn create_xr_views(&mut self) -> Result<(), openxr::sys::Result> {
+        for (i, swapchain) in self.swapchains.iter().enumerate() {
+            let images = swapchain.enumerate_images()?;
+
+            let mut views = Vec::new();
+
+            let swapchain_width = self.views[i].recommended_image_rect_width;
+            let swapchain_height = self.views[i].recommended_image_rect_height;
+
+            for raw_image in images {
+                let vk_image = vk::Image::from_raw(raw_image);
+
+                let hal_desc = wgpu_hal::TextureDescriptor {
+                    label: Some("OpenXR Swapchain Image"),
+                    size: wgpu::Extent3d {
+                        width: swapchain_width,
+                        height: swapchain_height,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                    usage: wgpu::TextureUses::COLOR_TARGET,
+                    view_formats: Vec::new(),
+                    memory_flags: wgpu_hal::MemoryFlags::empty(),
+                };
+                let desc = wgpu::TextureDescriptor {
+                    label: Some("OpenXR Swapchain Image"),
+                    size: wgpu::Extent3d {
+                        width: swapchain_width,
+                        height: swapchain_height,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    view_formats: &[],
+                };
+
+                let hal_texture = unsafe {
+                    let hal_device = self
+                        .device
+                        .as_hal::<wgpu_hal::api::Vulkan>()
+                        .expect("wgpu device is not using Vulkan");
+
+                    hal_device.texture_from_raw(
+                        vk_image,
+                        &hal_desc,
+                        Some(Box::new(|| {})),
+                        wgpu_hal::vulkan::TextureMemory::External,
+                    )
+                };
+
+                let texture = unsafe {
+                    self.device.create_texture_from_hal::<
+                        wgpu_hal::api::Vulkan
+                    >(
+                        hal_texture,
+                        &desc,
+                        wgpu::TextureUses::UNINITIALIZED,
+                    )
+                };
+
+                let view = texture.create_view(
+                    &wgpu::TextureViewDescriptor::default()
+                );
+
+                views.push(view);
+            }
+
+            self.swapchain_views.push(views);
+
+            let depth_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("XR Depth"),
+                size: wgpu::Extent3d {
+                    width: swapchain_width,
+                    height: swapchain_height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Depth24Plus,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            });
+
+            let depth_view = depth_texture.create_view(
+                &wgpu::TextureViewDescriptor::default()
+            );
+
+            self.depth_views.push(depth_view);
+        }
+
+        Ok(())
+    }
+
     pub fn create_swapchains(&mut self) -> Result<(), openxr::sys::Result> {
         let views = self.instance
             .enumerate_view_configuration_views(
@@ -283,7 +398,7 @@ impl XRManager {
                 self.view_config,
             )?;
 
-        let format = vk::Format::R8G8B8A8_SRGB.as_raw();
+        let format = vk::Format::B8G8R8A8_SRGB.as_raw();
 
         for view in &views {
             let swapchain = self.session.create_swapchain(
@@ -316,6 +431,7 @@ impl XRManager {
                             println!("XR session started");
                             self.session_running = true;
                             self.create_swapchains()?;
+                            self.create_xr_views()?;
                             println!("Swapchains created");
                         }
 
