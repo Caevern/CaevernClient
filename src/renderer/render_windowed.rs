@@ -16,7 +16,7 @@ use crate::renderer::buffers::uniform_buffers::{
 };
 use crate::renderer::default_elements::register_default_textures;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
-use crate::renderer::shader_type::ShaderType;
+use crate::renderer::render_scene::render_scene;
 use crate::renderer::texture_object::TextureObject;
 use crate::renderer::vertex::Vertex;
 use crate::renderer::{init_wgpu, transforms, vertex};
@@ -493,77 +493,6 @@ impl<'window> RendererWindowed<'window> {
         self.frame += 1;
     }
 
-    // TODO: For parity, move out of this struct
-    fn render_scene(
-        &self,
-        encoder: &mut wgpu::CommandEncoder,
-        color_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
-    ) {
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: color_view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.2,
-                        g: 0.247,
-                        b: 0.314,
-                        a: 1.0,
-                    }),
-                    store: wgpu::StoreOp::Store,
-                },
-                depth_slice: None,
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: wgpu::StoreOp::Discard,
-                }),
-                stencil_ops: None,
-            }),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-
-        let mut current_shader = ShaderType::Displacement;
-        render_pass.set_pipeline(&self.pipeline_displacement);
-
-        for mesh in 0..self.buffer_collection.vertex_buffers.len() {
-            let shader_type = &self.buffer_collection.shader_type[mesh];
-
-            if shader_type != &current_shader {
-                match shader_type {
-                    ShaderType::Displacement => {
-                        render_pass.set_pipeline(&self.pipeline_displacement);
-                        current_shader = ShaderType::Displacement;
-                    }
-
-                    ShaderType::DisplacementBones => {
-                        render_pass.set_pipeline(&self.pipeline_displacement_bones);
-                        current_shader = ShaderType::DisplacementBones;
-                    }
-                }
-            }
-
-            for i in 0..self.buffer_collection.vertex_buffers[mesh].len() {
-                render_pass
-                    .set_vertex_buffer(0, self.buffer_collection.vertex_buffers[mesh][i].slice(..));
-
-                render_pass.set_bind_group(
-                    0,
-                    &self.buffer_collection.uniform_bind_groups[mesh][i],
-                    &[],
-                );
-
-                render_pass.draw(0..self.buffer_collection.num_vertices[mesh][i], 0..1);
-            }
-        }
-    }
-
     pub fn render(&mut self, depth_texture: &wgpu::Texture) -> Result<(), ()> {
         let output = match self.init.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(frame) => frame,
@@ -600,7 +529,14 @@ impl<'window> RendererWindowed<'window> {
                     label: Some("Window Render Encoder"),
                 });
 
-        self.render_scene(&mut encoder, &view, &depth_view);
+        render_scene(
+            &mut encoder,
+            &view,
+            &depth_view,
+            &self.buffer_collection,
+            &self.pipeline_displacement,
+            &self.pipeline_displacement_bones,
+        );
 
         self.init.queue.submit(Some(encoder.finish()));
         self.init.queue.present(output);

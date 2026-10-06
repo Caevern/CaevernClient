@@ -16,7 +16,7 @@ use crate::renderer::buffers::uniform_buffers::{
 use crate::renderer::default_elements::register_default_textures;
 use crate::renderer::input_state::InputState;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
-use crate::renderer::shader_type::ShaderType;
+use crate::renderer::render_scene::render_scene;
 use crate::renderer::texture_object::TextureObject;
 use crate::renderer::transforms::{fov_to_projection, get_eye_view_matrix, quaternion_to_euler};
 use crate::renderer::vertex::Vertex;
@@ -464,77 +464,6 @@ impl RendererOpenXR {
         self.frame += 1;
     }
 
-    // TODO: For parity, move out of this struct
-    fn render_scene(
-        &self,
-        encoder: &mut wgpu::CommandEncoder,
-        color_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
-    ) {
-        let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Render Pass"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: color_view,
-                resolve_target: None,
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: 0.2,
-                        g: 0.247,
-                        b: 0.314,
-                        a: 1.0,
-                    }),
-                    store: wgpu::StoreOp::Store,
-                },
-                depth_slice: None,
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: depth_view,
-                depth_ops: Some(wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(1.0),
-                    store: wgpu::StoreOp::Discard,
-                }),
-                stencil_ops: None,
-            }),
-            occlusion_query_set: None,
-            timestamp_writes: None,
-            multiview_mask: None,
-        });
-
-        let mut current_shader = ShaderType::Displacement;
-        render_pass.set_pipeline(&self.pipeline_displacement);
-
-        for mesh in 0..self.buffer_collection.vertex_buffers.len() {
-            let shader_type = &self.buffer_collection.shader_type[mesh];
-
-            if shader_type != &current_shader {
-                match shader_type {
-                    ShaderType::Displacement => {
-                        render_pass.set_pipeline(&self.pipeline_displacement);
-                        current_shader = ShaderType::Displacement;
-                    }
-
-                    ShaderType::DisplacementBones => {
-                        render_pass.set_pipeline(&self.pipeline_displacement_bones);
-                        current_shader = ShaderType::DisplacementBones;
-                    }
-                }
-            }
-
-            for i in 0..self.buffer_collection.vertex_buffers[mesh].len() {
-                render_pass
-                    .set_vertex_buffer(0, self.buffer_collection.vertex_buffers[mesh][i].slice(..));
-
-                render_pass.set_bind_group(
-                    0,
-                    &self.buffer_collection.uniform_bind_groups[mesh][i],
-                    &[],
-                );
-
-                render_pass.draw(0..self.buffer_collection.num_vertices[mesh][i], 0..1);
-            }
-        }
-    }
-
     fn render_frame(&mut self, player: &mut Player) -> Result<(), openxr::sys::Result> {
         let frame_state = self.init.frame_waiter.wait()?;
 
@@ -602,10 +531,13 @@ impl RendererOpenXR {
             self.init.swapchains[0].wait_image(openxr::Duration::from_nanos(1_000_000_000))?;
             let left_color_view = &self.init.swapchain_views[0][left_index as usize];
 
-            self.render_scene(
+            render_scene(
                 &mut encoder_left,
                 left_color_view,
                 &self.init.depth_views[0],
+                &self.buffer_collection,
+                &self.pipeline_displacement,
+                &self.pipeline_displacement_bones,
             );
             self.init.queue.submit(Some(encoder_left.finish()));
             self.init.swapchains[0].release_image()?;
@@ -627,10 +559,13 @@ impl RendererOpenXR {
             self.init.swapchains[1].wait_image(openxr::Duration::from_nanos(1_000_000_000))?;
             let right_color_view = &self.init.swapchain_views[1][right_index as usize];
 
-            self.render_scene(
+            render_scene(
                 &mut encoder_right,
                 right_color_view,
                 &self.init.depth_views[1],
+                &self.buffer_collection,
+                &self.pipeline_displacement,
+                &self.pipeline_displacement_bones,
             );
             self.init.queue.submit(Some(encoder_right.finish()));
             self.init.swapchains[1].release_image()?;

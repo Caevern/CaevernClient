@@ -20,3 +20,4 @@ mod init_wgpu;
 mod pipelines;
 mod render_openxr;
 mod render_windowed;
+mod render_scene;
