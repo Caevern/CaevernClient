@@ -1,14 +1,17 @@
 use cgmath::Vector3;
 use futures_util::{FutureExt, SinkExt, StreamExt, TryStreamExt};
+use std::{
+    collections::HashMap,
+    f32, println,
+    sync::mpsc::{Receiver, Sender},
+};
 use tokio::net::TcpStream;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tungstenite::Message;
-use std::{
-    collections::HashMap, f32, println, sync::mpsc::{Receiver, Sender},
-};
 
 use crate::{
-    network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate::{self, SendUserPosition}}, renderer::transform::Transform,
+    network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate},
+    renderer::transform::Transform,
 };
 
 pub async fn start_user_handler(

@@ -10,7 +10,6 @@ use cgmath::{InnerSpace, Matrix, SquareMatrix, Vector3};
 
 use crate::{
     game::{update_bone::update_bone, update_bones::update_bones},
-    modules::load_module::load_module,
     network::{
         avatar_updates::AvatarUpdate,
         user_updates::UserUpdate::{self, UpdateAvatarId},

@@ -1,8 +1,7 @@
 use cgmath::*;
-use rust_embed::RustEmbed;
 use std::collections::HashMap;
+use std::f32;
 use std::sync::Arc;
-use std::{f32, println};
 use winit::window::Window;
 
 use crate::ALLOCATOR;

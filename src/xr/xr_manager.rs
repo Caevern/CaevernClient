@@ -24,7 +24,7 @@ pub struct XRManager {
 impl XRManager {
     pub fn new() -> Result<Self, openxr::sys::Result> {
         let entry = unsafe {
-            match openxr::Entry::load() {
+            match openxr::Entry::load(&()) {
                 Ok(entry) => entry,
                 Err(err) => {
                     eprintln!("OpenXR Entry::load() failed: {err:?}");
@@ -50,6 +50,7 @@ impl XRManager {
             },
             &extensions,
             &[],
+            &(),
         )?;
 
         let system = instance.system(openxr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
@@ -262,10 +263,8 @@ impl XRManager {
             requirements.min_api_version_supported, requirements.max_api_version_supported,
         );
 
-        let reference_space = session.create_reference_space(
-            openxr::ReferenceSpaceType::LOCAL,
-            openxr::Posef::IDENTITY,
-        )?;
+        let reference_space = session
+            .create_reference_space(openxr::ReferenceSpaceType::LOCAL, openxr::Posef::IDENTITY)?;
 
         Ok(Self {
             instance: instance,
@@ -349,18 +348,15 @@ impl XRManager {
                 };
 
                 let texture = unsafe {
-                    self.device.create_texture_from_hal::<
-                        wgpu_hal::api::Vulkan
-                    >(
-                        hal_texture,
-                        &desc,
-                        wgpu::TextureUses::UNINITIALIZED,
-                    )
+                    self.device
+                        .create_texture_from_hal::<wgpu_hal::api::Vulkan>(
+                            hal_texture,
+                            &desc,
+                            wgpu::TextureUses::UNINITIALIZED,
+                        )
                 };
 
-                let view = texture.create_view(
-                    &wgpu::TextureViewDescriptor::default()
-                );
+                let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
 
                 views.push(view);
             }
@@ -382,9 +378,7 @@ impl XRManager {
                 view_formats: &[],
             });
 
-            let depth_view = depth_texture.create_view(
-                &wgpu::TextureViewDescriptor::default()
-            );
+            let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
             self.depth_views.push(depth_view);
         }
@@ -393,17 +387,16 @@ impl XRManager {
     }
 
     pub fn create_swapchains(&mut self) -> Result<(), openxr::sys::Result> {
-        let views = self.instance
-            .enumerate_view_configuration_views(
-                self.system,
-                self.view_config,
-            )?;
+        let views = self
+            .instance
+            .enumerate_view_configuration_views(self.system, self.view_config)?;
 
         let format = vk::Format::B8G8R8A8_SRGB.as_raw();
 
         for view in &views {
-            let swapchain = self.session.create_swapchain(
-                &openxr::SwapchainCreateInfo {
+            let swapchain = self
+                .session
+                .create_swapchain(&openxr::SwapchainCreateInfo {
                     create_flags: openxr::SwapchainCreateFlags::EMPTY,
                     usage_flags: openxr::SwapchainUsageFlags::COLOR_ATTACHMENT,
                     format: format as u32,
@@ -413,8 +406,7 @@ impl XRManager {
                     face_count: 1,
                     array_size: 1,
                     mip_count: 1,
-                },
-            )?;
+                })?;
 
             self.swapchains.push(swapchain);
         }
@@ -425,28 +417,26 @@ impl XRManager {
     pub fn poll_events(&mut self) -> Result<(), openxr::sys::Result> {
         while let Some(event) = self.instance.poll_event(&mut self.event_buffer)? {
             match event {
-                openxr::Event::SessionStateChanged(event) => {
-                    match event.state() {
-                        openxr::SessionState::READY => {
-                            self.session.begin(self.view_config)?;
-                            println!("XR session started");
-                            self.session_running = true;
-                            self.create_swapchains()?;
-                            self.create_xr_views()?;
-                            println!("Swapchains created");
-                        }
-
-                        openxr::SessionState::STOPPING => {
-                            self.session.end()?;
-                            println!("XR session stopped");
-                            self.session_running = false;
-                        }
-
-                        state => {
-                            println!("XR session state: {state:?}");
-                        }
+                openxr::Event::SessionStateChanged(event) => match event.state() {
+                    openxr::SessionState::READY => {
+                        self.session.begin(self.view_config)?;
+                        println!("XR session started");
+                        self.session_running = true;
+                        self.create_swapchains()?;
+                        self.create_xr_views()?;
+                        println!("Swapchains created");
                     }
-                }
+
+                    openxr::SessionState::STOPPING => {
+                        self.session.end()?;
+                        println!("XR session stopped");
+                        self.session_running = false;
+                    }
+
+                    state => {
+                        println!("XR session state: {state:?}");
+                    }
+                },
 
                 _ => {}
             }

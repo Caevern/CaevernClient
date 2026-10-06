@@ -1,9 +1,7 @@
 use cgmath::*;
-use rust_embed::RustEmbed;
 use std::collections::HashMap;
-use std::ops::Deref;
+use std::f32;
 use std::time::Instant;
-use std::{f32, println};
 
 use crate::ALLOCATOR;
 use crate::game::update_bone::update_bone;
@@ -27,7 +25,7 @@ use crate::setup::fonts::load_font_uvs;
 use crate::world::object::ObjectType;
 use crate::world::objects::player::Player;
 use crate::world::objects::text;
-use crate::xr::xr_input::{self, XrInput, poll_xr_inputs};
+use crate::xr::xr_input::{XrInput, poll_xr_inputs};
 use crate::xr::xr_manager::XRManager;
 
 pub struct RendererOpenXR {
