@@ -36,6 +36,10 @@ impl Widget for Label {
         self.text_color = [r, g, b];
     }
 
+    fn get_id(&self) -> usize {
+        self.object_id
+    }
+
     fn build(&mut self, id: usize) -> Object {
         self.object_id = id;
         let font_uvs = load_font_uvs("fonts/NotoSansJP.ttf");

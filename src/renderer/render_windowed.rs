@@ -168,9 +168,7 @@ impl<'window> RendererWindowed<'window> {
             for object_index in 0..world.get_objects().len() {
                 let object = world.get_object(object_index);
                 let object_type = object.get_object_type();
-                if object_type == ObjectType::TabletMenu
-                    || object_type == ObjectType::TabletMenuButton
-                {
+                if object_type == ObjectType::TabletMenu {
                     let model_mat = transforms::create_transforms(
                         [
                             player.camera.position.x + forward.x,
@@ -201,15 +199,20 @@ impl<'window> RendererWindowed<'window> {
                         64,
                         bytemuck::cast_slice(normal_ref),
                     );
+
+                    if let Some(canvas) = &object.canvas {
+                        for child in canvas.children.iter() {
+                            let child_id = child.get_id();
+                            println!("{}", child_id);
+                        }
+                    }
                 }
             }
         } else if menu_tablet_state == 3 {
             for object_index in 0..world.get_objects().len() {
                 let object = world.get_object(object_index);
                 let object_type = object.get_object_type();
-                if object_type == ObjectType::TabletMenu
-                    || object_type == ObjectType::TabletMenuButton
-                {
+                if object_type == ObjectType::TabletMenu {
                     let model_mat = transforms::create_transforms(
                         [0.0, -10.0, 0.0],
                         [
