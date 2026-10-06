@@ -17,10 +17,12 @@ use crate::renderer::default_elements::register_default_textures;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
 use crate::renderer::shader_type::ShaderType;
 use crate::renderer::texture_object::TextureObject;
+use crate::renderer::transforms::{fov_to_projection, get_eye_view_matrix, pose_to_view_matrix};
 use crate::renderer::vertex::Vertex;
 use crate::renderer::{transform, transforms, vertex};
 use crate::setup::fonts::load_font_uvs;
 use crate::world::object::ObjectType;
+use crate::world::objects::player::Player;
 use crate::world::objects::text;
 use crate::xr::xr_manager::XRManager;
 
@@ -359,28 +361,28 @@ impl RendererOpenXR {
             }
         }*/
 
-        let up_direction = cgmath::Vector3::unit_y();
-        let camera_position = Point3 {
-            x: player.camera.position.x,
-            y: player.camera.position.y,
-            z: player.camera.position.z,
-        };
-        let (view_mat, project_mat, _) = transforms::create_view_rotation(
-            camera_position,
-            player.camera.rotation.y,
-            player.camera.rotation.x,
-            up_direction,
-            1.0,
-        );
+        //let up_direction = cgmath::Vector3::unit_y();
+        //let camera_position = Point3 {
+        //    x: player.camera.position.x,
+        //    y: player.camera.position.y,
+        //    z: player.camera.position.z,
+        //};
+        //let (view_mat, project_mat, _) = transforms::create_view_rotation(
+        //    camera_position,
+        //    player.camera.rotation.y,
+        //    player.camera.rotation.x,
+        //    up_direction,
+        //    1.0,
+        //);
 
-        let view_project_mat = project_mat * view_mat;
-        let view_projection_ref: &[f32; 16] = view_project_mat.as_ref();
+        //let view_project_mat = project_mat * view_mat;
+        //let view_projection_ref: &[f32; 16] = view_project_mat.as_ref();
 
-        self.init.queue.write_buffer(
-            &self.buffer_collection.vertex_uniform_buffer,
-            64,
-            bytemuck::cast_slice(view_projection_ref),
-        );
+        //self.init.queue.write_buffer(
+        //    &self.buffer_collection.vertex_uniform_buffer,
+        //    64,
+        //    bytemuck::cast_slice(view_projection_ref),
+        //);
 
         // update ingame fps label when menu tablet is enabled
         if menu_tablet_state == 1 && self.frame % 60 == 0 {
@@ -461,7 +463,7 @@ impl RendererOpenXR {
         &self,
         encoder: &mut wgpu::CommandEncoder,
         color_view: &wgpu::TextureView,
-        depth_view: &wgpu::TextureView,
+        depth_view: &wgpu::TextureView
     ) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Render Pass"),
@@ -532,7 +534,7 @@ impl RendererOpenXR {
         }
     }
 
-    fn render_frame(&mut self) -> Result<(), openxr::sys::Result> {
+    fn render_frame(&mut self, player: &Player) -> Result<(), openxr::sys::Result> {
         let frame_state = self.init.frame_waiter.wait()?;
 
         self.init.frame_stream.begin()?;
@@ -546,37 +548,57 @@ impl RendererOpenXR {
 
             assert_eq!(views.len(), 2);
 
-            let left_index = self.init.swapchains[0].acquire_image()?;
-            self.init.swapchains[0].wait_image(
-                openxr::Duration::from_nanos(1_000_000_000),
-            )?;
-
-            let right_index = self.init.swapchains[1].acquire_image()?;
-            self.init.swapchains[1].wait_image(
-                openxr::Duration::from_nanos(1_000_000_000),
-            )?;
-
-            let left_view = &self.init.swapchain_views[0][left_index as usize];
-            let right_view = &self.init.swapchain_views[1][right_index as usize];
-
             let mut encoder = self.init.device.create_command_encoder(
                 &wgpu::CommandEncoderDescriptor {
                     label: Some("XR Render Encoder"),
                 },
             );
 
-            self.render_scene(
-                &mut encoder,
-                left_view,
-                &self.init.depth_views[0],
+            let left_proj = fov_to_projection(views[0].fov, 0.1, 1000.0);
+            let left_view = get_eye_view_matrix(
+                player.camera.position,
+                player.camera.rotation.y,
+                views[0].pose,
             );
+            let left_view_proj = left_proj * left_view;
+            let left_view_proj_ref: &[f32; 16] = left_view_proj.as_ref();
+            self.init.queue.write_buffer(
+                &self.buffer_collection.vertex_uniform_buffer,
+                64,
+                bytemuck::cast_slice(left_view_proj_ref),
+            );
+            let left_index = self.init.swapchains[0].acquire_image()?;
+            self.init.swapchains[0].wait_image(openxr::Duration::from_nanos(1_000_000_000))?;
+            let left_color_view = &self.init.swapchain_views[0][left_index as usize];
 
             self.render_scene(
                 &mut encoder,
-                right_view,
-                &self.init.depth_views[1],
+                left_color_view,
+                &self.init.depth_views[0]
             );
 
+            let right_proj = fov_to_projection(views[1].fov, 0.1, 1000.0);
+            let right_view = get_eye_view_matrix(
+                player.camera.position,
+                player.camera.rotation.y,
+                views[1].pose,
+            );
+            let right_view_proj = right_proj * right_view;
+            let right_vp_ref: &[f32; 16] = right_view_proj.as_ref();
+            self.init.queue.write_buffer(
+                &self.buffer_collection.vertex_uniform_buffer,
+                64,
+                bytemuck::cast_slice(right_vp_ref),
+            );
+            let right_index = self.init.swapchains[1].acquire_image()?;
+            self.init.swapchains[1].wait_image(openxr::Duration::from_nanos(1_000_000_000))?;
+            let right_color_view = &self.init.swapchain_views[1][right_index as usize];
+
+            self.render_scene(
+                &mut encoder,
+                right_color_view,
+                &self.init.depth_views[1]
+            );
 
             self.init.queue.submit(Some(encoder.finish()));
 
@@ -657,7 +679,7 @@ impl RendererOpenXR {
             self.update(frame_time, 0, &mut engine);
 
             if self.init.get_session_running() {
-                if let Err(e) = self.render_frame() {
+                if let Err(e) = self.render_frame(&engine.player) {
                     eprintln!("XR Frame Error: {:?}", e);
                 }
             } else {
