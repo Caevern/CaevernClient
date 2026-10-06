@@ -6,7 +6,7 @@ use winit::event_loop::EventLoop;
 use crate::renderer::game_window::GameWindow;
 use crate::world::world::World;
 
-pub fn start_engine(world: World) {
+pub fn start_engine(world: World, no_vr: bool) {
     env_logger::init();
     let event_loop = EventLoop::new().unwrap();
 
@@ -14,7 +14,6 @@ pub fn start_engine(world: World) {
         window: None,
 
         windowed_renderer: None,
-        openxr_renderer: None,
 
         engine: None,
 
@@ -33,7 +32,7 @@ pub fn start_engine(world: World) {
         mouse_locked: false,
         use_confined: false,
 
-        xr_enabled: false,
+        xr_enabled: !no_vr,
 
         menu_tablet_state: 0,
 

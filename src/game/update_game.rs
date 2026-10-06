@@ -101,9 +101,11 @@ impl Engine {
         self.player.camera.position += updated_camera_position;
 
         let player_position = [
-            self.player.camera.position.x - self.player.camera.rotation.y.cos() * 0.1,
-            self.player.camera.position.y - self.player.height,
-            self.player.camera.position.z - self.player.camera.rotation.y.sin() * 0.1,
+            self.player.camera.position.x - self.player.camera.rotation.y.cos() * 0.1
+                + self.player.camera_offset.x,
+            self.player.camera.position.y - self.player.height + self.player.camera_offset.y,
+            self.player.camera.position.z - self.player.camera.rotation.y.sin() * 0.1
+                + self.player.camera_offset.z,
         ];
 
         apply_gravity(&mut self.player, frame_time);

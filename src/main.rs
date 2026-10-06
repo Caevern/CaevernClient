@@ -15,7 +15,6 @@ use cgmath::Vector3;
 use std::alloc;
 use world::object::Object;
 
-use crate::modules::load_module::load_module;
 use crate::renderer::transform::Transform;
 use crate::setup::fonts::load_font_uvs;
 use crate::world::objects::text;
@@ -25,6 +24,16 @@ use crate::world::{object::ObjectType, parsers::fbx_parser::parse};
 static ALLOCATOR: Cap<alloc::System> = Cap::new(alloc::System, usize::max_value());
 
 fn main() {
+    let args: Vec<String> = std::env::args().collect();
+
+    let no_vr = args.contains(&"--no-vr".to_string());
+
+    if no_vr {
+        println!("Running desktop mode");
+    } else {
+        println!("Running VR mode");
+    }
+
     let mut world = world::world::create_world();
 
     let skybox = parse(
@@ -133,5 +142,5 @@ fn main() {
         ALLOCATOR.allocated() as f32 / 1000000.0
     );
 
-    renderer::eventloop::start_engine(world);
+    renderer::eventloop::start_engine(world, no_vr);
 }

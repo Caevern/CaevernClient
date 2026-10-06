@@ -279,11 +279,6 @@ impl<'window> RendererWindowed<'window> {
             } else if object_type == ObjectType::SkinnedMesh {
                 if self.frame < 60 {
                     let skeleton = object.get_skeleton();
-                    //self.bones[i][skeleton["head"]].0.rotation.x = -player.camera.rotation.x;
-                    //self.bones[i][skeleton["arm_right"]].0.rotation.z = -player.camera.rotation.x;
-                    /*self.bones[i][skeleton["head"]].0.rotation.y =
-                    -player.camera.rotation.y - 1.57079633;*/
-                    // TODO: make the local character have this dissabled by default.
                     self.buffer_collection.bones[object.buffer_bindings.bones][skeleton["neck"]]
                         .0
                         .scale = [0.0, 0.0, 0.0].into();
@@ -349,12 +344,8 @@ impl<'window> RendererWindowed<'window> {
 
         // update skybox positions
         if self.frame % 10 == 0 {
-            let grabbable_object_index = raycast_grab(
-                world.get_objects(),
-                player.camera.position,
-                forward,
-                5,
-            );
+            let grabbable_object_index =
+                raycast_grab(world.get_objects(), player.camera.position, forward, 5);
 
             if grabbable_object_index > 0 {
                 let grabbable_object = world.get_object_mut(grabbable_object_index);
@@ -544,10 +535,8 @@ impl<'window> RendererWindowed<'window> {
             }
 
             for i in 0..self.buffer_collection.vertex_buffers[mesh].len() {
-                render_pass.set_vertex_buffer(
-                    0,
-                    self.buffer_collection.vertex_buffers[mesh][i].slice(..),
-                );
+                render_pass
+                    .set_vertex_buffer(0, self.buffer_collection.vertex_buffers[mesh][i].slice(..));
 
                 render_pass.set_bind_group(
                     0,
@@ -555,10 +544,7 @@ impl<'window> RendererWindowed<'window> {
                     &[],
                 );
 
-                render_pass.draw(
-                    0..self.buffer_collection.num_vertices[mesh][i],
-                    0..1,
-                );
+                render_pass.draw(0..self.buffer_collection.num_vertices[mesh][i], 0..1);
             }
         }
     }
@@ -592,17 +578,14 @@ impl<'window> RendererWindowed<'window> {
 
         let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
 
-        let mut encoder = self.init.device.create_command_encoder(
-            &wgpu::CommandEncoderDescriptor {
-                label: Some("Window Render Encoder"),
-            },
-        );
+        let mut encoder =
+            self.init
+                .device
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Window Render Encoder"),
+                });
 
-        self.render_scene(
-            &mut encoder,
-            &view,
-            &depth_view,
-        );
+        self.render_scene(&mut encoder, &view, &depth_view);
 
         self.init.queue.submit(Some(encoder.finish()));
         self.init.queue.present(output);

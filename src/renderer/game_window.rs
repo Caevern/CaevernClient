@@ -28,7 +28,6 @@ use crate::network::voice::start_voice_handler;
 use crate::renderer::render_openxr::RendererOpenXR;
 use crate::renderer::render_windowed::RendererWindowed;
 use crate::world::world::World;
-use crate::xr::xr_input;
 use crate::xr::xr_input::XrInput;
 use crate::xr::xr_manager::XRManager;
 
@@ -36,7 +35,6 @@ pub struct GameWindow<'window> {
     pub window: Option<Arc<Window>>,
 
     pub windowed_renderer: Option<RendererWindowed<'window>>,
-    pub openxr_renderer: Option<RendererOpenXR>,
 
     pub engine: Option<Engine>,
 
@@ -88,13 +86,17 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
             });
         });
 
-        if let Ok(xr) = XRManager::new() {
+        if self.xr_enabled
+            && let Ok(xr) = XRManager::new()
+        {
             println!("STARTED XRManager!!!");
-            self.xr_enabled = true;
 
             let mut renderer_openxr = pollster::block_on(RendererOpenXR::new(xr));
-            let xr_input = XrInput::new(&renderer_openxr.init.instance).expect("Failed to create xr input");
-            xr_input.attach_to_session(&renderer_openxr.init.session).expect("Failed to attach xr input to session");
+            let xr_input =
+                XrInput::new(&renderer_openxr.init.instance).expect("Failed to create xr input");
+            xr_input
+                .attach_to_session(&renderer_openxr.init.session)
+                .expect("Failed to attach xr input to session");
 
             let mut engine = Engine::new(data_thread_tx.clone(), avatar_thread_rx);
             engine.set_world(
@@ -103,6 +105,9 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 &renderer_openxr.init.device,
                 &renderer_openxr.init.queue,
             );
+            data_thread_tx
+                .send(UserUpdate::SendReadySignal)
+                .expect("Sending user ready signal failed :C");
 
             renderer_openxr.run_frame_loop(engine, xr_input);
         } else {
@@ -115,25 +120,22 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
             let mut renderer = pollster::block_on(RendererWindowed::new(&window));
 
-            self.depth_texture = Some(
-                renderer
-                    .init
-                    .device
-                    .create_texture(&wgpu::TextureDescriptor {
-                        size: wgpu::Extent3d {
-                            width: renderer.init.config.width,
-                            height: renderer.init.config.height,
-                            depth_or_array_layers: 1,
-                        },
-                        mip_level_count: 1,
-                        sample_count: 1,
-                        dimension: wgpu::TextureDimension::D2,
-                        format: wgpu::TextureFormat::Depth24Plus,
-                        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                        label: None,
-                        view_formats: &[],
-                    }),
-            );
+            self.depth_texture = Some(renderer.init.device.create_texture(
+                &wgpu::TextureDescriptor {
+                    size: wgpu::Extent3d {
+                        width: renderer.init.config.width,
+                        height: renderer.init.config.height,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Depth24Plus,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    label: None,
+                    view_formats: &[],
+                },
+            ));
 
             //renderer.set_world(self.home_world.clone());
             self.engine.as_mut().unwrap().set_world(

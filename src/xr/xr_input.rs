@@ -1,4 +1,4 @@
-use openxr::{Action, ActionSet, ActiveActionSet, Binding, Instance, Path, Posef, Session, Vector2f};
+use openxr::{Action, ActionSet, ActiveActionSet, Binding, Instance, Path, Session, Vector2f};
 
 use crate::renderer::input_state::InputState;
 
@@ -11,19 +11,12 @@ pub struct XrInput {
 impl XrInput {
     pub fn new(instance: &Instance) -> openxr::Result<Self> {
         let action_set = instance.create_action_set("gameplay", "Gameplay Inputs", 0)?;
-        let move_action = action_set.create_action::<Vector2f>(
-            "move",
-            "Player Movement",
-            &[],
-        )?;
+        let move_action = action_set.create_action::<Vector2f>("move", "Player Movement", &[])?;
 
-        let menu_action = action_set.create_action::<bool>(
-            "menu",
-            "Menu",
-            &[],
-        )?;
+        let menu_action = action_set.create_action::<bool>("menu", "Menu", &[])?;
 
-        let oculus_profile = instance.string_to_path("/interaction_profiles/oculus/touch_controller")?;
+        let oculus_profile =
+            instance.string_to_path("/interaction_profiles/oculus/touch_controller")?;
         let oculus_left_stick = instance.string_to_path("/user/hand/left/input/thumbstick")?;
         let oculus_menu_button = instance.string_to_path("/user/hand/left/input/menu/click")?;
 
@@ -35,7 +28,8 @@ impl XrInput {
             ],
         )?;
 
-        let index_profile = instance.string_to_path("/interaction_profiles/valve/index_controller")?;
+        let index_profile =
+            instance.string_to_path("/interaction_profiles/valve/index_controller")?;
         let index_left_stick = instance.string_to_path("/user/hand/left/input/thumbstick")?;
         let index_b_button = instance.string_to_path("/user/hand/left/input/b/click")?;
 
@@ -59,14 +53,13 @@ impl XrInput {
             ],
         )?;
 
-        let simple_profile = instance.string_to_path("/interaction_profiles/khr/simple_controller")?;
+        let simple_profile =
+            instance.string_to_path("/interaction_profiles/khr/simple_controller")?;
         let simple_menu = instance.string_to_path("/user/hand/left/input/menu/click")?;
 
         instance.suggest_interaction_profile_bindings(
             simple_profile,
-            &[
-                Binding::new(&menu_action, simple_menu),
-            ],
+            &[Binding::new(&menu_action, simple_menu)],
         )?;
 
         Ok(Self {
@@ -100,7 +93,7 @@ pub fn poll_xr_inputs(
     let menu_state = xr_input.menu_action.state(session, Path::NULL)?;
     if menu_state.is_active {
         input.menu = menu_state.current_state;
-        println!("menu: menu={}", input.menu);
+        //println!("menu: menu={}", input.menu);
     }
 
     Ok(())

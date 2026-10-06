@@ -23,14 +23,15 @@ pub struct XRManager {
 }
 impl XRManager {
     pub fn new() -> Result<Self, openxr::sys::Result> {
-        let entry;
-        unsafe {
-            if let Ok(temp_entry) = openxr::Entry::load() {
-                entry = temp_entry;
-            } else {
-                return Err(openxr::sys::Result::ERROR_SESSION_NOT_RUNNING);
+        let entry = unsafe {
+            match openxr::Entry::load() {
+                Ok(entry) => entry,
+                Err(err) => {
+                    eprintln!("OpenXR Entry::load() failed: {err:?}");
+                    return Err(openxr::sys::Result::ERROR_INITIALIZATION_FAILED);
+                }
             }
-        }
+        };
 
         let mut extensions = openxr::ExtensionSet::default();
         extensions.khr_vulkan_enable2 = true;

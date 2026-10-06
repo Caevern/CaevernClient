@@ -129,10 +129,7 @@ pub fn fov_to_projection(fov: openxr::Fovf, near: f32, far: f32) -> Matrix4<f32>
     let m32 = -(2.0 * far * near) / (far - near);
 
     let opengl_proj = Matrix4::new(
-        m00,  0.0,  0.0,  0.0,
-        0.0,  m11,  0.0,  0.0,
-        m20,  m21,  m22, -1.0,
-        0.0,  0.0,  m32,  0.0,
+        m00, 0.0, 0.0, 0.0, 0.0, m11, 0.0, 0.0, m20, m21, m22, -1.0, 0.0, 0.0, m32, 0.0,
     );
 
     OPENGL_TO_WGPU_MATRIX * opengl_proj
@@ -178,4 +175,23 @@ pub fn get_eye_view_matrix(
     let eye_world_transform = player_rig_transform * eye_local_transform;
 
     eye_world_transform.invert().unwrap_or(Matrix4::identity())
+}
+
+pub fn quaternion_to_euler(q: Quaternion<f32>) -> (f32, f32, f32) {
+    let sinr_cosp = 2.0 * (q.s * q.v.x + q.v.y * q.v.z);
+    let cosr_cosp = 1.0 - 2.0 * (q.v.x * q.v.x + q.v.y * q.v.y);
+    let x = sinr_cosp.atan2(cosr_cosp);
+
+    let sinp = 2.0 * (q.s * q.v.y - q.v.z * q.v.x);
+    let y = if sinp.abs() >= 1.0 {
+        sinp.signum() * std::f32::consts::FRAC_PI_2
+    } else {
+        sinp.asin()
+    };
+
+    let siny_cosp = 2.0 * (q.s * q.v.z + q.v.x * q.v.y);
+    let cosy_cosp = 1.0 - 2.0 * (q.v.y * q.v.y + q.v.z * q.v.z);
+    let z = siny_cosp.atan2(cosy_cosp);
+
+    (x, y, z)
 }
