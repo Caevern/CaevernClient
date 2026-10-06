@@ -13,7 +13,7 @@ pub fn load_font_atlas(path: &str) -> DynamicImage {
     let font = Font::from_bytes(font_data.data.as_ref(), fontdue::FontSettings::default()).unwrap();
 
     let size = 48.0;
-    let chars: Vec<char> = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-+_:;.".chars().collect();
+    let chars: Vec<char> = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-+_:;.!?[]".chars().collect();
 
     let mut glyphs = Vec::new();
     let mut atlas_width = 0;
@@ -59,7 +59,7 @@ pub fn load_font_uvs(path: &str) -> HashMap<String, (f32, f32, f32, f32, f32)> {
     let font = Font::from_bytes(font_data.data.as_ref(), fontdue::FontSettings::default()).unwrap();
 
     let size = 48.0;
-    let chars: Vec<char> = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-+_:;.".chars().collect();
+    let chars: Vec<char> = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-+_:;.!?[]".chars().collect();
 
     let mut glyphs = Vec::new();
     let mut atlas_width = 0;

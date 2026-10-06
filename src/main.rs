@@ -17,6 +17,7 @@ use std::alloc;
 use world::object::Object;
 
 use crate::renderer::transform::Transform;
+use crate::setup::fonts::load_font_uvs;
 use crate::ui::canvas::Canvas;
 use crate::ui::widget::Widget;
 use crate::ui::widgets::button::Button;
@@ -66,20 +67,25 @@ fn main() {
 
     let mut tablet_canvas = Canvas::new();
 
-    let mut tablet_frame_text_label = Label::with_text("Hello, World!".to_string());
-    tablet_frame_text_label.set_position(-0.5, 0.3, -0.01);
+    let font_uvs = load_font_uvs("fonts/NotoSansJP.ttf");
+
+    let mut tablet_frame_text_label = Label::with_text("[CLOCK]".to_string(), font_uvs.clone());
+    tablet_frame_text_label.set_position(-0.5, 0.3, -0.005);
+    tablet_frame_text_label.update();
     tablet_canvas.add_child(tablet_frame_text_label);
 
-    let mut tablet_frame_chat_button = Button::with_text("Chat".to_string());
-    tablet_frame_chat_button.set_position(-0.5, 0.0, -0.01);
+    let mut tablet_frame_chat_button = Button::with_text("Chat".to_string(), font_uvs.clone());
+    tablet_frame_chat_button.set_position(-0.5, 0.0, -0.005);
     tablet_canvas.add_child(tablet_frame_chat_button);
 
-    let mut tablet_frame_fps_label = Label::with_text("FPS: 0".to_string());
-    tablet_frame_fps_label.set_position(-0.5, -0.3, -0.01);
+    let mut tablet_frame_fps_label = Label::with_text("FPS: [FPS]".to_string(), font_uvs.clone());
+    tablet_frame_fps_label.set_position(-0.5, -0.3, -0.005);
+    tablet_frame_fps_label.update();
     tablet_canvas.add_child(tablet_frame_fps_label);
 
-    let mut tablet_frame_ram_label = Label::with_text("RAM: 0".to_string());
-    tablet_frame_ram_label.set_position(-0.5, -0.2, -0.01);
+    let mut tablet_frame_ram_label = Label::with_text("RAM: [RAM]".to_string(), font_uvs.clone());
+    tablet_frame_ram_label.set_position(-0.5, -0.2, -0.005);
+    tablet_frame_ram_label.update();
     tablet_canvas.add_child(tablet_frame_ram_label);
 
     let tablet = parse(
@@ -100,65 +106,6 @@ fn main() {
     let last_object = world.get_objects().len() - 1;
     tablet_object.build_canvas(&mut world);
     world.add_object_at_index(tablet_object, last_object);
-
-    /*let font_uvs = load_font_uvs("fonts/NotoSansJP.ttf");
-    let sentence = text::create_plane_with_text(
-        (-0.5, 0.3, -0.02),
-        (0.03, 0.03, 1.0),
-        &font_uvs,
-        [1.0, 1.0, 1.0],
-        "goodbye :C",
-    );
-    let mut sentence_object = Object::create(
-        ObjectType::TabletMenu,
-        renderer::vertex::create_vertices(&sentence),
-    );
-    sentence_object.set_default_texture("fonts/NotoSansJP.ttf");
-    world.add_object(sentence_object);
-
-    let chat_button = text::create_plane_with_text(
-        (-0.5, 0.0, -0.02),
-        (0.03, 0.03, 1.0),
-        &font_uvs,
-        [1.0, 1.0, 1.0],
-        "CHAT",
-    );
-    let mut chat_button_object = Object::create(
-        ObjectType::TabletMenuButton,
-        renderer::vertex::create_vertices(&chat_button),
-    );
-    chat_button_object.set_default_texture("fonts/NotoSansJP.ttf");
-    world.add_object(chat_button_object);
-
-    let fps_label = text::create_plane_with_text(
-        (-0.5, -0.3, -0.02),
-        (0.02, 0.02, 1.0),
-        &font_uvs,
-        [1.0, 1.0, 1.0],
-        "FPS: 0",
-    );
-    let mut fps_label_object = Object::create(
-        ObjectType::TabletMenu,
-        renderer::vertex::create_vertices(&fps_label),
-    );
-    fps_label_object.set_default_texture("fonts/NotoSansJP.ttf");
-    fps_label_object.set_tag("fps_label");
-    world.add_object(fps_label_object);
-
-    let ram_label = text::create_plane_with_text(
-        (-0.5, -0.2, -0.02),
-        (0.02, 0.02, 1.0),
-        &font_uvs,
-        [1.0, 1.0, 1.0],
-        "RAM: 0",
-    );
-    let mut ram_label_object = Object::create(
-        ObjectType::TabletMenu,
-        renderer::vertex::create_vertices(&ram_label),
-    );
-    ram_label_object.set_default_texture("fonts/NotoSansJP.ttf");
-    ram_label_object.set_tag("ram_label");
-    world.add_object(ram_label_object);*/
 
     println!(
         "Memory after startup: {} MB",

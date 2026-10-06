@@ -24,7 +24,6 @@ use crate::renderer::{transforms, vertex};
 use crate::setup::fonts::load_font_uvs;
 use crate::world::object::ObjectType;
 use crate::world::objects::player::Player;
-use crate::world::objects::text;
 use crate::xr::xr_input::{XrInput, poll_xr_inputs};
 use crate::xr::xr_manager::XRManager;
 
@@ -191,6 +190,26 @@ impl RendererOpenXR {
                         64,
                         bytemuck::cast_slice(normal_ref),
                     );
+
+                    if let Some(canvas) = &object.canvas {
+                        for child in canvas.children.iter() {
+                            let child_id = child.get_id();
+                            let child_object = world.get_object(child_id);
+
+                            self.init.queue.write_buffer(
+                                &self.buffer_collection.model_uniform_buffers
+                                    [child_object.buffer_bindings.model_uniform_buffer],
+                                0,
+                                bytemuck::cast_slice(model_ref),
+                            );
+                            self.init.queue.write_buffer(
+                                &self.buffer_collection.model_uniform_buffers
+                                    [child_object.buffer_bindings.model_uniform_buffer],
+                                64,
+                                bytemuck::cast_slice(normal_ref),
+                            );
+                        }
+                    }
                 }
             }
         } else if menu_tablet_state == 3 {
@@ -226,6 +245,26 @@ impl RendererOpenXR {
                         64,
                         bytemuck::cast_slice(normal_ref),
                     );
+
+                    if let Some(canvas) = &object.canvas {
+                        for child in canvas.children.iter() {
+                            let child_id = child.get_id();
+                            let child_object = world.get_object(child_id);
+
+                            self.init.queue.write_buffer(
+                                &self.buffer_collection.model_uniform_buffers
+                                    [child_object.buffer_bindings.model_uniform_buffer],
+                                0,
+                                bytemuck::cast_slice(model_ref),
+                            );
+                            self.init.queue.write_buffer(
+                                &self.buffer_collection.model_uniform_buffers
+                                    [child_object.buffer_bindings.model_uniform_buffer],
+                                64,
+                                bytemuck::cast_slice(normal_ref),
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -373,19 +412,33 @@ impl RendererOpenXR {
         // update ingame fps label when menu tablet is enabled
         if menu_tablet_state == 1 && self.frame % 60 == 0 {
             for (_, object) in world.get_objects() {
-                match object.get_tag() {
-                    "fps_label" => {
-                        let fps_label = text::create_plane_with_text(
-                            (-0.5, -0.3, -0.02),
-                            (0.02, 0.02, 1.0),
-                            &self.buffer_collection.font_maps["NotoSansJP"],
-                            [1.0, 1.0, 1.0],
-                            &format!("FPS: {}", (1.0 / frame_time).round()),
+                if let Some(canvas) = &object.canvas {
+                    for child in &canvas.children {
+                        if !child.needs_update() { continue; }
+                        let child_id = child.get_id();
+                        let child_object = world.get_object(child_id);
+
+                        let text_placeholder = child.get_text_placeholder();
+
+                        let text_formatted = &text_placeholder.replace(
+                            "[RAM]",
+                            &format!("{:.2} MB", ALLOCATOR.allocated() as f32 / 1000000.0)
                         );
-                        let meshes = vertex::create_vertices(&fps_label);
-                        for (vertices, _) in meshes {
+                        let text_formatted = &text_formatted.replace(
+                            "[FPS]",
+                            &format!("{}", (1.0 / frame_time).round())
+                        );
+                        let text_formatted = &text_formatted.replace(
+                            "[CLOCK]",
+                            &chrono::Local::now().format("%H:%M:%S").to_string()
+                        );
+
+                        let meshes = child.get_meshes_from_text(text_formatted);
+
+                        let meshes_created = vertex::create_vertices(&meshes);
+                        for (vertices, _) in meshes_created {
                             self.buffer_collection.num_vertices
-                                [object.buffer_bindings.num_vertices] = vec![vertices.len() as u32];
+                                [child_object.buffer_bindings.num_vertices] = vec![vertices.len() as u32];
                             let vertex_buffer =
                                 self.init.device.create_buffer(&wgpu::BufferDescriptor {
                                     label: Some("Vertex Buffer"),
@@ -395,49 +448,16 @@ impl RendererOpenXR {
                                     mapped_at_creation: false,
                                 });
                             self.buffer_collection.vertex_buffers
-                                [object.buffer_bindings.vertex_buffer] = vec![vertex_buffer];
+                                [child_object.buffer_bindings.vertex_buffer] = vec![vertex_buffer];
                             self.init.queue.write_buffer(
                                 &self.buffer_collection.vertex_buffers
-                                    [object.buffer_bindings.vertex_buffer][0],
+                                    [child_object.buffer_bindings.vertex_buffer][0],
                                 0,
                                 bytemuck::cast_slice(&vertices),
                             );
                         }
                     }
-                    "ram_label" => {
-                        let ram_label = text::create_plane_with_text(
-                            (-0.5, -0.2, -0.02),
-                            (0.02, 0.02, 1.0),
-                            &self.buffer_collection.font_maps["NotoSansJP"],
-                            [1.0, 1.0, 1.0],
-                            &format!("RAM: {:.2} MB", ALLOCATOR.allocated() as f32 / 1000000.0),
-                        );
-                        let meshes = vertex::create_vertices(&ram_label);
-                        for (vertices, _) in meshes {
-                            self.buffer_collection.num_vertices
-                                [object.buffer_bindings.num_vertices] = vec![vertices.len() as u32];
-                            let vertex_buffer =
-                                self.init.device.create_buffer(&wgpu::BufferDescriptor {
-                                    label: Some("Vertex Buffer"),
-                                    size: (size_of::<Vertex>() * vertices.len()) as u64,
-                                    usage: wgpu::BufferUsages::VERTEX
-                                        | wgpu::BufferUsages::COPY_DST,
-                                    mapped_at_creation: false,
-                                });
-                            self.buffer_collection.vertex_buffers
-                                [object.buffer_bindings.vertex_buffer] = vec![vertex_buffer];
-                            self.init.queue.write_buffer(
-                                &self.buffer_collection.vertex_buffers
-                                    [object.buffer_bindings.vertex_buffer][0],
-                                0,
-                                bytemuck::cast_slice(&vertices),
-                            );
-                        }
-                    }
-                    _ => {
-                        continue;
-                    }
-                };
+                }
             }
         }
 
