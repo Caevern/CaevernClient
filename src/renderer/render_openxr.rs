@@ -14,16 +14,18 @@ use crate::renderer::buffers::uniform_buffers::{
     create_fragment_uniform_buffer, create_vertex_uniform_buffer,
 };
 use crate::renderer::default_elements::register_default_textures;
+use crate::renderer::input_state::InputState;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
 use crate::renderer::shader_type::ShaderType;
 use crate::renderer::texture_object::TextureObject;
-use crate::renderer::transforms::{fov_to_projection, get_eye_view_matrix, pose_to_view_matrix};
+use crate::renderer::transforms::{fov_to_projection, get_eye_view_matrix};
 use crate::renderer::vertex::Vertex;
-use crate::renderer::{transform, transforms, vertex};
+use crate::renderer::{transforms, vertex};
 use crate::setup::fonts::load_font_uvs;
 use crate::world::object::ObjectType;
 use crate::world::objects::player::Player;
 use crate::world::objects::text;
+use crate::xr::xr_input::{self, XrInput, poll_xr_inputs};
 use crate::xr::xr_manager::XRManager;
 
 pub struct RendererOpenXR {
@@ -142,7 +144,7 @@ impl RendererOpenXR {
     }
 
     pub fn update(&mut self, frame_time: f32, menu_tablet_state: usize, engine: &mut Engine) {
-        let mut world = engine.world_rc.borrow_mut();
+        let world = engine.world_rc.borrow_mut();
 
         let player = &engine.player;
         let forward = Vector3::new(
@@ -668,16 +670,18 @@ impl RendererOpenXR {
         Ok(())
     }
 
-    pub fn run_frame_loop(&mut self, engine: Engine) {
+    pub fn run_frame_loop(&mut self, engine: Engine, xr_input: XrInput) {
         let mut engine = engine;
-
+        let mut xr_input = xr_input;
         let mut last_frame_time = Instant::now();
+        let mut input = InputState::default();
 
         loop {
             let now = Instant::now();
             let frame_time = now.duration_since(last_frame_time).as_secs_f32();
             last_frame_time = now;
 
+            let _ = poll_xr_inputs(&self.init.session, &mut xr_input, &mut input);
             self.init.poll_events().ok();
 
             self.update(frame_time, 0, &mut engine);

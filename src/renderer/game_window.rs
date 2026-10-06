@@ -28,6 +28,8 @@ use crate::network::voice::start_voice_handler;
 use crate::renderer::render_openxr::RendererOpenXR;
 use crate::renderer::render_windowed::RendererWindowed;
 use crate::world::world::World;
+use crate::xr::xr_input;
+use crate::xr::xr_input::XrInput;
 use crate::xr::xr_manager::XRManager;
 
 pub struct GameWindow<'window> {
@@ -91,6 +93,8 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
             self.xr_enabled = true;
 
             let mut renderer_openxr = pollster::block_on(RendererOpenXR::new(xr));
+            let xr_input = XrInput::new(&renderer_openxr.init.instance).expect("Failed to create xr input");
+            xr_input.attach_to_session(&renderer_openxr.init.session).expect("Failed to attach xr input to session");
 
             let mut engine = Engine::new(data_thread_tx.clone(), avatar_thread_rx);
             engine.set_world(
@@ -100,9 +104,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 &renderer_openxr.init.queue,
             );
 
-            renderer_openxr.run_frame_loop(engine);
-
-            self.openxr_renderer = Some(renderer_openxr);
+            renderer_openxr.run_frame_loop(engine, xr_input);
         } else {
             self.engine = Some(Engine::new(data_thread_tx.clone(), avatar_thread_rx));
 
