@@ -125,15 +125,17 @@ pub fn fov_to_projection(fov: openxr::Fovf, near: f32, far: f32) -> Matrix4<f32>
     let m11 = 2.0 / tan_height;
     let m20 = (tan_right + tan_left) / tan_width;
     let m21 = (tan_up + tan_down) / tan_height;
-    let m22 = -far / (far - near);
-    let m32 = -(far * near) / (far - near);
+    let m22 = -(far + near) / (far - near);
+    let m32 = -(2.0 * far * near) / (far - near);
 
-    Matrix4::new(
-        m00, 0.0, 0.0, 0.0,
-        0.0, m11, 0.0, 0.0,
-        m20, m21, m22, -1.0,
-        0.0, 0.0, m32, 0.0,
-    )
+    let opengl_proj = Matrix4::new(
+        m00,  0.0,  0.0,  0.0,
+        0.0,  m11,  0.0,  0.0,
+        m20,  m21,  m22, -1.0,
+        0.0,  0.0,  m32,  0.0,
+    );
+
+    OPENGL_TO_WGPU_MATRIX * opengl_proj
 }
 
 pub fn pose_to_view_matrix(pose: openxr::Posef) -> Matrix4<f32> {
@@ -147,9 +149,9 @@ pub fn pose_to_view_matrix(pose: openxr::Posef) -> Matrix4<f32> {
 
     let translation = Matrix4::from_translation(pos);
     let rotation = Matrix4::from(rot);
-    let model = translation * rotation;
+    let eye_world = translation * rotation;
 
-    model.invert().unwrap_or(Matrix4::identity())
+    eye_world.invert().unwrap_or(Matrix4::identity())
 }
 
 pub fn get_eye_view_matrix(

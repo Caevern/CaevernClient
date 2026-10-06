@@ -548,7 +548,12 @@ impl RendererOpenXR {
 
             assert_eq!(views.len(), 2);
 
-            let mut encoder = self.init.device.create_command_encoder(
+            let mut encoder_left = self.init.device.create_command_encoder(
+                &wgpu::CommandEncoderDescriptor {
+                    label: Some("XR Render Encoder"),
+                },
+            );
+            let mut encoder_right = self.init.device.create_command_encoder(
                 &wgpu::CommandEncoderDescriptor {
                     label: Some("XR Render Encoder"),
                 },
@@ -572,10 +577,12 @@ impl RendererOpenXR {
             let left_color_view = &self.init.swapchain_views[0][left_index as usize];
 
             self.render_scene(
-                &mut encoder,
+                &mut encoder_left,
                 left_color_view,
                 &self.init.depth_views[0]
             );
+            self.init.queue.submit(Some(encoder_left.finish()));
+            self.init.swapchains[0].release_image()?;
 
             let right_proj = fov_to_projection(views[1].fov, 0.1, 1000.0);
             let right_view = get_eye_view_matrix(
@@ -595,14 +602,11 @@ impl RendererOpenXR {
             let right_color_view = &self.init.swapchain_views[1][right_index as usize];
 
             self.render_scene(
-                &mut encoder,
+                &mut encoder_right,
                 right_color_view,
                 &self.init.depth_views[1]
             );
-
-            self.init.queue.submit(Some(encoder.finish()));
-
-            self.init.swapchains[0].release_image()?;
+            self.init.queue.submit(Some(encoder_right.finish()));
             self.init.swapchains[1].release_image()?;
 
             let left_rect = openxr::Rect2Di {
