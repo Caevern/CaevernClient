@@ -15,7 +15,6 @@ use crate::{
     },
 };
 
-#[derive(Clone)]
 pub struct World {
     pub objects: HashMap<usize, Object>,
     pub textures: HashSet<String>,
@@ -38,6 +37,9 @@ impl World {
         } else {
             self.objects.insert(self.get_free_object_id(), object);
         }
+    }
+    pub fn add_object_at_index(&mut self, object: Object, index: usize) {
+        self.objects.insert(index, object);
     }
 
     pub fn get_free_object_id(&self) -> usize {

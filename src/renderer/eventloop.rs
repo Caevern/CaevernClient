@@ -36,7 +36,7 @@ pub fn start_engine(world: World, no_vr: bool) {
 
         menu_tablet_state: 0,
 
-        home_world: world,
+        home_world: Some(world),
     };
 
     event_loop.run_app(&mut game_window).unwrap();

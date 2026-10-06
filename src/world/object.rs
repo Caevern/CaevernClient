@@ -4,7 +4,8 @@ use cgmath::Vector3;
 
 use crate::{
     renderer::{buffer_bindings::BufferBindings, transform::Transform, vertex::Vertex},
-    world::material::Material,
+    ui::canvas::Canvas,
+    world::{material::Material, world::World},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,8 +31,6 @@ fn new_bone_vec(amount: usize) -> Vec<(Transform, Transform, i64, usize)> {
     bones
 }
 
-// this is a game object, and will be used to render the vertices
-#[derive(Clone)]
 pub struct Object {
     object_type: ObjectType,
     transform: Transform,
@@ -41,6 +40,7 @@ pub struct Object {
     skeleton: HashMap<String, usize>,
     movable: bool,
     tag: String,
+    pub canvas: Option<Canvas>,
     pub buffer_bindings: BufferBindings,
 }
 impl Object {
@@ -64,6 +64,7 @@ impl Object {
             skeleton: HashMap::new(),
             movable: false,
             tag: "unnamed".to_string(),
+            canvas: None,
             buffer_bindings: BufferBindings::empty(),
         }
     }
@@ -73,6 +74,15 @@ impl Object {
     }
     pub fn add_meshes(&mut self, meshes: Vec<(Vec<Vertex>, String)>) {
         self.vertices.extend(meshes);
+    }
+
+    pub fn set_canvas(&mut self, canvas: Canvas) {
+        self.canvas = Some(canvas);
+    }
+    pub fn build_canvas(&mut self, world: &mut World) {
+        if let Some(canvas) = self.canvas.as_mut() {
+            canvas.build(world);
+        }
     }
 
     pub fn set_position(&mut self, x: f32, y: f32, z: f32) {

@@ -58,7 +58,7 @@ pub struct GameWindow<'window> {
 
     pub menu_tablet_state: usize,
 
-    pub home_world: World,
+    pub home_world: Option<World>,
 }
 
 impl<'window> ApplicationHandler for GameWindow<'window> {
@@ -100,7 +100,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
             let mut engine = Engine::new(data_thread_tx.clone(), avatar_thread_rx);
             engine.set_world(
-                self.home_world.clone(),
+                self.home_world.take().unwrap(),
                 &mut renderer_openxr.buffer_collection,
                 &renderer_openxr.init.device,
                 &renderer_openxr.init.queue,
@@ -139,7 +139,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
             //renderer.set_world(self.home_world.clone());
             self.engine.as_mut().unwrap().set_world(
-                self.home_world.clone(),
+                self.home_world.take().unwrap(),
                 &mut renderer.buffer_collection,
                 &renderer.init.device,
                 &renderer.init.queue,

@@ -7,6 +7,7 @@ pub mod network;
 pub mod physics;
 pub mod renderer;
 pub mod setup;
+pub mod ui;
 pub mod world;
 pub mod xr;
 
@@ -16,8 +17,10 @@ use std::alloc;
 use world::object::Object;
 
 use crate::renderer::transform::Transform;
-use crate::setup::fonts::load_font_uvs;
-use crate::world::objects::text;
+use crate::ui::canvas::Canvas;
+use crate::ui::widget::Widget;
+use crate::ui::widgets::button::Button;
+use crate::ui::widgets::label::Label;
 use crate::world::{object::ObjectType, parsers::fbx_parser::parse};
 
 #[global_allocator]
@@ -61,7 +64,24 @@ fn main() {
     //world.load_world("worlds/scene3.cae");
     world.load_world("worlds/test.json");
 
-    //let tablet = cube::create_cube((0.0, 0.0, 0.0), (0.5, 0.4, 0.01));
+    let mut tablet_canvas = Canvas::new();
+
+    let mut tablet_frame_text_label = Label::with_text("Hello, World!".to_string());
+    tablet_frame_text_label.set_position(-0.5, 0.3, -0.01);
+    tablet_canvas.add_child(tablet_frame_text_label);
+
+    let mut tablet_frame_chat_button = Button::with_text("Chat".to_string());
+    tablet_frame_chat_button.set_position(-0.5, 0.0, -0.01);
+    tablet_canvas.add_child(tablet_frame_chat_button);
+
+    let mut tablet_frame_fps_label = Label::with_text("FPS: 0".to_string());
+    tablet_frame_fps_label.set_position(-0.5, -0.3, -0.01);
+    tablet_canvas.add_child(tablet_frame_fps_label);
+
+    let mut tablet_frame_ram_label = Label::with_text("RAM: 0".to_string());
+    tablet_frame_ram_label.set_position(-0.5, -0.2, -0.01);
+    tablet_canvas.add_child(tablet_frame_ram_label);
+
     let tablet = parse(
         "models/tablet.fbx",
         Transform::new(
@@ -76,9 +96,12 @@ fn main() {
     );
     tablet_object.set_position(0.0, -10.0, 0.0);
     tablet_object.set_default_texture("textures/tablet.png");
-    world.add_object(tablet_object);
+    tablet_object.set_canvas(tablet_canvas);
+    let last_object = world.get_objects().len() - 1;
+    tablet_object.build_canvas(&mut world);
+    world.add_object_at_index(tablet_object, last_object);
 
-    let font_uvs = load_font_uvs("fonts/NotoSansJP.ttf");
+    /*let font_uvs = load_font_uvs("fonts/NotoSansJP.ttf");
     let sentence = text::create_plane_with_text(
         (-0.5, 0.3, -0.02),
         (0.03, 0.03, 1.0),
@@ -135,7 +158,7 @@ fn main() {
     );
     ram_label_object.set_default_texture("fonts/NotoSansJP.ttf");
     ram_label_object.set_tag("ram_label");
-    world.add_object(ram_label_object);
+    world.add_object(ram_label_object);*/
 
     println!(
         "Memory after startup: {} MB",
