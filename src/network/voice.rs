@@ -222,7 +222,8 @@ pub async fn start_voice_handler(user_id: u32, mic_state_arc: Arc<AtomicBool>) {
         }],
     );
     let audio_track = Arc::new(
-        TrackLocalStaticSample::new(media_track).expect("Failed to create local audio track"),
+        TrackLocalStaticSample::new(std::time::Instant::now(), media_track)
+            .expect("Failed to create local audio track"),
     );
 
     let (ice_tx, mut ice_rx) = tokio::sync::mpsc::channel(32);
@@ -344,8 +345,11 @@ pub async fn start_voice_handler(user_id: u32, mic_state_arc: Arc<AtomicBool>) {
                                 111,
                                 &Sample {
                                     data: encoded.into(),
+                                    timestamp: std::time::Instant::now(),
                                     duration: Duration::from_millis(20),
-                                    ..Default::default()
+                                    packet_timestamp: 0,
+                                    prev_dropped_packets: 0,
+                                    prev_padding_packets: 0,
                                 },
                                 &[],
                             )
