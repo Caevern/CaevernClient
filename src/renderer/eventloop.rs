@@ -2,9 +2,19 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
 use winit::event_loop::EventLoop;
+use winit::window::Icon;
 
 use crate::renderer::game_window::GameWindow;
 use crate::world::world::World;
+
+fn load_icon() -> Option<Icon> {
+    let image = image::open("assets/icons/icon-small.png")
+        .ok()?
+        .into_rgba8();
+    let (width, height) = image.dimensions();
+
+    Icon::from_rgba(image.into_raw(), width, height).ok()
+}
 
 pub fn start_engine(world: World, no_vr: bool) {
     env_logger::init();
@@ -22,7 +32,7 @@ pub fn start_engine(world: World, no_vr: bool) {
         window_size: (0, 0),
 
         title: "Caevern".to_string(),
-        icon: None,
+        icon: load_icon(),
 
         render_start_time: std::time::Instant::now(),
         keys: [false; 6],
