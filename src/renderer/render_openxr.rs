@@ -1,64 +1,40 @@
 use cgmath::*;
-use rust_embed::RustEmbed;
 use std::collections::HashMap;
-use std::{f32, println};
+use std::f32;
+use std::time::Instant;
 
 use crate::ALLOCATOR;
+use crate::game::update_bone::update_bone;
+use crate::game::update_bones::update_bones;
+use crate::game::update_game::Engine;
 use crate::interract::raycast::raycast_grab;
+use crate::renderer::buffer_collection::BufferCollection;
 use crate::renderer::buffers::bind_group_layout::create_bind_group_layout;
-use crate::renderer::buffers::displacement_buffer::create_buffer_displacement;
 use crate::renderer::buffers::uniform_buffers::{
     create_fragment_uniform_buffer, create_vertex_uniform_buffer,
 };
 use crate::renderer::default_elements::register_default_textures;
+use crate::renderer::input_state::InputState;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
+use crate::renderer::render_scene::render_scene;
 use crate::renderer::texture_object::TextureObject;
-use crate::renderer::transforms::create_transforms;
+use crate::renderer::transforms::{fov_to_projection, get_eye_view_matrix, quaternion_to_euler};
 use crate::renderer::vertex::Vertex;
-use crate::renderer::{transform, transforms, vertex};
+use crate::renderer::{transforms, vertex};
 use crate::setup::fonts::load_font_uvs;
-use crate::world::object::{Object, ObjectType};
-use crate::world::objects::player::{self, Player};
-use crate::world::objects::text;
-use crate::world::world::World;
+use crate::world::object::ObjectType;
+use crate::world::objects::player::Player;
+use crate::xr::xr_input::{XrInput, poll_xr_inputs};
 use crate::xr::xr_manager::XRManager;
-
-#[derive(PartialEq)]
-pub enum ShaderType {
-    Displacement,
-    DisplacementBones,
-}
-
-#[derive(RustEmbed)]
-#[folder = "assets/"]
-pub struct Assets;
 
 pub struct RendererOpenXR {
     pub init: XRManager,
+    pub buffer_collection: BufferCollection,
 
     pipeline_displacement: wgpu::RenderPipeline,
     pipeline_displacement_bones: wgpu::RenderPipeline,
 
     frame: usize,
-    previous_frame_time: std::time::Instant,
-
-    vertex_buffers: Vec<Vec<wgpu::Buffer>>,
-    uniform_bind_groups: Vec<Vec<wgpu::BindGroup>>,
-    num_vertices: Vec<Vec<u32>>,
-    bone_buffers: Vec<wgpu::Buffer>,
-    bones: Vec<Vec<(transform::Transform, transform::Transform, i64, usize)>>,
-    final_marices: Vec<Vec<[[f32; 4]; 4]>>,
-    shader_type: Vec<ShaderType>,
-
-    uniform_bind_group_layout: wgpu::BindGroupLayout,
-    vertex_uniform_buffer: wgpu::Buffer,
-    model_uniform_buffers: Vec<wgpu::Buffer>,
-    fragment_uniform_buffer: wgpu::Buffer,
-
-    textures: HashMap<String, TextureObject>,
-    font_maps: HashMap<String, HashMap<String, (f32, f32, f32, f32, f32)>>,
-
-    world: World,
 }
 impl RendererOpenXR {
     pub async fn new(init: XRManager) -> Self {
@@ -133,36 +109,43 @@ impl RendererOpenXR {
             load_font_uvs("fonts/NotoSansJP.ttf"),
         );
 
+        let buffer_collection = BufferCollection {
+            textures,
+            font_maps,
+
+            final_matrices: Vec::new(),
+
+            bones: Vec::new(),
+            bone_buffers: Vec::new(),
+
+            shader_type: Vec::new(),
+
+            vertex_buffers: Vec::new(),
+            uniform_bind_groups: Vec::new(),
+            num_vertices: Vec::new(),
+
+            model_uniform_buffers: Vec::new(),
+
+            uniform_bind_group_layout,
+            vertex_uniform_buffer,
+            fragment_uniform_buffer,
+        };
+
         Self {
             init,
+            buffer_collection,
 
             pipeline_displacement,
             pipeline_displacement_bones,
 
             frame: 0,
-            previous_frame_time: std::time::Instant::now(),
-
-            vertex_buffers: Vec::new(),
-            uniform_bind_groups: Vec::new(),
-            num_vertices: Vec::new(),
-            bone_buffers: Vec::new(),
-            bones: Vec::new(),
-            final_marices: Vec::new(),
-            shader_type: Vec::new(),
-
-            uniform_bind_group_layout,
-            vertex_uniform_buffer,
-            model_uniform_buffers: Vec::new(),
-            fragment_uniform_buffer,
-
-            textures,
-            font_maps,
-
-            world: World::new(),
         }
     }
 
-    pub fn update(&mut self, frame_time: f32, menu_tablet_state: usize, player: &Player) {
+    pub fn update(&mut self, frame_time: f32, menu_tablet_state: usize, engine: &mut Engine) {
+        let mut world = engine.world_rc.borrow_mut();
+
+        let player = &engine.player;
         let forward = Vector3::new(
             player.camera.rotation.y.cos() * player.camera.rotation.x.cos(),
             player.camera.rotation.x.sin(),
@@ -171,8 +154,9 @@ impl RendererOpenXR {
         .normalize();
 
         if menu_tablet_state == 2 {
-            for i in 0..self.world.get_objects().len() {
-                let object_type = self.world.get_objects()[i].get_object_type();
+            for object_index in 0..world.get_objects().len() {
+                let object = world.get_object(object_index);
+                let object_type = object.get_object_type();
                 if object_type == ObjectType::TabletMenu
                     || object_type == ObjectType::TabletMenuButton
                 {
@@ -195,20 +179,43 @@ impl RendererOpenXR {
                     let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
                     self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[i],
+                        &self.buffer_collection.model_uniform_buffers
+                            [object.buffer_bindings.model_uniform_buffer],
                         0,
                         bytemuck::cast_slice(model_ref),
                     );
                     self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[i],
+                        &self.buffer_collection.model_uniform_buffers
+                            [object.buffer_bindings.model_uniform_buffer],
                         64,
                         bytemuck::cast_slice(normal_ref),
                     );
+
+                    if let Some(canvas) = &object.canvas {
+                        for child in canvas.children.iter() {
+                            let child_id = child.get_id();
+                            let child_object = world.get_object(child_id);
+
+                            self.init.queue.write_buffer(
+                                &self.buffer_collection.model_uniform_buffers
+                                    [child_object.buffer_bindings.model_uniform_buffer],
+                                0,
+                                bytemuck::cast_slice(model_ref),
+                            );
+                            self.init.queue.write_buffer(
+                                &self.buffer_collection.model_uniform_buffers
+                                    [child_object.buffer_bindings.model_uniform_buffer],
+                                64,
+                                bytemuck::cast_slice(normal_ref),
+                            );
+                        }
+                    }
                 }
             }
         } else if menu_tablet_state == 3 {
-            for i in 0..self.world.get_objects().len() {
-                let object_type = self.world.get_objects()[i].get_object_type();
+            for object_index in 0..world.get_objects().len() {
+                let object = world.get_object(object_index);
+                let object_type = object.get_object_type();
                 if object_type == ObjectType::TabletMenu
                     || object_type == ObjectType::TabletMenuButton
                 {
@@ -227,21 +234,45 @@ impl RendererOpenXR {
                     let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
                     self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[i],
+                        &self.buffer_collection.model_uniform_buffers
+                            [object.buffer_bindings.model_uniform_buffer],
                         0,
                         bytemuck::cast_slice(model_ref),
                     );
                     self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[i],
+                        &self.buffer_collection.model_uniform_buffers
+                            [object.buffer_bindings.model_uniform_buffer],
                         64,
                         bytemuck::cast_slice(normal_ref),
                     );
+
+                    if let Some(canvas) = &object.canvas {
+                        for child in canvas.children.iter() {
+                            let child_id = child.get_id();
+                            let child_object = world.get_object(child_id);
+
+                            self.init.queue.write_buffer(
+                                &self.buffer_collection.model_uniform_buffers
+                                    [child_object.buffer_bindings.model_uniform_buffer],
+                                0,
+                                bytemuck::cast_slice(model_ref),
+                            );
+                            self.init.queue.write_buffer(
+                                &self.buffer_collection.model_uniform_buffers
+                                    [child_object.buffer_bindings.model_uniform_buffer],
+                                64,
+                                bytemuck::cast_slice(normal_ref),
+                            );
+                        }
+                    }
                 }
             }
         }
 
-        for i in 0..self.world.get_objects().len() {
-            if self.world.get_object(i).get_object_type() == ObjectType::Skybox {
+        for object_index in 0..world.get_objects().len() {
+            let object = world.get_object(object_index);
+            let object_type = object.get_object_type();
+            if object_type == ObjectType::Skybox {
                 let model_mat = transforms::create_transforms(
                     [
                         player.camera.position.x,
@@ -257,33 +288,38 @@ impl RendererOpenXR {
                 let normal_ref: &[f32; 16] = normal_mat.as_ref();
                 let eye_position: &[f32; 3] = &player.camera.position.into();
                 self.init.queue.write_buffer(
-                    &self.fragment_uniform_buffer,
+                    &self.buffer_collection.fragment_uniform_buffer,
                     16,
                     bytemuck::cast_slice(eye_position),
                 );
                 self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[i],
+                    &self.buffer_collection.model_uniform_buffers
+                        [object.buffer_bindings.model_uniform_buffer],
                     0,
                     bytemuck::cast_slice(model_ref),
                 );
                 self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[i],
+                    &self.buffer_collection.model_uniform_buffers
+                        [object.buffer_bindings.model_uniform_buffer],
                     64,
                     bytemuck::cast_slice(normal_ref),
                 );
-            } else if self.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
+            } else if object_type == ObjectType::SkinnedMesh {
                 if self.frame < 60 {
-                    let skeleton = self.world.get_object(i).get_skeleton();
-                    //self.bones[i][skeleton["head"]].0.rotation.x = -player.camera.rotation.x;
-                    //self.bones[i][skeleton["arm_right"]].0.rotation.z = -player.camera.rotation.x;
-                    /*self.bones[i][skeleton["head"]].0.rotation.y =
-                    -player.camera.rotation.y - 1.57079633;*/
-                    // TODO: make the local character have this dissabled by default.
-                    self.bones[i][skeleton["neck"]].0.scale = [0.0, 0.0, 0.0].into();
-                    self.update_bone(i, skeleton["head"]);
+                    let skeleton = object.get_skeleton();
+                    self.buffer_collection.bones[object.buffer_bindings.bones][skeleton["neck"]]
+                        .0
+                        .scale = [0.0, 0.0, 0.0].into();
+                    update_bone(
+                        &world,
+                        object_index,
+                        object.buffer_bindings,
+                        skeleton["head"],
+                        &mut self.buffer_collection,
+                        &self.init.queue,
+                    );
                 }
 
-                let object = self.world.get_object(i);
                 let position = [
                     object.get_position().x + player.camera.position.x
                         - player.camera.rotation.y.cos() * 0.1,
@@ -297,18 +333,6 @@ impl RendererOpenXR {
                     object.get_rotation().z,
                 ];
 
-                /*let _ = self
-                .data_thread_tx
-                .send(UserUpdate::SendUserPosition(Transform {
-                    position: position.into(),
-                    rotation: Vector3::new(
-                        -player.camera.rotation.x,
-                        rotation[1],
-                        -player.camera.rotation.z,
-                    ),
-                    scale: Vector3::new(1.0, 1.0, 1.0),
-                }));*/
-
                 let model_mat =
                     transforms::create_transforms(position, rotation, object.get_scale().into());
                 let normal_mat = (model_mat.invert().unwrap()).transpose();
@@ -317,113 +341,31 @@ impl RendererOpenXR {
                 let normal_ref: &[f32; 16] = normal_mat.as_ref();
 
                 self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[i],
+                    &self.buffer_collection.model_uniform_buffers
+                        [object.buffer_bindings.model_uniform_buffer],
                     0,
                     bytemuck::cast_slice(model_ref),
                 );
                 self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[i],
+                    &self.buffer_collection.model_uniform_buffers
+                        [object.buffer_bindings.model_uniform_buffer],
                     64,
                     bytemuck::cast_slice(normal_ref),
                 );
             }
         }
 
-        // TODO: Refactor into an avatar struct
-        /*if let Ok(avatar_update) = self.avatar_thread_rx.try_recv() {
-            match avatar_update {
-                AvatarUpdate::RegisterUser(transform, id) => {
-                    println!("Registered User Avatar");
-                    let mut object =
-                        Object::create(ObjectType::Mesh, self.fallback_vertices.clone());
-
-                    object.set_bones(
-                        self.fallback_bones.clone(),
-                        Vector3::new(0.0, 0.0, 0.0),
-                        Vector3::new(0.0, 0.0, 0.0),
-                        Vector3::new(1.0, 1.0, 1.0),
-                    );
-                    object.set_skeleton(self.fallback_skeleton.clone());
-
-                    object.set_position(
-                        transform.position.x,
-                        transform.position.y,
-                        transform.position.z,
-                    );
-                    object.set_rotation(0.0, transform.rotation.y + f32::consts::PI, 0.0);
-                    object.set_scale(0.017, 0.017, 0.017);
-
-                    object.add_material(
-                        Material::from_texture("textures/CG_Body_Base_color.png"),
-                        "BodyMaterial".to_string(),
-                    );
-                    object.add_material(
-                        Material::from_texture("textures/CG_Hairs_Base_color.png"),
-                        "HairsMaterial".to_string(),
-                    );
-                    object.add_material(
-                        Material::from_texture("textures/CG_Dress_Base_color.png"),
-                        "DressMaterial".to_string(),
-                    );
-
-                    let object_id = self.world.get_objects().len();
-
-                    self.create_rendered_object(&object);
-                    self.world.add_object(object);
-
-                    self.bones[object_id][self.fallback_skeleton["head"]]
-                        .0
-                        .rotation = [transform.rotation.x, 0.0, transform.rotation.z].into();
-                    self.update_bones(object_id);
-
-                    self.data_thread_tx
-                        .send(UpdateAvatarId(id, object_id))
-                        .expect(
-                            "Updating the avatar lookup table with the network stack has failed.",
-                        );
-                }
-                AvatarUpdate::SetUserPosition(transform, object_id) => {
-                    self.bones[object_id][self.fallback_skeleton["head"]]
-                        .0
-                        .rotation = [transform.rotation.x, 0.0, transform.rotation.z].into();
-                    self.update_bone(object_id, self.fallback_skeleton["head"]);
-
-                    let object = self.world.get_object(object_id);
-                    let position = [
-                        transform.position.x,
-                        transform.position.y,
-                        transform.position.z,
-                    ];
-                    let rotation = [0.0, transform.rotation.y + f32::consts::PI, 0.0];
-
-                    let model_mat = transforms::create_transforms(
-                        position,
-                        rotation,
-                        object.get_scale().into(),
-                    );
-                    let normal_mat = (model_mat.invert().unwrap()).transpose();
-
-                    let model_ref: &[f32; 16] = model_mat.as_ref();
-                    let normal_ref: &[f32; 16] = normal_mat.as_ref();
-
-                    self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[object_id],
-                        0,
-                        bytemuck::cast_slice(model_ref),
-                    );
-                    self.init.queue.write_buffer(
-                        &self.model_uniform_buffers[object_id],
-                        64,
-                        bytemuck::cast_slice(normal_ref),
-                    );
-                }
-            }
-        }*/
-
         if self.frame % 20 == 1 {
-            for i in 0..self.world.get_objects().len() {
-                if self.world.get_object(i).get_object_type() == ObjectType::SkinnedMesh {
-                    self.update_bones(i);
+            for object_index in 0..world.get_objects().len() {
+                let object = world.get_object(object_index);
+                if object.get_object_type() == ObjectType::SkinnedMesh {
+                    update_bones(
+                        &world,
+                        object_index,
+                        object.buffer_bindings,
+                        &mut self.buffer_collection,
+                        &self.init.queue,
+                    );
                 }
             }
         }
@@ -431,13 +373,12 @@ impl RendererOpenXR {
         // update skybox positions
         if self.frame % 10 == 0 {
             let grabbable_object_index =
-                raycast_grab(self.world.get_objects(), player.camera.position, forward, 5);
+                raycast_grab(world.get_objects(), player.camera.position, forward, 5);
 
             if grabbable_object_index > 0 {
-                let y_rotation = self.world.get_objects()[grabbable_object_index]
-                    .get_rotation()
-                    .y;
-                self.world.objects[grabbable_object_index].set_rotation_y(y_rotation + 0.1);
+                let grabbable_object = world.get_object_mut(grabbable_object_index);
+                let y_rotation = grabbable_object.get_rotation().y;
+                grabbable_object.set_rotation_y(y_rotation + 0.1);
                 let model_mat = transforms::create_transforms(
                     [0.0, 0.0, 0.0],
                     [0.0, y_rotation + 0.1, 0.0],
@@ -449,61 +390,55 @@ impl RendererOpenXR {
                 let normal_ref: &[f32; 16] = normal_mat.as_ref();
                 let eye_position: &[f32; 3] = &player.camera.position.into();
                 self.init.queue.write_buffer(
-                    &self.fragment_uniform_buffer,
+                    &self.buffer_collection.fragment_uniform_buffer,
                     16,
                     bytemuck::cast_slice(eye_position),
                 );
                 self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[grabbable_object_index],
+                    &self.buffer_collection.model_uniform_buffers
+                        [grabbable_object.buffer_bindings.model_uniform_buffer],
                     0,
                     bytemuck::cast_slice(model_ref),
                 );
                 self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[grabbable_object_index],
+                    &self.buffer_collection.model_uniform_buffers
+                        [grabbable_object.buffer_bindings.model_uniform_buffer],
                     64,
                     bytemuck::cast_slice(normal_ref),
                 );
             }
         }
 
-        let up_direction = cgmath::Vector3::unit_y();
-        let camera_position = Point3 {
-            x: player.camera.position.x,
-            y: player.camera.position.y,
-            z: player.camera.position.z,
-        };
-        let (view_mat, project_mat, _) = transforms::create_view_rotation(
-            camera_position,
-            player.camera.rotation.y,
-            player.camera.rotation.x,
-            up_direction,
-            1.0,
-        );
-
-        let view_project_mat = project_mat * view_mat;
-        let view_projection_ref: &[f32; 16] = view_project_mat.as_ref();
-
-        self.init.queue.write_buffer(
-            &self.vertex_uniform_buffer,
-            64,
-            bytemuck::cast_slice(view_projection_ref),
-        );
-
         // update ingame fps label when menu tablet is enabled
         if menu_tablet_state == 1 && self.frame % 60 == 0 {
-            for (index, object) in self.world.get_objects().iter().enumerate() {
-                match object.get_tag() {
-                    "fps_label" => {
-                        let fps_label = text::create_plane_with_text(
-                            (-0.5, -0.3, -0.02),
-                            (0.02, 0.02, 1.0),
-                            &self.font_maps["NotoSansJP"],
-                            [1.0, 1.0, 1.0],
-                            &format!("FPS: {}", (1.0 / frame_time).round()),
+            for (_, object) in world.get_objects() {
+                if let Some(canvas) = &object.canvas {
+                    for child in &canvas.children {
+                        if !child.needs_update() { continue; }
+                        let child_id = child.get_id();
+                        let child_object = world.get_object(child_id);
+
+                        let text_placeholder = child.get_text_placeholder();
+
+                        let text_formatted = &text_placeholder.replace(
+                            "[RAM]",
+                            &format!("{:.2} MB", ALLOCATOR.allocated() as f32 / 1000000.0)
                         );
-                        let meshes = vertex::create_vertices(&fps_label);
-                        for (vertices, _) in meshes {
-                            self.num_vertices[index] = vec![vertices.len() as u32];
+                        let text_formatted = &text_formatted.replace(
+                            "[FPS]",
+                            &format!("{}", (1.0 / frame_time).round())
+                        );
+                        let text_formatted = &text_formatted.replace(
+                            "[CLOCK]",
+                            &chrono::Local::now().format("%H:%M:%S").to_string()
+                        );
+
+                        let meshes = child.get_meshes_from_text(text_formatted);
+
+                        let meshes_created = vertex::create_vertices(&meshes);
+                        for (vertices, _) in meshes_created {
+                            self.buffer_collection.num_vertices
+                                [child_object.buffer_bindings.num_vertices] = vec![vertices.len() as u32];
                             let vertex_buffer =
                                 self.init.device.create_buffer(&wgpu::BufferDescriptor {
                                     label: Some("Vertex Buffer"),
@@ -512,806 +447,219 @@ impl RendererOpenXR {
                                         | wgpu::BufferUsages::COPY_DST,
                                     mapped_at_creation: false,
                                 });
-                            self.vertex_buffers[index] = vec![vertex_buffer];
+                            self.buffer_collection.vertex_buffers
+                                [child_object.buffer_bindings.vertex_buffer] = vec![vertex_buffer];
                             self.init.queue.write_buffer(
-                                &self.vertex_buffers[index][0],
+                                &self.buffer_collection.vertex_buffers
+                                    [child_object.buffer_bindings.vertex_buffer][0],
                                 0,
                                 bytemuck::cast_slice(&vertices),
                             );
                         }
                     }
-                    "ram_label" => {
-                        let ram_label = text::create_plane_with_text(
-                            (-0.5, -0.2, -0.02),
-                            (0.02, 0.02, 1.0),
-                            &self.font_maps["NotoSansJP"],
-                            [1.0, 1.0, 1.0],
-                            &format!("RAM: {:.2} MB", ALLOCATOR.allocated() as f32 / 1000000.0),
-                        );
-                        let meshes = vertex::create_vertices(&ram_label);
-                        for (vertices, _) in meshes {
-                            self.num_vertices[index] = vec![vertices.len() as u32];
-                            let vertex_buffer =
-                                self.init.device.create_buffer(&wgpu::BufferDescriptor {
-                                    label: Some("Vertex Buffer"),
-                                    size: (size_of::<Vertex>() * vertices.len()) as u64,
-                                    usage: wgpu::BufferUsages::VERTEX
-                                        | wgpu::BufferUsages::COPY_DST,
-                                    mapped_at_creation: false,
-                                });
-                            self.vertex_buffers[index] = vec![vertex_buffer];
-                            self.init.queue.write_buffer(
-                                &self.vertex_buffers[index][0],
-                                0,
-                                bytemuck::cast_slice(&vertices),
-                            );
-                        }
-                    }
-                    _ => {
-                        continue;
-                    }
-                };
+                }
             }
         }
 
         self.frame += 1;
     }
 
-    // TODO: Update the bones in hiarchy, this keeps updating O(n)
-    pub fn update_bone(&mut self, object_index: usize, affected_bone: usize) {
-        for (bone_index, bone) in self.bones[object_index].iter().enumerate() {
-            let mut bone_position =
-                Vector3::new(bone.1.position.x, bone.1.position.y, bone.1.position.z);
+    fn render_frame(&mut self, player: &mut Player) -> Result<(), openxr::sys::Result> {
+        let frame_state = self.init.frame_waiter.wait()?;
 
-            let mut is_descendant = false;
+        self.init.frame_stream.begin()?;
 
-            if bone_index == affected_bone {
-                is_descendant = true;
-            }
+        if frame_state.should_render {
+            let (_view_flags, views) = self.init.session.locate_views(
+                self.init.view_config,
+                frame_state.predicted_display_time,
+                &self.init.reference_space,
+            )?;
 
-            if bone.2 != -1 {
-                let mut current_parent = bone.2;
-                for _ in 0..self.bones[object_index].len() {
-                    if current_parent == -1 {
-                        break;
-                    }
-                    if current_parent as usize == affected_bone {
-                        is_descendant = true;
-                    }
+            assert_eq!(views.len(), 2);
 
-                    let current_parent_bone = self.bones[object_index][current_parent as usize];
+            let left_eye_position = views[0].pose.position;
+            let left_eye_orientation = views[0].pose.orientation;
 
-                    if current_parent_bone.2 != -1 {
-                        bone_position.x += current_parent_bone.1.position.x;
-                        bone_position.y += current_parent_bone.1.position.y;
-                        bone_position.z += current_parent_bone.1.position.z;
-                    }
-
-                    current_parent = current_parent_bone.2;
-                }
-            } else {
-                bone_position = Vector3::new(0.0, 0.0, 0.0);
-            }
-
-            if !is_descendant {
-                continue;
-            }
-
-            let mut global_matrix = create_transforms(
-                [
-                    bone.0.position.x,
-                    bone.0.position.y
-                        + bone_position.y
-                            * self.world.get_object(object_index).get_scale().y
-                            * 150.0,
-                    bone.0.rotation.z,
-                ],
-                bone.0.rotation.into(),
-                bone.0.scale.into(),
+            let left_eye_rotation = cgmath::Quaternion::new(
+                left_eye_orientation.w as f32,
+                left_eye_orientation.x as f32,
+                left_eye_orientation.y as f32,
+                left_eye_orientation.z as f32,
             );
 
-            if bone.2 != -1 {
-                let mut current_parent = bone.2;
-                for _ in 0..self.bones[object_index].len() {
-                    if current_parent == -1 {
-                        break;
-                    }
+            let left_eye_euler = quaternion_to_euler(left_eye_rotation);
 
-                    let current_parent_bone = self.bones[object_index][current_parent as usize];
+            player.camera.rotation = Vector3 {
+                x: left_eye_euler.0,
+                y: left_eye_euler.1,
+                z: left_eye_euler.2,
+            };
+            player.camera_offset = Vector3 {
+                x: left_eye_position.x,
+                y: left_eye_position.y,
+                z: left_eye_position.z,
+            };
 
-                    let parent_matrix = create_transforms(
-                        current_parent_bone.0.position.into(),
-                        current_parent_bone.0.rotation.into(),
-                        current_parent_bone.0.scale.into(),
-                    );
-                    global_matrix = parent_matrix * global_matrix;
-
-                    current_parent = current_parent_bone.2;
-                }
-            }
-
-            if bone.3 != 0 {
-                let model_mat = transforms::create_transforms(
-                    [
-                        -2.5 + bone_position.x * 0.05,
-                        3.0 + bone_position.y * 0.05,
-                        bone_position.z * 0.05,
-                    ],
-                    [0.0, 0.0, 0.0],
-                    [1.0, 1.0, 1.0],
-                );
-                let normal_mat = (model_mat.invert().unwrap()).transpose();
-
-                let model_ref: &[f32; 16] = model_mat.as_ref();
-                let normal_ref: &[f32; 16] = normal_mat.as_ref();
-
-                self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[bone.3],
-                    0,
-                    bytemuck::cast_slice(model_ref),
-                );
-                self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[bone.3],
-                    64,
-                    bytemuck::cast_slice(normal_ref),
-                );
-            }
-
-            let bind_global = create_transforms(
-                [
-                    0.0,
-                    bone_position.y * self.world.get_object(object_index).get_scale().y * 150.0,
-                    0.0,
-                ],
-                [0.0, 0.0, 0.0],
-                [1.0, 1.0, 1.0],
-            );
-            let inverse_bind = bind_global.invert().expect("BIND DOESN'T EXIST");
-
-            let final_matrix = global_matrix * inverse_bind;
-            self.final_marices[object_index][bone_index] = final_matrix.into();
-        }
-        self.init.queue.write_buffer(
-            &self.bone_buffers[object_index],
-            0,
-            bytemuck::cast_slice(&self.final_marices[object_index]),
-        );
-    }
-
-    // TODO: Update the bones in hiarchy, this keeps updating O(n)
-    pub fn update_bones(&mut self, object_index: usize) {
-        for (bone_index, bone) in self.bones[object_index].iter().enumerate() {
-            let mut bone_position =
-                Vector3::new(bone.1.position.x, bone.1.position.y, bone.1.position.z);
-
-            if bone.2 != -1 {
-                let mut current_parent = bone.2;
-                for _ in 0..self.bones[object_index].len() {
-                    if current_parent == -1 {
-                        break;
-                    }
-
-                    let current_parent_bone = self.bones[object_index][current_parent as usize];
-
-                    if current_parent_bone.2 != -1 {
-                        bone_position.x += current_parent_bone.1.position.x;
-                        bone_position.y += current_parent_bone.1.position.y;
-                        bone_position.z += current_parent_bone.1.position.z;
-                    }
-
-                    current_parent = current_parent_bone.2;
-                }
-            } else {
-                bone_position = Vector3::new(0.0, 0.0, 0.0);
-            }
-
-            let mut global_matrix = create_transforms(
-                [
-                    bone.0.position.x,
-                    bone.0.position.y
-                        + bone_position.y
-                            * self.world.get_object(object_index).get_scale().y
-                            * 150.0,
-                    bone.0.rotation.z,
-                ],
-                bone.0.rotation.into(),
-                bone.0.scale.into(),
-            );
-
-            if bone.2 != -1 {
-                let mut current_parent = bone.2;
-                for _ in 0..self.bones[object_index].len() {
-                    if current_parent == -1 {
-                        break;
-                    }
-
-                    let current_parent_bone = self.bones[object_index][current_parent as usize];
-
-                    let parent_matrix = create_transforms(
-                        current_parent_bone.0.position.into(),
-                        current_parent_bone.0.rotation.into(),
-                        current_parent_bone.0.scale.into(),
-                    );
-                    global_matrix = parent_matrix * global_matrix;
-
-                    current_parent = current_parent_bone.2;
-                }
-            }
-
-            if bone.3 != 0 {
-                let model_mat = transforms::create_transforms(
-                    [
-                        -2.5 + bone_position.x * 0.05,
-                        3.0 + bone_position.y * 0.05,
-                        bone_position.z * 0.05,
-                    ],
-                    [0.0, 0.0, 0.0],
-                    [1.0, 1.0, 1.0],
-                );
-                let normal_mat = (model_mat.invert().unwrap()).transpose();
-
-                let model_ref: &[f32; 16] = model_mat.as_ref();
-                let normal_ref: &[f32; 16] = normal_mat.as_ref();
-
-                self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[bone.3],
-                    0,
-                    bytemuck::cast_slice(model_ref),
-                );
-                self.init.queue.write_buffer(
-                    &self.model_uniform_buffers[bone.3],
-                    64,
-                    bytemuck::cast_slice(normal_ref),
-                );
-            }
-
-            let bind_global = create_transforms(
-                [
-                    0.0,
-                    bone_position.y * self.world.get_object(object_index).get_scale().y * 150.0,
-                    0.0,
-                ],
-                [0.0, 0.0, 0.0],
-                [1.0, 1.0, 1.0],
-            );
-            let inverse_bind = bind_global.invert().expect("BIND DOESN'T EXIST");
-
-            let final_matrix = global_matrix * inverse_bind;
-            self.final_marices[object_index][bone_index] = final_matrix.into();
-        }
-        self.init.queue.write_buffer(
-            &self.bone_buffers[object_index],
-            0,
-            bytemuck::cast_slice(&self.final_marices[object_index]),
-        );
-    }
-
-    // TODO: Use this in the set world to reduce duplicate code
-    pub fn create_rendered_object(&mut self, object: &Object) {
-        for texture in self.world.get_textures() {
-            if self.textures.contains_key(&texture.to_string()) {
-                continue;
-            }
-
-            self.textures.insert(
-                texture.to_string(),
-                TextureObject::create(texture, &self.init.device),
-            );
-        }
-
-        let meshes = object.get_vertices();
-        let materials = object.get_materials();
-        let mut bones: Vec<[[f32; 4]; 4]> = Vec::new();
-        self.vertex_buffers.push(Vec::new());
-        self.uniform_bind_groups.push(Vec::new());
-        self.num_vertices.push(Vec::new());
-
-        let object_id = self.vertex_buffers.len() - 1;
-
-        let bone_transforms = object.get_bones();
-        self.final_marices.push(Vec::new());
-        for _ in 0..bone_transforms.len() {
-            self.final_marices[object_id].push([
-                [0.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 0.0, 0.0],
-            ]);
-        }
-        self.bones.push(bone_transforms.clone());
-
-        for bone in bone_transforms {
-            bones.push(
-                transforms::create_transforms(
-                    bone.0.position.into(),
-                    bone.0.rotation.into(),
-                    bone.0.scale.into(),
-                )
-                .into(),
-            );
-        }
-
-        let bone_buffer;
-        if bones.len() > 0 {
-            println!("{}", object_id);
-            self.shader_type.push(ShaderType::DisplacementBones);
-            bone_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("Bone Buffer"),
-                size: (bones.len() * std::mem::size_of::<Matrix4<f32>>()) as u64,
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-            self.init
-                .queue
-                .write_buffer(&bone_buffer, 0, bytemuck::cast_slice(&bones));
-        } else {
-            self.shader_type.push(ShaderType::Displacement);
-            bone_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("Bone Buffer"),
-                size: 16,
-                usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-        }
-
-        self.bone_buffers.push(bone_buffer);
-
-        let model_uniform_buffer: wgpu::Buffer =
-            self.init.device.create_buffer(&wgpu::BufferDescriptor {
-                label: Some("Vertex Uniform Buffer"),
-                size: 128,
-                usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                mapped_at_creation: false,
-            });
-
-        let model_mat = transforms::create_transforms(
-            [
-                object.get_position().x,
-                object.get_position().y,
-                object.get_position().z,
-            ],
-            [
-                object.get_rotation().x,
-                object.get_rotation().y,
-                object.get_rotation().z,
-            ],
-            [
-                object.get_scale().x,
-                object.get_scale().y,
-                object.get_scale().z,
-            ],
-        );
-        let normal_mat = (model_mat.invert().unwrap()).transpose();
-
-        let model_ref: &[f32; 16] = model_mat.as_ref();
-        let normal_ref: &[f32; 16] = normal_mat.as_ref();
-        self.init
-            .queue
-            .write_buffer(&model_uniform_buffer, 0, bytemuck::cast_slice(model_ref));
-        self.init
-            .queue
-            .write_buffer(&model_uniform_buffer, 64, bytemuck::cast_slice(normal_ref));
-
-        for (vertices, material_name) in meshes {
-            let material_found;
-            let bytes_filtered: Vec<u8> =
-                material_name.bytes().filter(|c| c > &(31 as u8)).collect();
-            let material_string = String::from_utf8(bytes_filtered).unwrap();
-
-            if let Some(material) = materials.get(&material_string) {
-                material_found = material;
-            } else {
-                material_found = &materials.get("default").unwrap();
-            }
-
-            let material_found_texture = material_found.get_texture();
-            let material_found_displacement = material_found.get_displacement();
-
-            println!(
-                "loading: {} from: {}",
-                material_found_texture, material_string
-            );
-
-            let texture_object;
-            if let Some(texture) = self.textures.get(material_found_texture) {
-                texture_object = texture;
-            } else {
-                continue;
-            }
-
-            let texture_object_displacement;
-            if let Some(texture_displacement_name) = material_found_displacement {
-                if let Some(texture_displacement) = self.textures.get(texture_displacement_name) {
-                    texture_object_displacement = Some(texture_displacement);
-                } else {
-                    texture_object_displacement = None;
-                }
-            } else {
-                texture_object_displacement = None;
-            }
-
-            let uniform_bind_group;
-            let vertex_buffer;
-            if let Some(texture_displacement) = texture_object_displacement {
-                (uniform_bind_group, vertex_buffer) = create_buffer_displacement(
-                    &self.init.queue,
-                    &self.init.device,
-                    &self.uniform_bind_group_layout,
-                    &self.vertex_uniform_buffer,
-                    &self.fragment_uniform_buffer,
-                    &model_uniform_buffer,
-                    &self.bone_buffers[object_id],
-                    &texture_displacement.texture,
-                    texture_displacement.texture_size,
-                    &texture_displacement.texture_rgba,
-                    texture_displacement.texture_width,
-                    texture_displacement.texture_height,
-                    &texture_object.texture,
-                    texture_object.texture_size,
-                    &texture_object.texture_rgba,
-                    texture_object.texture_width,
-                    texture_object.texture_height,
-                    vertices.len(),
-                );
-            } else {
-                if let Some(texture_displacement) = self.textures.get("textures/displacement.png") {
-                    (uniform_bind_group, vertex_buffer) = create_buffer_displacement(
-                        &self.init.queue,
-                        &self.init.device,
-                        &self.uniform_bind_group_layout,
-                        &self.vertex_uniform_buffer,
-                        &self.fragment_uniform_buffer,
-                        &model_uniform_buffer,
-                        &self.bone_buffers[object_id],
-                        &texture_displacement.texture,
-                        texture_displacement.texture_size,
-                        &texture_displacement.texture_rgba,
-                        texture_displacement.texture_width,
-                        texture_displacement.texture_height,
-                        &texture_object.texture,
-                        texture_object.texture_size,
-                        &texture_object.texture_rgba,
-                        texture_object.texture_width,
-                        texture_object.texture_height,
-                        vertices.len(),
-                    );
-                } else {
-                    continue;
-                }
-            }
-
-            self.vertex_buffers[object_id].push(vertex_buffer);
-            self.uniform_bind_groups[object_id].push(uniform_bind_group);
-
-            self.num_vertices[object_id].push(vertices.len() as u32);
-            self.init.queue.write_buffer(
-                &self.vertex_buffers[object_id][self.vertex_buffers[object_id].len() - 1],
-                0,
-                bytemuck::cast_slice(vertices),
-            );
-        }
-
-        self.model_uniform_buffers.push(model_uniform_buffer);
-    }
-
-    pub fn set_world(&mut self, world: World) {
-        self.world = world;
-
-        self.vertex_buffers.clear();
-        self.uniform_bind_groups.clear();
-        self.num_vertices.clear();
-
-        for texture in self.world.get_textures() {
-            self.textures.insert(
-                texture.to_string(),
-                TextureObject::create(texture, &self.init.device),
-            );
-        }
-
-        for object in self.world.get_objects().iter().enumerate() {
-            let meshes = object.1.get_vertices();
-            let materials = object.1.get_materials();
-            let mut bones: Vec<[[f32; 4]; 4]> = Vec::new();
-            self.vertex_buffers.push(Vec::new());
-            self.uniform_bind_groups.push(Vec::new());
-            self.num_vertices.push(Vec::new());
-
-            let bone_transforms = object.1.get_bones();
-            self.final_marices.push(Vec::new());
-            for _ in 0..bone_transforms.len() {
-                self.final_marices[object.0].push([
-                    [0.0, 0.0, 0.0, 0.0],
-                    [0.0, 0.0, 0.0, 0.0],
-                    [0.0, 0.0, 0.0, 0.0],
-                    [0.0, 0.0, 0.0, 0.0],
-                ]);
-            }
-            self.bones.push(bone_transforms.clone());
-
-            for bone in bone_transforms {
-                bones.push(
-                    transforms::create_transforms(
-                        bone.0.position.into(),
-                        bone.0.rotation.into(),
-                        bone.0.scale.into(),
-                    )
-                    .into(),
-                );
-            }
-
-            let bone_buffer;
-            if bones.len() > 0 {
-                println!("{}", object.0);
-                self.shader_type.push(ShaderType::DisplacementBones);
-                bone_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("Bone Buffer"),
-                    size: (bones.len() * std::mem::size_of::<Matrix4<f32>>()) as u64,
-                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                });
+            let mut encoder_left =
                 self.init
-                    .queue
-                    .write_buffer(&bone_buffer, 0, bytemuck::cast_slice(&bones));
-            } else {
-                self.shader_type.push(ShaderType::Displacement);
-                bone_buffer = self.init.device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("Bone Buffer"),
-                    size: 16,
-                    usage: wgpu::BufferUsages::STORAGE | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                });
-            }
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("XR Render Encoder"),
+                    });
+            let mut encoder_right =
+                self.init
+                    .device
+                    .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                        label: Some("XR Render Encoder"),
+                    });
 
-            self.bone_buffers.push(bone_buffer);
-
-            let model_uniform_buffer: wgpu::Buffer =
-                self.init.device.create_buffer(&wgpu::BufferDescriptor {
-                    label: Some("Vertex Uniform Buffer"),
-                    size: 128,
-                    usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-                    mapped_at_creation: false,
-                });
-
-            let model_mat = transforms::create_transforms(
-                [
-                    object.1.get_position().x,
-                    object.1.get_position().y,
-                    object.1.get_position().z,
-                ],
-                [
-                    object.1.get_rotation().x,
-                    object.1.get_rotation().y,
-                    object.1.get_rotation().z,
-                ],
-                [
-                    object.1.get_scale().x,
-                    object.1.get_scale().y,
-                    object.1.get_scale().z,
-                ],
+            let left_proj = fov_to_projection(views[0].fov, 0.1, 1000.0);
+            let left_view = get_eye_view_matrix(
+                player.camera.position,
+                player.camera.rotation.y,
+                views[0].pose,
             );
-            let normal_mat = (model_mat.invert().unwrap()).transpose();
-
-            let model_ref: &[f32; 16] = model_mat.as_ref();
-            let normal_ref: &[f32; 16] = normal_mat.as_ref();
-            self.init
-                .queue
-                .write_buffer(&model_uniform_buffer, 0, bytemuck::cast_slice(model_ref));
+            let left_view_proj = left_proj * left_view;
+            let left_view_proj_ref: &[f32; 16] = left_view_proj.as_ref();
             self.init.queue.write_buffer(
-                &model_uniform_buffer,
+                &self.buffer_collection.vertex_uniform_buffer,
                 64,
-                bytemuck::cast_slice(normal_ref),
+                bytemuck::cast_slice(left_view_proj_ref),
             );
+            let left_index = self.init.swapchains[0].acquire_image()?;
+            self.init.swapchains[0].wait_image(openxr::Duration::from_nanos(1_000_000_000))?;
+            let left_color_view = &self.init.swapchain_views[0][left_index as usize];
 
-            for (vertices, material_name) in meshes {
-                let material_found;
-                let bytes_filtered: Vec<u8> =
-                    material_name.bytes().filter(|c| c > &(31 as u8)).collect();
-                let material_string = String::from_utf8(bytes_filtered).unwrap();
+            render_scene(
+                &mut encoder_left,
+                left_color_view,
+                &self.init.depth_views[0],
+                &self.buffer_collection,
+                &self.pipeline_displacement,
+                &self.pipeline_displacement_bones,
+            );
+            self.init.queue.submit(Some(encoder_left.finish()));
+            self.init.swapchains[0].release_image()?;
 
-                if let Some(material) = materials.get(&material_string) {
-                    material_found = material;
-                } else {
-                    material_found = &materials.get("default").unwrap();
-                }
+            let right_proj = fov_to_projection(views[1].fov, 0.1, 1000.0);
+            let right_view = get_eye_view_matrix(
+                player.camera.position,
+                player.camera.rotation.y,
+                views[1].pose,
+            );
+            let right_view_proj = right_proj * right_view;
+            let right_vp_ref: &[f32; 16] = right_view_proj.as_ref();
+            self.init.queue.write_buffer(
+                &self.buffer_collection.vertex_uniform_buffer,
+                64,
+                bytemuck::cast_slice(right_vp_ref),
+            );
+            let right_index = self.init.swapchains[1].acquire_image()?;
+            self.init.swapchains[1].wait_image(openxr::Duration::from_nanos(1_000_000_000))?;
+            let right_color_view = &self.init.swapchain_views[1][right_index as usize];
 
-                let material_found_texture = material_found.get_texture();
-                let material_found_displacement = material_found.get_displacement();
+            render_scene(
+                &mut encoder_right,
+                right_color_view,
+                &self.init.depth_views[1],
+                &self.buffer_collection,
+                &self.pipeline_displacement,
+                &self.pipeline_displacement_bones,
+            );
+            self.init.queue.submit(Some(encoder_right.finish()));
+            self.init.swapchains[1].release_image()?;
 
-                println!(
-                    "loading: {} from: {}",
-                    material_found_texture, material_string
-                );
+            let left_rect = openxr::Rect2Di {
+                offset: openxr::Offset2Di { x: 0, y: 0 },
+                extent: openxr::Extent2Di {
+                    width: self.init.views[0].recommended_image_rect_width as i32,
+                    height: self.init.views[0].recommended_image_rect_height as i32,
+                },
+            };
 
-                let texture_object;
-                if let Some(texture) = self.textures.get(material_found_texture) {
-                    texture_object = texture;
-                } else {
-                    continue;
-                }
+            let right_rect = openxr::Rect2Di {
+                offset: openxr::Offset2Di { x: 0, y: 0 },
+                extent: openxr::Extent2Di {
+                    width: self.init.views[1].recommended_image_rect_width as i32,
+                    height: self.init.views[1].recommended_image_rect_height as i32,
+                },
+            };
 
-                let texture_object_displacement;
-                if let Some(texture_displacement_name) = material_found_displacement {
-                    if let Some(texture_displacement) = self.textures.get(texture_displacement_name)
-                    {
-                        texture_object_displacement = Some(texture_displacement);
-                    } else {
-                        texture_object_displacement = None;
-                    }
-                } else {
-                    texture_object_displacement = None;
-                }
+            let proj_views = [
+                openxr::CompositionLayerProjectionView::new()
+                    .pose(views[0].pose)
+                    .fov(views[0].fov)
+                    .sub_image(
+                        openxr::SwapchainSubImage::new()
+                            .swapchain(&self.init.swapchains[0])
+                            .image_rect(left_rect)
+                            .image_array_index(0),
+                    ),
+                openxr::CompositionLayerProjectionView::new()
+                    .pose(views[1].pose)
+                    .fov(views[1].fov)
+                    .sub_image(
+                        openxr::SwapchainSubImage::new()
+                            .swapchain(&self.init.swapchains[1])
+                            .image_rect(right_rect)
+                            .image_array_index(0),
+                    ),
+            ];
 
-                let uniform_bind_group;
-                let vertex_buffer;
-                if let Some(texture_displacement) = texture_object_displacement {
-                    (uniform_bind_group, vertex_buffer) = create_buffer_displacement(
-                        &self.init.queue,
-                        &self.init.device,
-                        &self.uniform_bind_group_layout,
-                        &self.vertex_uniform_buffer,
-                        &self.fragment_uniform_buffer,
-                        &model_uniform_buffer,
-                        &self.bone_buffers[object.0],
-                        &texture_displacement.texture,
-                        texture_displacement.texture_size,
-                        &texture_displacement.texture_rgba,
-                        texture_displacement.texture_width,
-                        texture_displacement.texture_height,
-                        &texture_object.texture,
-                        texture_object.texture_size,
-                        &texture_object.texture_rgba,
-                        texture_object.texture_width,
-                        texture_object.texture_height,
-                        vertices.len(),
-                    );
-                } else {
-                    if let Some(texture_displacement) =
-                        self.textures.get("textures/displacement.png")
-                    {
-                        (uniform_bind_group, vertex_buffer) = create_buffer_displacement(
-                            &self.init.queue,
-                            &self.init.device,
-                            &self.uniform_bind_group_layout,
-                            &self.vertex_uniform_buffer,
-                            &self.fragment_uniform_buffer,
-                            &model_uniform_buffer,
-                            &self.bone_buffers[object.0],
-                            &texture_displacement.texture,
-                            texture_displacement.texture_size,
-                            &texture_displacement.texture_rgba,
-                            texture_displacement.texture_width,
-                            texture_displacement.texture_height,
-                            &texture_object.texture,
-                            texture_object.texture_size,
-                            &texture_object.texture_rgba,
-                            texture_object.texture_width,
-                            texture_object.texture_height,
-                            vertices.len(),
-                        );
-                    } else {
-                        continue;
-                    }
-                }
+            let projection_layer = openxr::CompositionLayerProjection::new()
+                .space(&self.init.reference_space)
+                .views(&proj_views);
 
-                self.vertex_buffers[object.0].push(vertex_buffer);
-                self.uniform_bind_groups[object.0].push(uniform_bind_group);
+            let layer_base: &openxr::CompositionLayerBase<openxr::Vulkan> = &projection_layer;
 
-                self.num_vertices[object.0].push(vertices.len() as u32);
-                self.init.queue.write_buffer(
-                    &self.vertex_buffers[object.0][self.vertex_buffers[object.0].len() - 1],
-                    0,
-                    bytemuck::cast_slice(vertices),
-                );
-            }
-
-            self.model_uniform_buffers.push(model_uniform_buffer);
+            self.init.frame_stream.end(
+                frame_state.predicted_display_time,
+                openxr::EnvironmentBlendMode::OPAQUE,
+                &[layer_base],
+            )?;
+        } else {
+            self.init.frame_stream.end(
+                frame_state.predicted_display_time,
+                openxr::EnvironmentBlendMode::OPAQUE,
+                &[],
+            )?;
         }
-
-        for object in self.world.objects.iter_mut() {
-            object.clear_vertices();
-        }
-
-        /*self.data_thread_tx
-        .send(UserUpdate::SendReadySignal)
-        .expect("Sending user ready signal failed :C");*/
-    }
-
-    pub fn render(&mut self, depth_texture: &wgpu::Texture) -> Result<(), ()> {
-        /*let output = match self.init.surface.get_current_texture() {
-            wgpu::CurrentSurfaceTexture::Success(frame) => frame,
-            wgpu::CurrentSurfaceTexture::Suboptimal(frame) => frame,
-
-            wgpu::CurrentSurfaceTexture::Outdated => {
-                self.init
-                    .surface
-                    .configure(&self.init.device, &self.init.config);
-                return Ok(());
-            }
-
-            wgpu::CurrentSurfaceTexture::Lost => {
-                return Ok(());
-            }
-
-            wgpu::CurrentSurfaceTexture::Timeout
-            | wgpu::CurrentSurfaceTexture::Occluded
-            | wgpu::CurrentSurfaceTexture::Validation => {
-                return Ok(());
-            }
-        };
-
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
-
-        let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
-
-        let mut encoder =
-            self.init
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.2,
-                            g: 0.247,
-                            b: 0.314,
-                            a: 1.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                    depth_slice: None,
-                })],
-                //depth_stencil_attachment: None,
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &depth_view,
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Discard,
-                    }),
-                    stencil_ops: None,
-                }),
-                occlusion_query_set: None,
-                timestamp_writes: None,
-                multiview_mask: None,
-            });
-
-            let mut current_shader = ShaderType::Displacement;
-            render_pass.set_pipeline(&self.pipeline_displacement);
-
-            for mesh in 0..self.vertex_buffers.len() {
-                let shader_type = &self.shader_type[mesh];
-                if shader_type != &current_shader {
-                    match shader_type {
-                        ShaderType::Displacement => {
-                            render_pass.set_pipeline(&self.pipeline_displacement);
-                            current_shader = ShaderType::Displacement;
-                        }
-                        ShaderType::DisplacementBones => {
-                            render_pass.set_pipeline(&self.pipeline_displacement_bones);
-                            current_shader = ShaderType::DisplacementBones;
-                        }
-                    }
-                }
-
-                for i in 0..self.vertex_buffers[mesh].len() {
-                    render_pass.set_vertex_buffer(0, self.vertex_buffers[mesh][i].slice(..));
-                    render_pass.set_bind_group(0, &self.uniform_bind_groups[mesh][i], &[]);
-                    render_pass.draw(0..self.num_vertices[mesh][i], 0..1);
-                }
-            }
-        }
-
-        self.init.queue.submit(Some(encoder.finish()));
-        self.init.queue.present(output);*/
 
         Ok(())
+    }
+
+    pub fn run_frame_loop(&mut self, engine: Engine, xr_input: XrInput) {
+        let mut engine = engine;
+        let mut xr_input = xr_input;
+        let mut last_frame_time = Instant::now();
+        let mut input = InputState::default();
+
+        loop {
+            let now = Instant::now();
+            let frame_time = now.duration_since(last_frame_time).as_secs_f32();
+            last_frame_time = now;
+
+            let _ = poll_xr_inputs(&self.init.session, &mut xr_input, &mut input);
+            self.init.poll_events().ok();
+
+            engine.update(
+                [0.0; 2],
+                [false; 6],
+                frame_time,
+                &mut self.buffer_collection,
+                &self.init.device,
+                &self.init.queue,
+            );
+            self.update(frame_time, 0, &mut engine);
+
+            if self.init.get_session_running() {
+                if let Err(e) = self.render_frame(&mut engine.player) {
+                    eprintln!("XR Frame Error: {:?}", e);
+                }
+            } else {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        }
     }
 }

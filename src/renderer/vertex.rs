@@ -28,10 +28,10 @@ impl Vertex {
 }
 
 // Convert vertices to set vertex size
-fn vertex(p: [f32; 3], n: [i8; 3], c: [f32; 3], u: [f32; 2], bi: [u32; 4], bw: [f32; 4]) -> Vertex {
+fn vertex(p: [f32; 3], n: [f32; 3], c: [f32; 3], u: [f32; 2], bi: [u32; 4], bw: [f32; 4]) -> Vertex {
     return Vertex {
         position: [p[0], p[1], p[2], 1.0],
-        normal: [n[0] as f32, n[1] as f32, n[2] as f32, 1.0],
+        normal: [n[0], n[1], n[2], 1.0],
         color: [c[0], c[1], c[2], 1.0],
         uv: [u[0], u[1], 0.0, 0.0],
         bone_ids: [bi[0] as f32, bi[1] as f32, bi[2] as f32, bi[3] as f32],
@@ -43,7 +43,7 @@ fn vertex(p: [f32; 3], n: [i8; 3], c: [f32; 3], u: [f32; 2], bi: [u32; 4], bw: [
 pub fn create_vertices(
     meshes: &Vec<(
         Vec<[f32; 3]>,
-        Vec<[i8; 3]>,
+        Vec<[f32; 3]>,
         Vec<[f32; 3]>,
         Vec<[f32; 2]>,
         String,
@@ -73,7 +73,7 @@ pub fn create_vertices(
 pub fn create_vertices_skinned(
     meshes: &Vec<(
         Vec<SkinnedVertex>,
-        Vec<[i8; 3]>,
+        Vec<[f32; 3]>,
         Vec<[f32; 3]>,
         Vec<[f32; 2]>,
         String,

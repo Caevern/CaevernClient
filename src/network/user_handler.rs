@@ -1,26 +1,26 @@
 use cgmath::Vector3;
+use futures_util::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use std::{
     collections::HashMap,
-    f32,
-    net::TcpStream,
-    println,
+    f32, println,
     sync::mpsc::{Receiver, Sender},
-    thread,
 };
-use tungstenite::{Message, WebSocket, stream::MaybeTlsStream};
+use tokio::net::TcpStream;
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
+use tungstenite::Message;
 
 use crate::{
     network::{avatar_updates::AvatarUpdate, user_updates::UserUpdate},
     renderer::transform::Transform,
 };
 
-pub fn start_user_handler(
-    mut socket: WebSocket<MaybeTlsStream<TcpStream>>,
+pub async fn start_user_handler(
+    mut socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
     data_thread_rx: Receiver<UserUpdate>,
     avatar_thread_tx: Sender<AvatarUpdate>,
     user_id: u32,
 ) {
-    thread::spawn(move || {
+    tokio::spawn(async move {
         let mut users_loaded = HashMap::new();
 
         loop {
@@ -29,6 +29,10 @@ pub fn start_user_handler(
                     UserUpdate::SendUserPosition(_) => {
                         while let Ok(newer_job) = data_thread_rx.try_recv() {
                             job = newer_job;
+                            match job {
+                                UserUpdate::SendUserPosition(_) => (),
+                                _ => break,
+                            }
                         }
                     }
                     _ => (),
@@ -56,7 +60,7 @@ pub fn start_user_handler(
                             data_sending.push(byte);
                         }
 
-                        let _ = socket.send(Message::Binary(data_sending.into()));
+                        let _ = socket.send(Message::Binary(data_sending.into())).await;
                     }
 
                     UserUpdate::UpdateAvatarId(temp_user_id, object_id) => {
@@ -64,12 +68,17 @@ pub fn start_user_handler(
                     }
 
                     UserUpdate::SendReadySignal => {
-                        let _ = socket.send(Message::Binary(vec![2].into()));
+                        println!("SENT 2");
+                        let _ = socket.send(Message::Binary(vec![2].into())).await;
                     }
                 }
             }
 
-            if let Ok(result) = socket.read() {
+            if let Some(Ok(mut result)) = socket.next().await {
+                while let Some(Ok(Some(newest))) = socket.try_next().now_or_never() {
+                    result = newest;
+                }
+
                 let data = result.into_data();
                 if data.len() > 0 {
                     match data[0] {
@@ -152,7 +161,6 @@ pub fn start_user_handler(
                                         );
                                 }
                             }
-                            let _ = socket.send(Message::Binary(vec![2].into()));
                         }
                         0 => {}
                         _ => {

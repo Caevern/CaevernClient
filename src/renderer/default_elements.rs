@@ -25,6 +25,6 @@ pub fn register_default_textures(
 
     textures.insert(
         "fonts/NotoSansJP.ttf".to_string(),
-        TextureObject::load_from_dynamic_image(load_font_atlas("fonts/NotoSansJP.ttf"), &device),
+        TextureObject::from_image(&load_font_atlas("fonts/NotoSansJP.ttf"), &device),
     );
 }

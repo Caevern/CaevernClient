@@ -1,24 +1,32 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    println,
+};
 
 use cgmath::Vector3;
 
 use crate::{
-    renderer::{transform::Transform, vertex::create_vertices_skinned}, world::{
-        material::Material, object::{Object, ObjectType}, parsers::{cae_parser::parse_cae, fbx_parser::parse}, scene::load_scene,
+    renderer::{transform::Transform, vertex::create_vertices_skinned},
+    world::{
+        material::Material,
+        object::{Object, ObjectType},
+        parsers::{cae_parser::parse_cae, fbx_parser::parse},
+        scene::load_scene,
     },
 };
 
-#[derive(Clone)]
 pub struct World {
-    pub objects: Vec<Object>,
+    pub objects: HashMap<usize, Object>,
     pub textures: HashSet<String>,
+    pub images: HashMap<String, image::DynamicImage>,
     cameras: Vec<Object>,
 }
 impl World {
     pub fn new() -> Self {
         Self {
-            objects: Vec::new(),
+            objects: HashMap::new(),
             textures: HashSet::new(),
+            images: HashMap::new(),
             cameras: Vec::new(),
         }
     }
@@ -27,14 +35,29 @@ impl World {
         if object.get_object_type() == ObjectType::Camera {
             self.cameras.push(object);
         } else {
-            self.objects.push(object);
+            self.objects.insert(self.get_free_object_id(), object);
         }
+    }
+    pub fn add_object_at_index(&mut self, object: Object, index: usize) {
+        self.objects.insert(index, object);
+    }
+
+    pub fn get_free_object_id(&self) -> usize {
+        self.objects.len()
     }
 
     pub fn get_object(&self, index: usize) -> &Object {
-        &self.objects[index]
+        &self
+            .objects
+            .get(&index)
+            .expect("Object doesn't exist at this index")
     }
-    pub fn get_objects(&self) -> &Vec<Object> {
+    pub fn get_object_mut(&mut self, index: usize) -> &mut Object {
+        self.objects
+            .get_mut(&index)
+            .expect("Object doesn't exist at this index")
+    }
+    pub fn get_objects(&self) -> &HashMap<usize, Object> {
         &self.objects
     }
 
@@ -47,6 +70,9 @@ impl World {
 
     pub fn get_textures(&self) -> &HashSet<String> {
         &self.textures
+    }
+    pub fn get_images(&self) -> &HashMap<String, image::DynamicImage> {
+        &self.images
     }
 
     pub fn load_world(&mut self, path: &str) {
@@ -62,8 +88,14 @@ impl World {
     fn load_from_cae(&mut self, path: &str) {
         let objects = parse_cae(path);
 
-        for object in objects {
+        for object in objects.0 {
             self.add_object(object);
+        }
+
+        for (name, material) in objects.1 {
+            if let Some(image) = material.image {
+                self.images.insert(name, image);
+            }
         }
     }
 

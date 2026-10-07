@@ -111,3 +111,87 @@ pub fn create_transforms(
     let model_mat = trans_mat * rotate_mat_z * rotate_mat_y * rotate_mat_x * scale_mat;
     model_mat
 }
+
+pub fn fov_to_projection(fov: openxr::Fovf, near: f32, far: f32) -> Matrix4<f32> {
+    let tan_left = fov.angle_left.tan();
+    let tan_right = fov.angle_right.tan();
+    let tan_down = fov.angle_down.tan();
+    let tan_up = fov.angle_up.tan();
+
+    let tan_width = tan_right - tan_left;
+    let tan_height = tan_up - tan_down;
+
+    let m00 = 2.0 / tan_width;
+    let m11 = 2.0 / tan_height;
+    let m20 = (tan_right + tan_left) / tan_width;
+    let m21 = (tan_up + tan_down) / tan_height;
+    let m22 = -(far + near) / (far - near);
+    let m32 = -(2.0 * far * near) / (far - near);
+
+    let opengl_proj = Matrix4::new(
+        m00, 0.0, 0.0, 0.0, 0.0, m11, 0.0, 0.0, m20, m21, m22, -1.0, 0.0, 0.0, m32, 0.0,
+    );
+
+    OPENGL_TO_WGPU_MATRIX * opengl_proj
+}
+
+pub fn pose_to_view_matrix(pose: openxr::Posef) -> Matrix4<f32> {
+    let pos = Vector3::new(pose.position.x, pose.position.y, pose.position.z);
+    let rot = Quaternion::new(
+        pose.orientation.w,
+        pose.orientation.x,
+        pose.orientation.y,
+        pose.orientation.z,
+    );
+
+    let translation = Matrix4::from_translation(pos);
+    let rotation = Matrix4::from(rot);
+    let eye_world = translation * rotation;
+
+    eye_world.invert().unwrap_or(Matrix4::identity())
+}
+
+pub fn get_eye_view_matrix(
+    player_pos: Vector3<f32>,
+    player_yaw: f32,
+    xr_eye_pose: openxr::Posef,
+) -> Matrix4<f32> {
+    let player_translation = Matrix4::from_translation(player_pos);
+    let player_rotation = Matrix4::from_angle_y(cgmath::Rad(player_yaw));
+    let player_rig_transform = player_translation * player_rotation;
+
+    let eye_pos = Vector3::new(
+        xr_eye_pose.position.x,
+        xr_eye_pose.position.y,
+        xr_eye_pose.position.z,
+    );
+    let eye_rot = Quaternion::new(
+        xr_eye_pose.orientation.w,
+        xr_eye_pose.orientation.x,
+        xr_eye_pose.orientation.y,
+        xr_eye_pose.orientation.z,
+    );
+    let eye_local_transform = Matrix4::from_translation(eye_pos) * Matrix4::from(eye_rot);
+    let eye_world_transform = player_rig_transform * eye_local_transform;
+
+    eye_world_transform.invert().unwrap_or(Matrix4::identity())
+}
+
+pub fn quaternion_to_euler(q: Quaternion<f32>) -> (f32, f32, f32) {
+    let sinr_cosp = 2.0 * (q.s * q.v.x + q.v.y * q.v.z);
+    let cosr_cosp = 1.0 - 2.0 * (q.v.x * q.v.x + q.v.y * q.v.y);
+    let x = sinr_cosp.atan2(cosr_cosp);
+
+    let sinp = 2.0 * (q.s * q.v.y - q.v.z * q.v.x);
+    let y = if sinp.abs() >= 1.0 {
+        sinp.signum() * std::f32::consts::FRAC_PI_2
+    } else {
+        sinp.asin()
+    };
+
+    let siny_cosp = 2.0 * (q.s * q.v.z + q.v.x * q.v.y);
+    let cosy_cosp = 1.0 - 2.0 * (q.v.y * q.v.y + q.v.z * q.v.z);
+    let z = siny_cosp.atan2(cosy_cosp);
+
+    (x, y, z)
+}

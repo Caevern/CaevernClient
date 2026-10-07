@@ -1,14 +1,18 @@
-use std::{net::TcpStream, println};
-use tungstenite::{Message, WebSocket, stream::MaybeTlsStream};
+use std::println;
+use futures_util::{StreamExt, SinkExt};
+use tokio::net::TcpStream;
+use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
+use tungstenite::Message;
 
-pub fn authenticate_user(
-    mut socket: WebSocket<MaybeTlsStream<TcpStream>>,
-) -> (WebSocket<MaybeTlsStream<TcpStream>>, u32) {
+pub async fn authenticate_user(
+    mut socket: WebSocketStream<MaybeTlsStream<TcpStream>>,
+) -> (WebSocketStream<MaybeTlsStream<TcpStream>>, u32) {
     println!("Connected to websocket /ws/user");
 
-    let _ = socket.send(Message::Binary(vec![1].into()));
+    let _ = socket.send(Message::Binary(vec![1].into())).await;
 
-    while let Ok(message) = socket.read() {
+    while let Some(message) = socket.next().await {
+        let message = message.unwrap();
         let data = message.into_data();
         if data.len() > 0 {
             match data[0] {

@@ -1,5 +1,8 @@
-use crate::renderer::render_windowed::Assets;
 use image::{DynamicImage, GenericImageView};
+
+#[derive(rust_embed::RustEmbed)]
+#[folder = "assets/"]
+pub struct Assets;
 
 pub struct TextureObject {
     pub texture: wgpu::Texture,
@@ -41,7 +44,7 @@ impl TextureObject {
         }
     }
 
-    pub fn load_from_dynamic_image(img: DynamicImage, device: &wgpu::Device) -> Self {
+    pub fn from_image(img: &DynamicImage, device: &wgpu::Device) -> Self {
         let texture_rgba = img.to_rgba8().to_vec();
         let (width, height) = img.dimensions();
         let texture_size = wgpu::Extent3d {

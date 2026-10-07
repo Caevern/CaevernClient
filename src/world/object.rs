@@ -3,8 +3,9 @@ use std::collections::HashMap;
 use cgmath::Vector3;
 
 use crate::{
-    renderer::{transform::Transform, vertex::Vertex},
-    world::material::Material,
+    renderer::{buffer_bindings::BufferBindings, transform::Transform, vertex::Vertex},
+    ui::canvas::Canvas,
+    world::{material::Material, world::World},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,8 +31,6 @@ fn new_bone_vec(amount: usize) -> Vec<(Transform, Transform, i64, usize)> {
     bones
 }
 
-// this is a game object, and will be used to render the vertices
-#[derive(Clone)]
 pub struct Object {
     object_type: ObjectType,
     transform: Transform,
@@ -41,6 +40,8 @@ pub struct Object {
     skeleton: HashMap<String, usize>,
     movable: bool,
     tag: String,
+    pub canvas: Option<Canvas>,
+    pub buffer_bindings: BufferBindings,
 }
 impl Object {
     pub fn create(object_type: ObjectType, meshes: Vec<(Vec<Vertex>, String)>) -> Self {
@@ -50,6 +51,8 @@ impl Object {
             Material {
                 texture: "textures/missing.png".to_string(),
                 displacement: "".to_string(),
+                color: (1.0, 1.0, 1.0),
+                image: None,
             },
         );
         Self {
@@ -61,6 +64,8 @@ impl Object {
             skeleton: HashMap::new(),
             movable: false,
             tag: "unnamed".to_string(),
+            canvas: None,
+            buffer_bindings: BufferBindings::empty(),
         }
     }
 
@@ -69,6 +74,15 @@ impl Object {
     }
     pub fn add_meshes(&mut self, meshes: Vec<(Vec<Vertex>, String)>) {
         self.vertices.extend(meshes);
+    }
+
+    pub fn set_canvas(&mut self, canvas: Canvas) {
+        self.canvas = Some(canvas);
+    }
+    pub fn build_canvas(&mut self, world: &mut World) {
+        if let Some(canvas) = self.canvas.as_mut() {
+            canvas.build(world);
+        }
     }
 
     pub fn set_position(&mut self, x: f32, y: f32, z: f32) {
@@ -99,6 +113,8 @@ impl Object {
             Material {
                 texture: texture.to_string(),
                 displacement: "".to_string(),
+                color: (1.0, 1.0, 1.0),
+                image: None,
             },
         );
     }

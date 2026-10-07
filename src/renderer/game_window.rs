@@ -1,9 +1,11 @@
 use std::println;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::thread;
 
-use tungstenite::connect;
+use tokio_tungstenite::connect_async;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalPosition;
 use winit::event::DeviceEvent;
@@ -26,13 +28,13 @@ use crate::network::voice::start_voice_handler;
 use crate::renderer::render_openxr::RendererOpenXR;
 use crate::renderer::render_windowed::RendererWindowed;
 use crate::world::world::World;
+use crate::xr::xr_input::XrInput;
 use crate::xr::xr_manager::XRManager;
 
 pub struct GameWindow<'window> {
     pub window: Option<Arc<Window>>,
 
     pub windowed_renderer: Option<RendererWindowed<'window>>,
-    pub openxr_renderer: Option<RendererOpenXR>,
 
     pub engine: Option<Engine>,
 
@@ -48,6 +50,7 @@ pub struct GameWindow<'window> {
     pub keys: [bool; 6],
     pub mouse_movement: [f32; 2],
 
+    pub muted: Arc<AtomicBool>,
     pub mouse_locked: bool,
     pub use_confined: bool,
 
@@ -55,7 +58,7 @@ pub struct GameWindow<'window> {
 
     pub menu_tablet_state: usize,
 
-    pub home_world: World,
+    pub home_world: Option<World>,
 }
 
 impl<'window> ApplicationHandler for GameWindow<'window> {
@@ -63,51 +66,62 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         let (data_thread_tx, data_thread_rx) = mpsc::channel::<UserUpdate>();
         let (avatar_thread_tx, avatar_thread_rx) = mpsc::channel::<AvatarUpdate>();
 
-        self.engine = Some(Engine::new(data_thread_tx, avatar_thread_rx));
+        let muted = Arc::clone(&self.muted);
+        thread::spawn(move || {
+            println!("Starting webserver connection");
 
-        if let Ok((socket, _)) = connect("ws://localhost:42142/ws/user") {
-            let (socket, user_id) = authenticate_user(socket);
-            println!("User ID: {}", user_id);
+            let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
+            runtime.block_on(async {
+                if let Ok((socket, _)) = connect_async("ws://178.128.158.197:5000/ws/user").await {
+                    let (socket, user_id) = authenticate_user(socket).await;
+                    println!("User ID: {}", user_id);
 
-            start_user_handler(socket, data_thread_rx, avatar_thread_tx, user_id);
-
-            thread::spawn(move || {
-                let runtime =
-                    tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
-
-                runtime.block_on(async {
-                    start_voice_handler(user_id).await;
-                });
+                    start_user_handler(socket, data_thread_rx, avatar_thread_tx, user_id).await;
+                    start_voice_handler(user_id, muted).await;
+                } else {
+                    println!(
+                        "Failed to connect to websocket /ws/user, not connected to any server"
+                    );
+                }
             });
-        } else {
-            println!("Failed to connect to websocket /ws/user, not connected to any server");
-        }
+        });
 
-        if let Ok(xr) = XRManager::new() {
+        if self.xr_enabled
+            && let Ok(xr) = XRManager::new()
+        {
             println!("STARTED XRManager!!!");
-            self.xr_enabled = true;
 
             let mut renderer_openxr = pollster::block_on(RendererOpenXR::new(xr));
+            let xr_input =
+                XrInput::new(&renderer_openxr.init.instance).expect("Failed to create xr input");
+            xr_input
+                .attach_to_session(&renderer_openxr.init.session)
+                .expect("Failed to attach xr input to session");
 
-            renderer_openxr.set_world(self.home_world.clone());
+            let mut engine = Engine::new(data_thread_tx.clone(), avatar_thread_rx);
+            engine.set_world(
+                self.home_world.take().unwrap(),
+                &mut renderer_openxr.buffer_collection,
+                &renderer_openxr.init.device,
+                &renderer_openxr.init.queue,
+            );
+            data_thread_tx
+                .send(UserUpdate::SendReadySignal)
+                .expect("Sending user ready signal failed :C");
 
-            self.openxr_renderer = Some(renderer_openxr);
+            renderer_openxr.run_frame_loop(engine, xr_input);
         } else {
-            println!("Initializing XRManager has failed :C");
-        }
+            self.engine = Some(Engine::new(data_thread_tx.clone(), avatar_thread_rx));
 
-        let attributes = WindowAttributes::default()
-            .with_title(self.title.clone())
-            .with_window_icon(self.icon.clone());
-        let window = Arc::new(event_loop.create_window(attributes).unwrap());
+            let attributes = WindowAttributes::default()
+                .with_title(self.title.clone())
+                .with_window_icon(self.icon.clone());
+            let window = Arc::new(event_loop.create_window(attributes).unwrap());
 
-        let mut renderer = pollster::block_on(RendererWindowed::new(&window));
+            let mut renderer = pollster::block_on(RendererWindowed::new(&window));
 
-        self.depth_texture = Some(
-            renderer
-                .init
-                .device
-                .create_texture(&wgpu::TextureDescriptor {
+            self.depth_texture = Some(renderer.init.device.create_texture(
+                &wgpu::TextureDescriptor {
                     size: wgpu::Extent3d {
                         width: renderer.init.config.width,
                         height: renderer.init.config.height,
@@ -120,15 +134,26 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
                     label: None,
                     view_formats: &[],
-                }),
-        );
+                },
+            ));
 
-        self.window_size = (renderer.init.size.width, renderer.init.size.height);
+            //renderer.set_world(self.home_world.clone());
+            self.engine.as_mut().unwrap().set_world(
+                self.home_world.take().unwrap(),
+                &mut renderer.buffer_collection,
+                &renderer.init.device,
+                &renderer.init.queue,
+            );
 
-        renderer.set_world(self.home_world.clone());
+            self.window_size = (renderer.init.size.width, renderer.init.size.height);
 
-        self.windowed_renderer = Some(renderer);
-        self.window = Some(window);
+            self.windowed_renderer = Some(renderer);
+            self.window = Some(window);
+        }
+
+        data_thread_tx
+            .send(UserUpdate::SendReadySignal)
+            .expect("Sending user ready signal failed :C");
 
         self.render_start_time = std::time::Instant::now();
     }
@@ -232,6 +257,9 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     PhysicalKey::Code(KeyCode::KeyD) => {
                         self.keys[3] = true;
                     }
+                    PhysicalKey::Code(KeyCode::KeyV) => {
+                        self.muted.store(false, Ordering::Relaxed);
+                    }
                     PhysicalKey::Code(KeyCode::Space) => {
                         self.keys[4] = true;
                     }
@@ -332,6 +360,9 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     PhysicalKey::Code(KeyCode::KeyD) => {
                         self.keys[3] = false;
                     }
+                    PhysicalKey::Code(KeyCode::KeyV) => {
+                        self.muted.store(true, Ordering::Relaxed);
+                    }
                     PhysicalKey::Code(KeyCode::Space) => {
                         self.keys[4] = false;
                     }
@@ -349,8 +380,15 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 let engine = self.engine.as_mut().unwrap();
                 let renderer = self.windowed_renderer.as_mut().unwrap();
 
-                engine.update(self.mouse_movement, self.keys, frame_time);
-                renderer.update(frame_time, self.menu_tablet_state, &engine.player);
+                engine.update(
+                    self.mouse_movement,
+                    self.keys,
+                    frame_time,
+                    &mut renderer.buffer_collection,
+                    &renderer.init.device,
+                    &renderer.init.queue,
+                );
+                renderer.update(frame_time, self.menu_tablet_state, engine);
 
                 if self.menu_tablet_state == 2 {
                     self.menu_tablet_state = 1;

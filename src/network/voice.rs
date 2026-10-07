@@ -10,8 +10,20 @@ use rtc::{
     },
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, println, sync::Arc, thread, time::Duration};
-use tokio::sync::mpsc::{Receiver, Sender};
+use std::{
+    collections::VecDeque,
+    println,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    thread,
+    time::Duration,
+};
+use tokio::{
+    net::UdpSocket,
+    sync::mpsc::{Receiver, Sender},
+};
 use tokio_tungstenite::connect_async;
 use tungstenite::Message;
 use webrtc::{
@@ -21,13 +33,26 @@ use webrtc::{
     },
     peer_connection::{
         MediaEngine, PeerConnection, PeerConnectionBuilder, PeerConnectionEventHandler,
-        RTCConfigurationBuilder, RTCIceConnectionState, RTCIceGatheringState,
-        RTCPeerConnectionIceEvent, RTCPeerConnectionState, RTCSessionDescription,
-        register_default_interceptors,
+        RTCConfigurationBuilder, RTCIceConnectionState, RTCIceGatheringState, RTCIceServer,
+        RTCPeerConnectionIceErrorEvent, RTCPeerConnectionIceEvent, RTCPeerConnectionState,
+        RTCSessionDescription, register_default_interceptors,
     },
 };
 
 use crate::network::start_microphone::start_microphone;
+
+async fn default_local_ip() -> std::io::Result<std::net::IpAddr> {
+    let socket = UdpSocket::bind("0.0.0.0:0")
+        .await
+        .expect("Failed to bind local socket");
+
+    socket
+        .connect("1.1.1.1:443")
+        .await
+        .expect("Failed to connect to 1.1.1.1:443");
+
+    Ok(socket.local_addr().expect("Failed to get local addr").ip())
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "type")]
@@ -46,12 +71,20 @@ struct VoiceHandler {
 #[async_trait::async_trait]
 impl PeerConnectionEventHandler for VoiceHandler {
     async fn on_ice_gathering_state_change(&self, state: RTCIceGatheringState) {
+        println!("MIC ICE GATHERING: {:?}", state);
         if state == RTCIceGatheringState::Complete {
+            println!("MIC ICE GATHERING COMPLETE");
             let _ = self.ice_tx.send(true).await;
         }
     }
     async fn on_ice_candidate(&self, event: RTCPeerConnectionIceEvent) {
         println!("MIC ICE candidate: {:?}", event.candidate);
+    }
+    async fn on_ice_candidate_error(&self, event: RTCPeerConnectionIceErrorEvent) {
+        eprintln!(
+            "ICE ERROR: code={} url={} text={}",
+            event.error_code, event.url, event.error_text
+        );
     }
 
     async fn on_ice_connection_state_change(&self, state: RTCIceConnectionState) {
@@ -99,6 +132,10 @@ pub fn start_speaker(mut rx: Receiver<Vec<f32>>) -> cpal::Stream {
         .default_output_device()
         .expect("No output device found");
 
+    println!("Host: {}", host.id().name());
+    for host_id in cpal::available_hosts() {
+        println!("{host_id:?}");
+    }
     println!("Speaker: {}", device.description().unwrap().name());
 
     let supported = device
@@ -150,8 +187,8 @@ pub fn start_speaker(mut rx: Receiver<Vec<f32>>) -> cpal::Stream {
     stream
 }
 
-pub async fn start_voice_handler(user_id: u32) {
-    let (mut socket, _) = connect_async("ws://localhost:42142/ws/voice")
+pub async fn start_voice_handler(user_id: u32, mic_state_arc: Arc<AtomicBool>) {
+    let (mut socket, _) = connect_async("ws://178.128.158.197:5000/ws/voice")
         .await
         .expect("Can't connect");
     println!("Connected to websocket /ws/voice");
@@ -162,6 +199,7 @@ pub async fn start_voice_handler(user_id: u32) {
         ))
         .await
         .expect("Failed to send voice offer");
+    println!("Sent auth request");
 
     let ssrc = rand::random::<u32>();
     let media_track = MediaStreamTrack::new(
@@ -184,7 +222,8 @@ pub async fn start_voice_handler(user_id: u32) {
         }],
     );
     let audio_track = Arc::new(
-        TrackLocalStaticSample::new(media_track).expect("Failed to create local audio track"),
+        TrackLocalStaticSample::new(std::time::Instant::now(), media_track)
+            .expect("Failed to create local audio track"),
     );
 
     let (ice_tx, mut ice_rx) = tokio::sync::mpsc::channel(32);
@@ -196,7 +235,22 @@ pub async fn start_voice_handler(user_id: u32) {
         std::thread::park();
     });
 
-    let config = RTCConfigurationBuilder::default().build();
+    let config = RTCConfigurationBuilder::default()
+        .with_ice_servers(vec![
+            RTCIceServer {
+                urls: vec!["stun:stun.l.google.com:19302".to_string()],
+                ..Default::default()
+            },
+            RTCIceServer {
+                urls: vec!["turn:178.128.158.197:3478".to_string()],
+                username: "caevern".to_string(),
+                credential: "81b6c7681a8a2101bb50078d8efd1318f1f91934266da218aa0af869f56b47f9"
+                    .to_string(),
+                ..Default::default()
+            },
+        ])
+        .build();
+    println!("Created RTC configuration");
 
     let mut media_engine = MediaEngine::default();
     media_engine
@@ -206,15 +260,22 @@ pub async fn start_voice_handler(user_id: u32) {
     let registry = register_default_interceptors(Registry::new(), &mut media_engine)
         .expect("Failed to register default interceptors");
 
+    let ip = default_local_ip().await.expect("Failed to get local ip");
+
+    println!("WebRTC default interface: {ip}");
+
+    let udp_addr = format!("{ip}:0");
+
     let pc = PeerConnectionBuilder::new()
         .with_configuration(config)
         .with_media_engine(media_engine)
         .with_interceptor_registry(registry)
         .with_handler(Arc::new(VoiceHandler { ice_tx, tx }))
-        .with_udp_addrs(vec!["0.0.0.0:0"])
+        .with_udp_addrs(vec![udp_addr])
         .build()
         .await
         .expect("Failed to create peer connection builder...");
+    println!("Created peer connection");
 
     pc.add_track(audio_track.clone() as Arc<dyn TrackLocal>)
         .await
@@ -224,26 +285,25 @@ pub async fn start_voice_handler(user_id: u32) {
         .create_offer(None)
         .await
         .expect("Failed to create peer connection offer...");
+    println!("Sent peer connection offer");
 
     pc.set_local_description(offer)
         .await
         .expect("Failed to set local description for peer connection :C");
+    println!("Set local description");
 
-    // Wait for Ice Gathering State
     let _ = ice_rx.recv().await;
 
     let description = pc
         .local_description()
         .await
         .expect("Missing local description");
-    println!("OFFER SDP:\n{}", description.sdp);
 
     let signal = VoiceSignal::Offer {
         sdp: description.sdp,
     };
 
     let text = serde_json::to_string(&signal).expect("Failed to serialize voice offer");
-    println!("{}", text);
 
     socket
         .send(Message::Text(text.into()))
@@ -251,6 +311,7 @@ pub async fn start_voice_handler(user_id: u32) {
         .expect("Failed to send voice offer");
 
     thread::spawn(move || {
+        let mic_state = mic_state_arc.clone();
         let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
 
         runtime.block_on(async {
@@ -269,27 +330,32 @@ pub async fn start_voice_handler(user_id: u32) {
                 while buffer.len() >= 960 {
                     let frame: Vec<f32> = buffer.drain(..960).collect();
 
-                    let mut encoded = vec![0u8; 1500];
+                    if !mic_state.load(Ordering::Relaxed) {
+                        let mut encoded = vec![0u8; 1500];
 
-                    let len = encoder
-                        .encode_float(&frame, &mut encoded)
-                        .expect("Failed to encode Opus");
+                        let len = encoder
+                            .encode_float(&frame, &mut encoded)
+                            .expect("Failed to encode Opus");
 
-                    encoded.truncate(len);
+                        encoded.truncate(len);
 
-                    audio_track
-                        .write_sample(
-                            ssrc,
-                            111,
-                            &Sample {
-                                data: encoded.into(),
-                                duration: Duration::from_millis(20),
-                                ..Default::default()
-                            },
-                            &[],
-                        )
-                        .await
-                        .expect("Failed to write audio sample");
+                        audio_track
+                            .write_sample(
+                                ssrc,
+                                111,
+                                &Sample {
+                                    data: encoded.into(),
+                                    timestamp: std::time::Instant::now(),
+                                    duration: Duration::from_millis(20),
+                                    packet_timestamp: 0,
+                                    prev_dropped_packets: 0,
+                                    prev_padding_packets: 0,
+                                },
+                                &[],
+                            )
+                            .await
+                            .expect("Failed to write audio sample");
+                    }
                 }
             }
         });

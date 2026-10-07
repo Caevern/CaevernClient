@@ -1,26 +1,37 @@
 use ash::vk::{self, Handle};
+use openxr::ViewConfigurationType;
 use wgpu_hal::Instance;
 
 pub struct XRManager {
-    instance: openxr::Instance,
-    system: openxr::SystemId,
+    pub instance: openxr::Instance,
+    pub system: openxr::SystemId,
     pub session: openxr::Session<openxr::Vulkan>,
-    frame_waiter: openxr::FrameWaiter,
-    frame_stream: openxr::FrameStream<openxr::Vulkan>,
-    views: Vec<openxr::View>,
+    pub frame_waiter: openxr::FrameWaiter,
+    pub frame_stream: openxr::FrameStream<openxr::Vulkan>,
+    pub views: Vec<openxr::ViewConfigurationView>,
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
+    pub view_config: ViewConfigurationType,
+    pub swapchains: Vec<openxr::Swapchain<openxr::Vulkan>>,
+    pub swapchain_images: Vec<Vec<vk::Image>>,
+    pub swapchain_textures: Vec<Vec<wgpu::Texture>>,
+    pub swapchain_views: Vec<Vec<wgpu::TextureView>>,
+    pub depth_views: Vec<wgpu::TextureView>,
+    pub reference_space: openxr::Space,
+    event_buffer: openxr::EventDataBuffer,
+    session_running: bool,
 }
 impl XRManager {
     pub fn new() -> Result<Self, openxr::sys::Result> {
-        let entry;
-        unsafe {
-            if let Ok(temp_entry) = openxr::Entry::load() {
-                entry = temp_entry;
-            } else {
-                return Err(openxr::sys::Result::ERROR_SESSION_NOT_RUNNING);
+        let entry = unsafe {
+            match openxr::Entry::load(&()) {
+                Ok(entry) => entry,
+                Err(err) => {
+                    eprintln!("OpenXR Entry::load() failed: {err:?}");
+                    return Err(openxr::sys::Result::ERROR_INITIALIZATION_FAILED);
+                }
             }
-        }
+        };
 
         let mut extensions = openxr::ExtensionSet::default();
         extensions.khr_vulkan_enable2 = true;
@@ -39,6 +50,7 @@ impl XRManager {
             },
             &extensions,
             &[],
+            &(),
         )?;
 
         let system = instance.system(openxr::FormFactor::HEAD_MOUNTED_DISPLAY)?;
@@ -80,7 +92,7 @@ impl XRManager {
         let vk_app_info = vk::ApplicationInfo::default()
             .application_version(0)
             .engine_version(0)
-            .api_version(vk::make_api_version(0, 1, 1, 0));
+            .api_version(vk::make_api_version(0, 1, 2, 0));
 
         let vk_instance = unsafe {
             let vk_instance = instance
@@ -251,37 +263,185 @@ impl XRManager {
             requirements.min_api_version_supported, requirements.max_api_version_supported,
         );
 
+        let reference_space = session
+            .create_reference_space(openxr::ReferenceSpaceType::LOCAL, openxr::Posef::IDENTITY)?;
+
         Ok(Self {
             instance: instance,
             system: system,
             session: session,
             frame_waiter: frame_waiter,
             frame_stream: frame_stream,
-            views: Vec::new(),
+            views: views,
             device: device,
             queue: queue,
+            view_config: view_config,
+            swapchains: Vec::new(),
+            swapchain_images: Vec::new(),
+            swapchain_textures: Vec::new(),
+            swapchain_views: Vec::new(),
+            depth_views: Vec::new(),
+            reference_space: reference_space,
+            event_buffer: openxr::EventDataBuffer::new(),
+            session_running: false,
         })
     }
 
-    pub fn run_frame_loop(&mut self) -> Result<(), openxr::sys::Result> {
-        loop {
-            /*let frame_state = self.frame_waiter.wait()?;
+    pub fn get_session_running(&self) -> bool {
+        self.session_running
+    }
 
-            self.frame_stream.begin()?;
+    fn create_xr_views(&mut self) -> Result<(), openxr::sys::Result> {
+        for (i, swapchain) in self.swapchains.iter().enumerate() {
+            let images = swapchain.enumerate_images()?;
 
-            if frame_state.should_render {
-                // locate views
-                // acquire swapchain images
-                // render left eye
-                // render right eye
-                // release images
+            let mut views = Vec::new();
+
+            let swapchain_width = self.views[i].recommended_image_rect_width;
+            let swapchain_height = self.views[i].recommended_image_rect_height;
+
+            for raw_image in images {
+                let vk_image = vk::Image::from_raw(raw_image);
+
+                let hal_desc = wgpu_hal::TextureDescriptor {
+                    label: Some("OpenXR Swapchain Image"),
+                    size: wgpu::Extent3d {
+                        width: swapchain_width,
+                        height: swapchain_height,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                    usage: wgpu::TextureUses::COLOR_TARGET,
+                    view_formats: Vec::new(),
+                    memory_flags: wgpu_hal::MemoryFlags::empty(),
+                };
+                let desc = wgpu::TextureDescriptor {
+                    label: Some("OpenXR Swapchain Image"),
+                    size: wgpu::Extent3d {
+                        width: swapchain_width,
+                        height: swapchain_height,
+                        depth_or_array_layers: 1,
+                    },
+                    mip_level_count: 1,
+                    sample_count: 1,
+                    dimension: wgpu::TextureDimension::D2,
+                    format: wgpu::TextureFormat::Bgra8UnormSrgb,
+                    usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                    view_formats: &[],
+                };
+
+                let hal_texture = unsafe {
+                    let hal_device = self
+                        .device
+                        .as_hal::<wgpu_hal::api::Vulkan>()
+                        .expect("wgpu device is not using Vulkan");
+
+                    hal_device.texture_from_raw(
+                        vk_image,
+                        &hal_desc,
+                        Some(Box::new(|| {})),
+                        wgpu_hal::vulkan::TextureMemory::External,
+                    )
+                };
+
+                let texture = unsafe {
+                    self.device
+                        .create_texture_from_hal::<wgpu_hal::api::Vulkan>(
+                            hal_texture,
+                            &desc,
+                            wgpu::TextureUses::UNINITIALIZED,
+                        )
+                };
+
+                let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+                views.push(view);
             }
 
-            self.frame_stream.end(
-                frame_state.predicted_display_time,
-                openxr::EnvironmentBlendMode::OPAQUE,
-                &layers,
-            )?;*/
+            self.swapchain_views.push(views);
+
+            let depth_texture = self.device.create_texture(&wgpu::TextureDescriptor {
+                label: Some("XR Depth"),
+                size: wgpu::Extent3d {
+                    width: swapchain_width,
+                    height: swapchain_height,
+                    depth_or_array_layers: 1,
+                },
+                mip_level_count: 1,
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D2,
+                format: wgpu::TextureFormat::Depth24Plus,
+                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+                view_formats: &[],
+            });
+
+            let depth_view = depth_texture.create_view(&wgpu::TextureViewDescriptor::default());
+
+            self.depth_views.push(depth_view);
         }
+
+        Ok(())
+    }
+
+    pub fn create_swapchains(&mut self) -> Result<(), openxr::sys::Result> {
+        let views = self
+            .instance
+            .enumerate_view_configuration_views(self.system, self.view_config)?;
+
+        let format = vk::Format::B8G8R8A8_SRGB.as_raw();
+
+        for view in &views {
+            let swapchain = self
+                .session
+                .create_swapchain(&openxr::SwapchainCreateInfo {
+                    create_flags: openxr::SwapchainCreateFlags::EMPTY,
+                    usage_flags: openxr::SwapchainUsageFlags::COLOR_ATTACHMENT,
+                    format: format as u32,
+                    sample_count: view.recommended_swapchain_sample_count,
+                    width: view.recommended_image_rect_width,
+                    height: view.recommended_image_rect_height,
+                    face_count: 1,
+                    array_size: 1,
+                    mip_count: 1,
+                })?;
+
+            self.swapchains.push(swapchain);
+        }
+
+        Ok(())
+    }
+
+    pub fn poll_events(&mut self) -> Result<(), openxr::sys::Result> {
+        while let Some(event) = self.instance.poll_event(&mut self.event_buffer)? {
+            match event {
+                openxr::Event::SessionStateChanged(event) => match event.state() {
+                    openxr::SessionState::READY => {
+                        self.session.begin(self.view_config)?;
+                        println!("XR session started");
+                        self.session_running = true;
+                        self.create_swapchains()?;
+                        self.create_xr_views()?;
+                        println!("Swapchains created");
+                    }
+
+                    openxr::SessionState::STOPPING => {
+                        self.session.end()?;
+                        println!("XR session stopped");
+                        self.session_running = false;
+                    }
+
+                    state => {
+                        println!("XR session state: {state:?}");
+                    }
+                },
+
+                _ => {}
+            }
+        }
+
+        Ok(())
     }
 }
