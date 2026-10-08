@@ -101,10 +101,10 @@ impl Engine {
 
         let player_position = [
             self.player.camera.position.x - self.player.camera.rotation.y.cos() * 0.1
-                + self.player.camera_offset.x,
-            self.player.camera.position.y - self.player.height + self.player.camera_offset.y,
+                + self.player.camera_offset.position.x,
+            self.player.camera.position.y - self.player.height + self.player.camera_offset.position.y,
             self.player.camera.position.z - self.player.camera.rotation.y.sin() * 0.1
-                + self.player.camera_offset.z,
+                + self.player.camera_offset.position.z,
         ];
 
         apply_gravity(&mut self.player, frame_time);
@@ -114,9 +114,9 @@ impl Engine {
             .send(UserUpdate::SendUserPosition(Transform {
                 position: player_position.into(),
                 rotation: Vector3::new(
-                    -self.player.camera.rotation.x,
-                    -self.player.camera.rotation.y + 1.57079633,
-                    -self.player.camera.rotation.z,
+                    -self.player.camera.rotation.x + self.player.camera_offset.rotation.x,
+                    -self.player.camera.rotation.y + 1.57079633 + self.player.camera_offset.rotation.y,
+                    -self.player.camera.rotation.z + self.player.camera_offset.rotation.z,
                 ),
                 scale: Vector3::new(1.0, 1.0, 1.0),
             }));

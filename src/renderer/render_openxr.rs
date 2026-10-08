@@ -490,12 +490,12 @@ impl RendererOpenXR {
 
             let left_eye_euler = quaternion_to_euler(left_eye_rotation);
 
-            player.camera.rotation = Vector3 {
+            player.camera_offset.rotation = Vector3 {
                 x: left_eye_euler.0,
                 y: left_eye_euler.1,
                 z: left_eye_euler.2,
             };
-            player.camera_offset = Vector3 {
+            player.camera_offset.position = Vector3 {
                 x: left_eye_position.x,
                 y: left_eye_position.y,
                 z: left_eye_position.z,
