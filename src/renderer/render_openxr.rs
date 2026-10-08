@@ -7,6 +7,7 @@ use crate::ALLOCATOR;
 use crate::game::update_bone::update_bone;
 use crate::game::update_bones::update_bones;
 use crate::game::update_game::Engine;
+use crate::interract::input_state::InputState;
 use crate::interract::raycast::raycast_grab;
 use crate::renderer::buffer_collection::BufferCollection;
 use crate::renderer::buffers::bind_group_layout::create_bind_group_layout;
@@ -14,7 +15,6 @@ use crate::renderer::buffers::uniform_buffers::{
     create_fragment_uniform_buffer, create_vertex_uniform_buffer,
 };
 use crate::renderer::default_elements::register_default_textures;
-use crate::renderer::input_state::InputState;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
 use crate::renderer::render_scene::render_scene;
 use crate::renderer::texture_object::TextureObject;
@@ -147,9 +147,13 @@ impl RendererOpenXR {
 
         let player = &engine.player;
         let forward = Vector3::new(
-            player.camera.rotation.y.cos() * player.camera.rotation.x.cos(),
-            player.camera.rotation.x.sin(),
-            player.camera.rotation.y.sin() * player.camera.rotation.x.cos(),
+            (player.camera.rotation.y + player.camera_offset.rotation.y).cos() *
+            (player.camera.rotation.x + player.camera_offset.rotation.x).cos(),
+
+            (player.camera.rotation.x + player.camera_offset.rotation.x).sin(),
+
+            (player.camera.rotation.y + player.camera_offset.rotation.y).sin() *
+            (player.camera.rotation.x + player.camera_offset.rotation.x).cos(),
         )
         .normalize();
 
@@ -167,9 +171,9 @@ impl RendererOpenXR {
                             player.camera.position.z + forward.z,
                         ],
                         [
-                            -player.camera.rotation.x,
-                            -player.camera.rotation.y + std::f32::consts::FRAC_PI_2,
-                            -player.camera.rotation.z,
+                            -(player.camera.rotation.x + player.camera_offset.rotation.x),
+                            -(player.camera.rotation.y + player.camera_offset.rotation.y) + std::f32::consts::FRAC_PI_2,
+                            -(player.camera.rotation.z + player.camera_offset.rotation.z),
                         ],
                         [1.0, 1.0, 1.0],
                     );
@@ -222,9 +226,9 @@ impl RendererOpenXR {
                     let model_mat = transforms::create_transforms(
                         [0.0, -10.0, 0.0],
                         [
-                            -player.camera.rotation.x,
-                            -player.camera.rotation.y + std::f32::consts::FRAC_PI_2,
-                            -player.camera.rotation.z,
+                            -(player.camera.rotation.x + player.camera_offset.rotation.x),
+                            -(player.camera.rotation.y + player.camera_offset.rotation.y) + std::f32::consts::FRAC_PI_2,
+                            -(player.camera.rotation.z + player.camera_offset.rotation.z),
                         ],
                         [1.0, 1.0, 1.0],
                     );
@@ -634,6 +638,7 @@ impl RendererOpenXR {
         let mut xr_input = xr_input;
         let mut last_frame_time = Instant::now();
         let mut input = InputState::default();
+        let mut menu_state = 0;
 
         loop {
             let now = Instant::now();
@@ -643,15 +648,26 @@ impl RendererOpenXR {
             let _ = poll_xr_inputs(&self.init.session, &mut xr_input, &mut input);
             self.init.poll_events().ok();
 
+            if input.menu {
+                menu_state = 2;
+            }
+
             engine.update(
                 [0.0; 2],
                 [false; 6],
+                &input,
                 frame_time,
                 &mut self.buffer_collection,
                 &self.init.device,
                 &self.init.queue,
             );
-            self.update(frame_time, 0, &mut engine);
+            self.update(frame_time, menu_state, &mut engine);
+
+            if menu_state == 2 {
+                menu_state = 1;
+            } else if menu_state == 3 {
+                menu_state = 0;
+            }
 
             if self.init.get_session_running() {
                 if let Err(e) = self.render_frame(&mut engine.player) {

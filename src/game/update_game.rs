@@ -9,23 +9,19 @@ use std::{
 use cgmath::{InnerSpace, Matrix, SquareMatrix, Vector3};
 
 use crate::{
-    game::{update_bone::update_bone, update_bones::update_bones},
-    network::{
+    game::{update_bone::update_bone, update_bones::update_bones}, interract::input_state::InputState, network::{
         avatar_updates::AvatarUpdate,
         user_updates::UserUpdate::{self, UpdateAvatarId},
-    },
-    physics::{
+    }, physics::{
         gravity::apply_gravity,
         movement::{get_camera_movement, get_camera_rotation},
-    },
-    renderer::{
+    }, renderer::{
         buffer_collection::BufferCollection,
         create_rendered_object::create_rendered_object,
         transform::Transform,
         transforms::create_transforms,
         vertex::{Vertex, create_vertices_skinned},
-    },
-    world::{
+    }, world::{
         material::Material,
         object::{Object, ObjectType},
         objects::{player::Player, skeleton::create_skeleton},
@@ -79,6 +75,7 @@ impl Engine {
         &mut self,
         mouse: [f32; 2],
         keys: [bool; 6],
+        input: &InputState,
         frame_time: f32,
         buffer_collection: &mut BufferCollection,
         device: &wgpu::Device,
@@ -88,15 +85,25 @@ impl Engine {
         self.player.camera.rotation.x = updated_camera_rotation.0;
         self.player.camera.rotation.y = updated_camera_rotation.1;
 
+        if input.left {
+            self.player.camera.rotation.y += 0.5 * frame_time;
+        } else if input.right {
+            self.player.camera.rotation.y -= 0.5 * frame_time;
+        }
+
         let forward = Vector3::new(
-            self.player.camera.rotation.y.cos() * self.player.camera.rotation.x.cos(),
-            self.player.camera.rotation.x.sin(),
-            self.player.camera.rotation.y.sin() * self.player.camera.rotation.x.cos(),
+            (self.player.camera.rotation.y + self.player.camera_offset.rotation.y).cos() *
+            (self.player.camera.rotation.x + self.player.camera_offset.rotation.x).cos(),
+
+            (self.player.camera.rotation.x + self.player.camera_offset.rotation.x).sin(),
+
+            (self.player.camera.rotation.y + self.player.camera_offset.rotation.y).sin() *
+            (self.player.camera.rotation.x + self.player.camera_offset.rotation.x).cos(),
         )
         .normalize();
 
         let updated_camera_position =
-            get_camera_movement(&mut self.player, keys, forward, frame_time);
+            get_camera_movement(&mut self.player, keys, input, forward, frame_time);
         self.player.camera.position += updated_camera_position;
 
         let player_position = [

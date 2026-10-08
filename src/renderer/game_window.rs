@@ -20,6 +20,7 @@ use winit::window::WindowAttributes;
 use winit::window::{Icon, Window};
 
 use crate::game::update_game::Engine;
+use crate::interract::input_state::InputState;
 use crate::network::avatar_updates::AvatarUpdate;
 use crate::network::user_authenticate::authenticate_user;
 use crate::network::user_handler::start_user_handler;
@@ -49,6 +50,7 @@ pub struct GameWindow<'window> {
 
     pub keys: [bool; 6],
     pub mouse_movement: [f32; 2],
+    pub input: InputState,
 
     pub muted: Arc<AtomicBool>,
     pub mouse_locked: bool,
@@ -383,6 +385,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 engine.update(
                     self.mouse_movement,
                     self.keys,
+                    &self.input,
                     frame_time,
                     &mut renderer.buffer_collection,
                     &renderer.init.device,

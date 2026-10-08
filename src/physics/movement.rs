@@ -1,6 +1,6 @@
 use cgmath::*;
 
-use crate::world::objects::player::Player;
+use crate::{interract::input_state::InputState, world::objects::player::Player};
 
 pub fn get_camera_rotation(player: &Player, mouse: [f32; 2], frame_time: f32) -> (f32, f32) {
     let mut rotation_x =
@@ -17,6 +17,7 @@ pub fn get_camera_rotation(player: &Player, mouse: [f32; 2], frame_time: f32) ->
 pub fn get_camera_movement(
     player: &mut Player,
     keys: [bool; 6],
+    input: &InputState,
     forward: Vector3<f32>,
     frame_time: f32,
 ) -> Vector3<f32> {
@@ -30,27 +31,27 @@ pub fn get_camera_movement(
     }
 
     let right = Vector3::new(
-        player.camera.rotation.y.sin(),
+        (player.camera.rotation.y + player.camera_offset.rotation.y).sin(),
         0.0,
-        -player.camera.rotation.y.cos(),
+        -(player.camera.rotation.y + player.camera_offset.rotation.y).cos(),
     )
     .normalize();
 
     let mut walking_force = Vector3::new(0.0, 0.0, 0.0);
 
-    if keys[0] {
+    if keys[0] || input.a {
         walking_force.x += frame_time * forward_x * player.walking_speed;
         walking_force.z += frame_time * forward_z * player.walking_speed;
     }
-    if keys[2] {
+    if keys[2] || input.d {
         walking_force.x -= frame_time * forward_x * player.walking_speed;
         walking_force.z -= frame_time * forward_z * player.walking_speed;
     }
-    if keys[1] {
+    if keys[1] || input.s {
         walking_force.x += frame_time * right[0] * player.walking_speed;
         walking_force.z += frame_time * right[2] * player.walking_speed;
     }
-    if keys[3] {
+    if keys[3] || input.w {
         walking_force.x -= frame_time * right[0] * player.walking_speed;
         walking_force.z -= frame_time * right[2] * player.walking_speed;
     }

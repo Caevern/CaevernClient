@@ -178,20 +178,25 @@ pub fn get_eye_view_matrix(
 }
 
 pub fn quaternion_to_euler(q: Quaternion<f32>) -> (f32, f32, f32) {
-    let sinr_cosp = 2.0 * (q.s * q.v.x + q.v.y * q.v.z);
-    let cosr_cosp = 1.0 - 2.0 * (q.v.x * q.v.x + q.v.y * q.v.y);
-    let x = sinr_cosp.atan2(cosr_cosp);
+    let w = q.s;
+    let x = q.v.x;
+    let y = q.v.y;
+    let z = q.v.z;
 
-    let sinp = 2.0 * (q.s * q.v.y - q.v.z * q.v.x);
-    let y = if sinp.abs() >= 1.0 {
+    let sinp = 2.0 * (w * x - y * z);
+    let pitch = if sinp.abs() >= 1.0 {
         sinp.signum() * std::f32::consts::FRAC_PI_2
     } else {
         sinp.asin()
     };
 
-    let siny_cosp = 2.0 * (q.s * q.v.z + q.v.x * q.v.y);
-    let cosy_cosp = 1.0 - 2.0 * (q.v.y * q.v.y + q.v.z * q.v.z);
-    let z = siny_cosp.atan2(cosy_cosp);
+    let siny_cosp = 2.0 * (w * y + z * x);
+    let cosy_cosp = 1.0 - 2.0 * (x * x + y * y);
+    let yaw = siny_cosp.atan2(cosy_cosp);
 
-    (x, y, z)
+    let sinr_cosp = 2.0 * (w * z + x * y);
+    let cosr_cosp = 1.0 - 2.0 * (y * y + z * z);
+    let roll = sinr_cosp.atan2(cosr_cosp);
+
+    (pitch, yaw, roll)
 }

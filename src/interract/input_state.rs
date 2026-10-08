@@ -4,5 +4,7 @@ pub struct InputState {
     pub a: bool,
     pub s: bool,
     pub d: bool,
+    pub left: bool,
+    pub right: bool,
     pub menu: bool,
 }

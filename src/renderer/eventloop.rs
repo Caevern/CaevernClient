@@ -4,6 +4,7 @@ use std::sync::atomic::AtomicBool;
 use winit::event_loop::EventLoop;
 use winit::window::Icon;
 
+use crate::interract::input_state::InputState;
 use crate::renderer::game_window::GameWindow;
 use crate::world::world::World;
 
@@ -37,6 +38,7 @@ pub fn start_engine(world: World, no_vr: bool) {
         render_start_time: std::time::Instant::now(),
         keys: [false; 6],
         mouse_movement: [0.0; 2],
+        input: InputState::default(),
 
         muted: Arc::new(AtomicBool::new(true)),
         mouse_locked: false,

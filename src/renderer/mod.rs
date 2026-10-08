@@ -11,7 +11,6 @@ pub mod buffer_collection;
 pub mod shader_type;
 pub mod texture_object;
 pub mod transforms;
-pub mod input_state;
 
 mod buffers;
 mod default_elements;
