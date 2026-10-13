@@ -12,7 +12,7 @@ pub fn distance(position_1: Vector3<f32>, position_2: Vector3<f32>) -> f32 {
     (dx * dx + dy * dy + dz * dz).sqrt()
 }
 
-// the function to get the nearest grabbable object
+// Function to get nearest grabbable object.
 pub fn raycast_grab(
     objects: &HashMap<usize, Object>,
     position: Vector3<f32>,
