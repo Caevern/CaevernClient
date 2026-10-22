@@ -9,7 +9,7 @@ use std::{
 use cgmath::{InnerSpace, Matrix, SquareMatrix, Vector3};
 
 use crate::{
-    game::{update_bone::update_bone, update_bones::update_bones}, interract::input_state::InputState, network::{
+    game::{update_bone::update_bone, update_bones::update_bones}, interract::input_state::InputState, modules::load_module::load_module, network::{
         avatar_updates::AvatarUpdate,
         user_updates::UserUpdate::{self, UpdateAvatarId},
     }, physics::{
@@ -132,7 +132,7 @@ impl Engine {
     }
 
     pub fn load_modules(&mut self) {
-        //let _ = load_module("assets/modules/caevern_polydural.wasm", self.world_rc.clone());
+        let _ = load_module("assets/modules/caevern_polydural.wasm", self.world_rc.clone());
     }
 
     pub fn set_world(
