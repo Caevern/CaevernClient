@@ -25,7 +25,7 @@ use crate::ui::widgets::label::Label;
 use crate::world::{object::ObjectType, parsers::fbx_parser::parse};
 
 #[global_allocator]
-static ALLOCATOR: Cap<alloc::System> = Cap::new(alloc::System, usize::max_value());
+static ALLOCATOR: Cap<alloc::System> = Cap::new(alloc::System, usize::MAX);
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
