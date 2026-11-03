@@ -20,6 +20,7 @@ use crate::renderer::render_scene::render_scene;
 use crate::renderer::texture_object::TextureObject;
 use crate::renderer::vertex::Vertex;
 use crate::renderer::{init_wgpu, transforms, vertex};
+use crate::setup::font_character::FontCharacter;
 use crate::setup::fonts::load_font_uvs;
 use crate::world::object::ObjectType;
 
@@ -99,8 +100,7 @@ impl<'window> RendererWindowed<'window> {
         let mut textures: HashMap<String, TextureObject> = HashMap::new();
         register_default_textures(&mut textures, &init.device);
 
-        let mut font_maps: HashMap<String, HashMap<String, (f32, f32, f32, f32, f32)>> =
-            HashMap::new();
+        let mut font_maps: HashMap<String, HashMap<String, FontCharacter>> = HashMap::new();
 
         font_maps.insert(
             "NotoSansJP".to_string(),

@@ -46,44 +46,34 @@ fn vertex(
     }
 }
 
-pub fn create_vertices(meshes: &Vec<(Vec<SimpleVertex>, String)>) -> Vec<(Vec<Vertex>, String)> {
+pub fn create_vertices(meshes: &[(Vec<SimpleVertex>, String)]) -> Vec<(Vec<Vertex>, String)> {
     let mut vertex_list: Vec<(Vec<Vertex>, String)> = Vec::with_capacity(meshes.len());
     for mesh in 0..meshes.len() {
         let vertices = &meshes[mesh].0;
         let material = &meshes[mesh].1;
         vertex_list.push((Vec::with_capacity(vertices.len()), material.clone()));
-        for i in 0..vertices.len() {
+        for v in vertices {
             vertex_list[mesh].0.push(vertex(
-                vertices[i].position,
-                vertices[i].normal,
-                vertices[i].color,
-                vertices[i].uv,
-                [0; 4],
-                [0.0; 4],
+                v.position, v.normal, v.color, v.uv, [0; 4], [0.0; 4],
             ));
         }
     }
-    return vertex_list.to_vec();
+    vertex_list.to_vec()
 }
 
 pub fn create_vertices_skinned(
-    meshes: &Vec<(Vec<SkinnedVertex>, String)>,
+    meshes: &[(Vec<SkinnedVertex>, String)],
 ) -> Vec<(Vec<Vertex>, String)> {
     let mut vertex_list: Vec<(Vec<Vertex>, String)> = Vec::with_capacity(meshes.len());
     for mesh in 0..meshes.len() {
         let vertices = &meshes[mesh].0;
         let material = &meshes[mesh].1;
         vertex_list.push((Vec::with_capacity(vertices.len()), material.clone()));
-        for i in 0..vertices.len() {
+        for v in vertices {
             vertex_list[mesh].0.push(vertex(
-                vertices[i].position,
-                vertices[i].normal,
-                vertices[i].color,
-                vertices[i].uv,
-                vertices[i].bone_ids,
-                vertices[i].weights,
+                v.position, v.normal, v.color, v.uv, v.bone_ids, v.weights,
             ));
         }
     }
-    return vertex_list.to_vec();
+    vertex_list.to_vec()
 }

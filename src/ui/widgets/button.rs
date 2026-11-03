@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     renderer::{self, simple_vertex::SimpleVertex},
+    setup::font_character::FontCharacter,
     ui::widget::Widget,
     world::{
         object::{Object, ObjectType},
@@ -17,11 +18,11 @@ pub struct Button {
     pub text_color: [f32; 3],
     pub needs_update: bool,
     object_id: usize,
-    font_uvs: HashMap<String, (f32, f32, f32, f32, f32)>,
+    font_uvs: HashMap<String, FontCharacter>,
 }
 
 impl Button {
-    pub fn with_text(text: String, font_uvs: HashMap<String, (f32, f32, f32, f32, f32)>) -> Self {
+    pub fn with_text(text: String, font_uvs: HashMap<String, FontCharacter>) -> Self {
         Self {
             text: text.clone(),
             text_placeholder: text,

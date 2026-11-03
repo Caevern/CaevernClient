@@ -71,7 +71,7 @@ pub fn create_rendered_object(
     }
 
     let bone_buffer;
-    if bones.len() > 0 {
+    if !bones.is_empty() {
         buffer_collection
             .shader_type
             .push(ShaderType::DisplacementBones);
@@ -132,13 +132,13 @@ pub fn create_rendered_object(
 
     for (vertices, material_name) in meshes {
         let material_found;
-        let bytes_filtered: Vec<u8> = material_name.bytes().filter(|c| c > &(31 as u8)).collect();
+        let bytes_filtered: Vec<u8> = material_name.bytes().filter(|c| c > &(31_u8)).collect();
         let material_string = String::from_utf8(bytes_filtered).unwrap();
 
         if let Some(material) = materials.get(&material_string) {
             material_found = material;
         } else {
-            material_found = &materials.get("default").unwrap();
+            material_found = materials.get("default").unwrap();
         }
 
         let material_found_texture = material_found.get_texture();
@@ -173,8 +173,8 @@ pub fn create_rendered_object(
         let vertex_buffer;
         if let Some(texture_displacement) = texture_object_displacement {
             (uniform_bind_group, vertex_buffer) = create_buffer_displacement(
-                &queue,
-                &device,
+                queue,
+                device,
                 &buffer_collection.uniform_bind_group_layout,
                 &buffer_collection.vertex_uniform_buffer,
                 &buffer_collection.fragment_uniform_buffer,
@@ -197,8 +197,8 @@ pub fn create_rendered_object(
                 buffer_collection.textures.get("textures/displacement.png")
             {
                 (uniform_bind_group, vertex_buffer) = create_buffer_displacement(
-                    &queue,
-                    &device,
+                    queue,
+                    device,
                     &buffer_collection.uniform_bind_group_layout,
                     &buffer_collection.vertex_uniform_buffer,
                     &buffer_collection.fragment_uniform_buffer,

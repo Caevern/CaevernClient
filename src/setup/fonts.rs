@@ -4,6 +4,8 @@ use fontdue::Font;
 use image::{DynamicImage, Rgba, RgbaImage};
 use rust_embed::RustEmbed;
 
+use crate::setup::font_character::FontCharacter;
+
 #[derive(RustEmbed)]
 #[folder = "assets/"]
 struct Assets;
@@ -53,7 +55,7 @@ pub fn load_font_atlas(path: &str) -> DynamicImage {
     DynamicImage::ImageRgba8(atlas)
 }
 
-pub fn load_font_uvs(path: &str) -> HashMap<String, (f32, f32, f32, f32, f32)> {
+pub fn load_font_uvs(path: &str) -> HashMap<String, FontCharacter> {
     let font_data = Assets::get(path).expect("Failed to load embedded texture");
     let font = Font::from_bytes(font_data.data.as_ref(), fontdue::FontSettings::default()).unwrap();
 
@@ -75,21 +77,19 @@ pub fn load_font_uvs(path: &str) -> HashMap<String, (f32, f32, f32, f32, f32)> {
         atlas_height = atlas_height.max(metrics.height);
     }
 
-    let mut mapped_characters: HashMap<String, (f32, f32, f32, f32, f32)> = HashMap::new();
+    let mut mapped_characters: HashMap<String, FontCharacter> = HashMap::new();
 
-    let mut x_offset = 0;
+    let mut x_offset = 0.0;
     for (c, metrics) in glyphs {
-        let glyph_width = metrics.width as u32;
+        let glyph_width = metrics.width as f32;
 
         mapped_characters.insert(
             c.to_string(),
-            (
-                x_offset as f32 / atlas_width as f32,
-                0.0,
-                (x_offset + glyph_width) as f32 / atlas_width as f32,
-                1.0,
-                (metrics.ymin as f32 / atlas_height as f32) * 2.0,
-            ),
+            FontCharacter {
+                offset: (metrics.ymin as f32 / atlas_height as f32) * 2.0,
+                start: x_offset / atlas_width as f32,
+                end: (x_offset + glyph_width) / atlas_width as f32,
+            },
         );
 
         x_offset += glyph_width;
