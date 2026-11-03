@@ -25,17 +25,14 @@ pub async fn start_user_handler(
 
         loop {
             if let Ok(mut job) = data_thread_rx.recv() {
-                match job {
-                    UserUpdate::SendUserPosition(_) => {
-                        while let Ok(newer_job) = data_thread_rx.try_recv() {
-                            job = newer_job;
-                            match job {
-                                UserUpdate::SendUserPosition(_) => (),
-                                _ => break,
-                            }
+                if let UserUpdate::SendUserPosition(_) = job {
+                    while let Ok(newer_job) = data_thread_rx.try_recv() {
+                        job = newer_job;
+
+                        if !matches!(job, UserUpdate::SendUserPosition(_)) {
+                            break;
                         }
                     }
-                    _ => (),
                 }
 
                 match job {
@@ -80,7 +77,7 @@ pub async fn start_user_handler(
                 }
 
                 let data = result.into_data();
-                if data.len() > 0 {
+                if !data.is_empty() {
                     match data[0] {
                         3 => {
                             let player_amount = (data.len() - 1) / 28;

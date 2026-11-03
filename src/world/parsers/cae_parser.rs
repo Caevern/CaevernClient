@@ -52,15 +52,7 @@ fn read_string<R: Read>(reader: &mut R) -> String {
         .expect("Failed to create string")
 }
 
-fn read_mesh<R: Read>(
-    mut reader: &mut R,
-) -> (
-    Vec<SkinnedVertex>,
-    Vec<[f32; 3]>,
-    Vec<[f32; 3]>,
-    Vec<[f32; 2]>,
-    String,
-) {
+fn read_mesh<R: Read>(mut reader: &mut R) -> (Vec<SkinnedVertex>, String) {
     let vertex_count = read_u32(&mut reader).expect("Failed to read vertex count") as usize;
     let mut vertices = vec![(0f32, 0f32, 0f32); vertex_count as usize];
     for i in 0..vertex_count {
@@ -104,13 +96,7 @@ fn read_mesh<R: Read>(
     }
     println!("normals_count: {normals_count}");
 
-    let mut mesh_data = (
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        String::new(),
-    );
+    let mut mesh_data = (Vec::new(), String::new());
 
     for i in 0..triangle_index_count {
         let vertex_index = indices[i];
@@ -122,12 +108,12 @@ fn read_mesh<R: Read>(
             position: [vertex.0, vertex.1, vertex.2],
             bone_ids: [0, 0, 0, 0],
             weights: [0.0, 0.0, 0.0, 0.0],
+            normal: [normal.0, normal.1, normal.2],
+            color: [1.0, 1.0, 1.0],
+            uv: [uv.0, uv.1],
         };
 
         mesh_data.0.push(skinned_vertex);
-        mesh_data.1.push([normal.0, normal.1, normal.2]);
-        mesh_data.2.push([1.0, 1.0, 1.0]);
-        mesh_data.3.push([uv.0, uv.1]);
     }
 
     mesh_data
@@ -136,25 +122,10 @@ fn read_mesh<R: Read>(
 fn read_object<R: Read>(
     mut reader: &mut R,
     i: u32,
-    meshes: &HashMap<
-        String,
-        (
-            Vec<SkinnedVertex>,
-            Vec<[f32; 3]>,
-            Vec<[f32; 3]>,
-            Vec<[f32; 2]>,
-            String,
-        ),
-    >,
+    meshes: &HashMap<String, (Vec<SkinnedVertex>, String)>,
     materials: &HashMap<String, Material>,
     _color: (f32, f32, f32),
-) -> (
-    Vec<SkinnedVertex>,
-    Vec<[f32; 3]>,
-    Vec<[f32; 3]>,
-    Vec<[f32; 2]>,
-    String,
-) {
+) -> (Vec<SkinnedVertex>, String) {
     let mesh_name = read_string(&mut reader);
     println!("mesh {i}: {mesh_name}");
 
@@ -165,6 +136,12 @@ fn read_object<R: Read>(
         let mesh_rotation = read_vec3(&mut reader);
         let mesh_scale = read_vec3(&mut reader);
 
+        let material_name = read_string(&mut reader);
+        let material = materials
+            .get(&material_name)
+            .expect("Material doesn't exist");
+        mesh.1 = material_name;
+
         for vertex in &mut mesh.0 {
             vertex.position = rotate_x(vertex.position, mesh_rotation[0] * 0.0174532925);
             vertex.position = rotate_y(vertex.position, mesh_rotation[1] * 0.0174532925);
@@ -173,53 +150,24 @@ fn read_object<R: Read>(
             vertex.position[0] = vertex.position[0] * mesh_scale[0] + mesh_position[0];
             vertex.position[1] = vertex.position[1] * mesh_scale[1] + mesh_position[1];
             vertex.position[2] = vertex.position[2] * mesh_scale[2] + mesh_position[2];
-        }
 
-        let material_name = read_string(&mut reader);
-        let material = materials
-            .get(&material_name)
-            .expect("Material doesn't exist");
-        mesh.4 = material_name;
-
-        for color_vert in &mut mesh.2 {
-            color_vert[0] = material.color.0;
-            color_vert[1] = material.color.1;
-            color_vert[2] = material.color.2;
+            vertex.color[0] = material.color.0;
+            vertex.color[1] = material.color.1;
+            vertex.color[2] = material.color.2;
         }
 
         return mesh;
     }
-    (
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        "default".to_string(),
-    )
+    (Vec::new(), "default".to_string())
 }
 
 fn read_object_data<R: Read>(
     mut reader: &mut R,
-    meshes_found: &HashMap<
-        String,
-        (
-            Vec<SkinnedVertex>,
-            Vec<[f32; 3]>,
-            Vec<[f32; 3]>,
-            Vec<[f32; 2]>,
-            String,
-        ),
-    >,
+    meshes_found: &HashMap<String, (Vec<SkinnedVertex>, String)>,
     materials: &HashMap<String, Material>,
     color: (f32, f32, f32),
 ) -> (
-    Vec<(
-        Vec<SkinnedVertex>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 2]>,
-        String,
-    )>,
+    Vec<(Vec<SkinnedVertex>, String)>,
     HashMap<i64, (usize, Transform, String, i64, usize)>,
 ) {
     let mesh_count = read_u32(&mut reader).expect("Failed to read mesh count");
@@ -234,16 +182,7 @@ fn read_object_data<R: Read>(
 
 fn create_object<R: Read>(
     mut reader: &mut R,
-    meshes: &HashMap<
-        String,
-        (
-            Vec<SkinnedVertex>,
-            Vec<[f32; 3]>,
-            Vec<[f32; 3]>,
-            Vec<[f32; 2]>,
-            String,
-        ),
-    >,
+    meshes: &HashMap<String, (Vec<SkinnedVertex>, String)>,
     materials: &HashMap<String, Material>,
 ) -> Object {
     let object_name = read_string(&mut reader);

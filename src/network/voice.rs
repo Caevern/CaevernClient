@@ -149,7 +149,7 @@ pub fn start_speaker(mut rx: Receiver<Vec<f32>>) -> cpal::Stream {
         supported.sample_format()
     );
 
-    let config: cpal::StreamConfig = supported.clone().into();
+    let config: cpal::StreamConfig = supported.into();
 
     let channels = config.channels as usize;
 
@@ -246,7 +246,6 @@ pub async fn start_voice_handler(user_id: u32, mic_state_arc: Arc<AtomicBool>) {
                 username: "caevern".to_string(),
                 credential: "81b6c7681a8a2101bb50078d8efd1318f1f91934266da218aa0af869f56b47f9"
                     .to_string(),
-                ..Default::default()
             },
         ])
         .build();
@@ -322,7 +321,7 @@ pub async fn start_voice_handler(user_id: u32, mic_state_arc: Arc<AtomicBool>) {
             let mut buffer = Vec::<f32>::new();
 
             while let Ok(samples) = rx.recv() {
-                for stereo in samples.chunks_exact(2) {
+                for stereo in samples.as_chunks::<2>().0 {
                     let mono = (stereo[0] + stereo[1]) * 0.5;
                     buffer.push(mono);
                 }

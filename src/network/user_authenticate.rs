@@ -14,7 +14,7 @@ pub async fn authenticate_user(
     while let Some(message) = socket.next().await {
         let message = message.unwrap();
         let data = message.into_data();
-        if data.len() > 0 {
+        if !data.is_empty() {
             match data[0] {
                 2 => {
                     let user_id = u32::from_be_bytes([data[1], data[2], data[3], data[4]]);
@@ -29,5 +29,5 @@ pub async fn authenticate_user(
         }
     }
 
-    return (socket, 0);
+    (socket, 0)
 }

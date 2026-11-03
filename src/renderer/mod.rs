@@ -1,4 +1,5 @@
 pub mod eventloop;
+pub mod simple_vertex;
 pub mod skinned_vertex;
 pub mod transform;
 pub mod vertex;

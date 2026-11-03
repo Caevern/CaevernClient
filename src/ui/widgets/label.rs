@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    renderer,
+    renderer::{self, simple_vertex::SimpleVertex},
     ui::widget::Widget,
     world::{
         object::{Object, ObjectType},
@@ -57,15 +57,7 @@ impl Widget for Label {
         self.object_id
     }
 
-    fn get_meshes(
-        &self,
-    ) -> Vec<(
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 2]>,
-        String,
-    )> {
+    fn get_meshes(&self) -> Vec<(Vec<SimpleVertex>, String)> {
         create_plane_with_text(
             self.position,
             (0.02, 0.02, 1.0),
@@ -74,16 +66,7 @@ impl Widget for Label {
             &self.text,
         )
     }
-    fn get_meshes_from_text(
-        &self,
-        text: &str,
-    ) -> Vec<(
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 2]>,
-        String,
-    )> {
+    fn get_meshes_from_text(&self, text: &str) -> Vec<(Vec<SimpleVertex>, String)> {
         create_plane_with_text(
             self.position,
             (0.02, 0.02, 1.0),

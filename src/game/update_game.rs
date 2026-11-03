@@ -126,7 +126,7 @@ impl Engine {
                 rotation: Vector3::new(
                     -self.player.camera.rotation.x + self.player.camera_offset.rotation.x,
                     -self.player.camera.rotation.y
-                        + 1.57079633
+                        + f32::consts::PI / 2.0
                         + self.player.camera_offset.rotation.y,
                     -self.player.camera.rotation.z + self.player.camera_offset.rotation.z,
                 ),
@@ -157,8 +157,8 @@ impl Engine {
         let mut world = self.world_rc.borrow_mut();
         let textures = world.get_textures().clone();
         for object_index in 0..world.objects.len() {
-            let mut object = world.objects.get_mut(&object_index).unwrap();
-            create_rendered_object(&textures, &mut object, buffer_collection, device, queue);
+            let object = world.objects.get_mut(&object_index).unwrap();
+            create_rendered_object(&textures, object, buffer_collection, device, queue);
         }
     }
 
@@ -219,7 +219,7 @@ impl Engine {
                     let object_id = world.get_objects().len();
 
                     create_rendered_object(
-                        &world.get_textures(),
+                        world.get_textures(),
                         &mut object,
                         buffer_collection,
                         device,
