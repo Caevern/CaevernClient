@@ -335,7 +335,7 @@ impl<'window> RendererWindowed<'window> {
                 ];
                 let rotation = [
                     object.get_rotation().x,
-                    object.get_rotation().y - player.camera.rotation.y + 1.57079633,
+                    object.get_rotation().y - player.camera.rotation.y + f32::consts::FRAC_PI_2,
                     object.get_rotation().z,
                 ];
 
@@ -377,7 +377,7 @@ impl<'window> RendererWindowed<'window> {
         }
 
         // update skybox positions
-        if self.frame % 10 == 0 {
+        if self.frame.is_multiple_of(10) {
             let grabbable_object_index =
                 raycast_grab(world.get_objects(), player.camera.position, forward, 5);
 
@@ -439,8 +439,8 @@ impl<'window> RendererWindowed<'window> {
         );
 
         // update ingame fps label when menu tablet is enabled
-        if menu_tablet_state == 1 && self.frame % 60 == 0 {
-            for (_, object) in world.get_objects() {
+        if menu_tablet_state == 1 && self.frame.is_multiple_of(60) {
+            for object in world.get_objects().values() {
                 if let Some(canvas) = &object.canvas {
                     for child in &canvas.children {
                         if !child.needs_update() {

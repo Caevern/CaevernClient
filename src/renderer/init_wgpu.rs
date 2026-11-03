@@ -23,7 +23,7 @@ impl<'window> InitWgpu<'window> {
             display: None,
         });
 
-        let surface = instance.create_surface(Arc::clone(&window)).unwrap();
+        let surface = instance.create_surface(Arc::clone(window)).unwrap();
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
                 power_preference: wgpu::PowerPreference::default(),

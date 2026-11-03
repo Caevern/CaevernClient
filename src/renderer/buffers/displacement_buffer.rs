@@ -64,7 +64,7 @@ pub fn create_buffer_displacement(
     });
 
     let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: &uniform_bind_group_layout,
+        layout: uniform_bind_group_layout,
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
@@ -110,5 +110,5 @@ pub fn create_buffer_displacement(
         mapped_at_creation: false,
     });
 
-    return (uniform_bind_group, vertex_buffer);
+    (uniform_bind_group, vertex_buffer)
 }

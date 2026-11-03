@@ -199,43 +199,37 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 state,
                 button,
             } => {
-                if state.is_pressed() {
-                    match button {
-                        MouseButton::Left => {
-                            if !self.mouse_locked {
-                                if let Err(err) = self
-                                    .window
-                                    .as_mut()
-                                    .unwrap()
-                                    .set_cursor_grab(winit::window::CursorGrabMode::Locked)
-                                {
-                                    eprintln!("Failed to lock the cursor: {:?}", err);
-                                    self.use_confined = true;
+                if state.is_pressed() && button == MouseButton::Left && !self.mouse_locked {
+                    if let Err(err) = self
+                        .window
+                        .as_mut()
+                        .unwrap()
+                        .set_cursor_grab(winit::window::CursorGrabMode::Locked)
+                    {
+                        eprintln!("Failed to lock the cursor: {:?}", err);
+                        self.use_confined = true;
 
-                                    if let Err(err) =
-                                        self.window.as_ref().unwrap().set_cursor_grab(
-                                            winit::window::CursorGrabMode::Confined,
-                                        )
-                                    {
-                                        eprintln!("Failed to confine the cursor: {:?}", err);
-                                    }
-                                    let window_size = self.window.as_ref().unwrap().inner_size();
-                                    let center_x = window_size.width as f64 / 2.0;
-                                    let center_y = window_size.height as f64 / 2.0;
-                                    self.window
-                                        .as_ref()
-                                        .unwrap()
-                                        .set_cursor_position(winit::dpi::PhysicalPosition::new(
-                                            center_x, center_y,
-                                        ))
-                                        .expect("Failed to set cursor position");
-                                }
-                                self.window.as_mut().unwrap().set_cursor_visible(false);
-                                self.mouse_locked = true;
-                            }
+                        if let Err(err) = self
+                            .window
+                            .as_ref()
+                            .unwrap()
+                            .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+                        {
+                            eprintln!("Failed to confine the cursor: {:?}", err);
                         }
-                        _ => {}
+                        let window_size = self.window.as_ref().unwrap().inner_size();
+                        let center_x = window_size.width as f64 / 2.0;
+                        let center_y = window_size.height as f64 / 2.0;
+                        self.window
+                            .as_ref()
+                            .unwrap()
+                            .set_cursor_position(winit::dpi::PhysicalPosition::new(
+                                center_x, center_y,
+                            ))
+                            .expect("Failed to set cursor position");
                     }
+                    self.window.as_mut().unwrap().set_cursor_visible(false);
+                    self.mouse_locked = true;
                 }
             }
 
@@ -398,7 +392,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 self.input.mouse.x = 0.0;
                 self.input.mouse.y = 0.0;
 
-                match renderer.render(&self.depth_texture.as_mut().unwrap()) {
+                match renderer.render(self.depth_texture.as_mut().unwrap()) {
                     Ok(_) => {
                         self.window.as_ref().unwrap().request_redraw();
                     }
@@ -416,23 +410,22 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         _device_id: DeviceId,
         event: DeviceEvent,
     ) {
-        if let DeviceEvent::MouseMotion { delta } = event {
-            if self.mouse_locked {
-                self.input.mouse.x -= delta.0 as f32 * 0.3;
-                self.input.mouse.y -= delta.1 as f32 * 0.3;
-                if !self.use_confined {
-                    if let Err(err) =
-                        self.window
-                            .as_ref()
-                            .unwrap()
-                            .set_cursor_position(LogicalPosition {
-                                x: self.window_size.0 / 2,
-                                y: self.window_size.1 / 2,
-                            })
-                    {
-                        eprint!("Failed to move back cursor {:?}", err);
-                    }
-                }
+        if let DeviceEvent::MouseMotion { delta } = event
+            && self.mouse_locked
+        {
+            self.input.mouse.x -= delta.0 as f32 * 0.3;
+            self.input.mouse.y -= delta.1 as f32 * 0.3;
+            if !self.use_confined
+                && let Err(err) =
+                    self.window
+                        .as_ref()
+                        .unwrap()
+                        .set_cursor_position(LogicalPosition {
+                            x: self.window_size.0 / 2,
+                            y: self.window_size.1 / 2,
+                        })
+            {
+                eprint!("Failed to move back cursor {:?}", err);
             }
         }
     }

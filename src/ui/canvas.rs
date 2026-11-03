@@ -4,6 +4,11 @@ pub struct Canvas {
     pub children: Vec<Box<dyn Widget>>,
 }
 
+impl Default for Canvas {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl Canvas {
     pub fn new() -> Self {
         Self {
