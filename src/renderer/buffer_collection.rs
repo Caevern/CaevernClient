@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use crate::{
-    renderer::{shader_type::ShaderType, texture_object::TextureObject, transform::Transform},
+    renderer::{
+        shader_type::ShaderType, textures::texture_object::TextureObject, transform::Transform,
+    },
     setup::font_character::FontCharacter,
 };
 

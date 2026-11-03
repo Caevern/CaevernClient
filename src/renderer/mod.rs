@@ -10,7 +10,7 @@ pub mod buffer_bindings;
 pub mod buffer_collection;
 
 pub mod shader_type;
-pub mod texture_object;
+pub mod textures;
 pub mod transforms;
 
 mod buffers;

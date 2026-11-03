@@ -17,7 +17,7 @@ use crate::renderer::buffers::uniform_buffers::{
 use crate::renderer::default_elements::register_default_textures;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
 use crate::renderer::render_scene::render_scene;
-use crate::renderer::texture_object::TextureObject;
+use crate::renderer::textures::texture_object::TextureObject;
 use crate::renderer::vertex::Vertex;
 use crate::renderer::{init_wgpu, transforms, vertex};
 use crate::setup::font_character::FontCharacter;

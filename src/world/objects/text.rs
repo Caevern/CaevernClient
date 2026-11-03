@@ -25,7 +25,7 @@ pub fn create_plane_with_text(
                     position.2,
                 ],
                 normal: [0.0, 0.0, -1.0],
-                color: color,
+                color,
                 uv: [from.0, to.1],
             });
             vertices.push(SimpleVertex {
@@ -35,7 +35,7 @@ pub fn create_plane_with_text(
                     position.2,
                 ],
                 normal: [0.0, 0.0, -1.0],
-                color: color,
+                color,
                 uv: [to.0, to.1],
             });
             vertices.push(SimpleVertex {
@@ -45,7 +45,7 @@ pub fn create_plane_with_text(
                     position.2,
                 ],
                 normal: [0.0, 0.0, -1.0],
-                color: color,
+                color,
                 uv: [from.0, from.1],
             });
             vertices.push(SimpleVertex {
@@ -55,7 +55,7 @@ pub fn create_plane_with_text(
                     position.2,
                 ],
                 normal: [0.0, 0.0, -1.0],
-                color: color,
+                color,
                 uv: [from.0, from.1],
             });
             vertices.push(SimpleVertex {
@@ -65,7 +65,7 @@ pub fn create_plane_with_text(
                     position.2,
                 ],
                 normal: [0.0, 0.0, -1.0],
-                color: color,
+                color,
                 uv: [to.0, to.1],
             });
             vertices.push(SimpleVertex {
@@ -75,11 +75,11 @@ pub fn create_plane_with_text(
                     position.2,
                 ],
                 normal: [0.0, 0.0, -1.0],
-                color: color,
+                color,
                 uv: [to.0, from.1],
             });
         }
     }
 
-    return vec![(vertices, "default".to_string())];
+    vec![(vertices, "default".to_string())]
 }

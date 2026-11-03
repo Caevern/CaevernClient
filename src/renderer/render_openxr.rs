@@ -17,7 +17,7 @@ use crate::renderer::buffers::uniform_buffers::{
 use crate::renderer::default_elements::register_default_textures;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
 use crate::renderer::render_scene::render_scene;
-use crate::renderer::texture_object::TextureObject;
+use crate::renderer::textures::texture_object::TextureObject;
 use crate::renderer::transforms::{fov_to_projection, get_eye_view_matrix, quaternion_to_euler};
 use crate::renderer::vertex::Vertex;
 use crate::renderer::{transforms, vertex};

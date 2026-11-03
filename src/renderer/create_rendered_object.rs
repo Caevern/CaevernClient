@@ -8,7 +8,7 @@ use crate::renderer::buffer_bindings::BufferBindings;
 use crate::renderer::buffer_collection::BufferCollection;
 use crate::renderer::buffers::displacement_buffer::create_buffer_displacement;
 use crate::renderer::shader_type::ShaderType;
-use crate::renderer::texture_object::TextureObject;
+use crate::renderer::textures::texture_object::TextureObject;
 use crate::renderer::transforms;
 use crate::world::object::Object;
 
@@ -180,16 +180,8 @@ pub fn create_rendered_object(
                 &buffer_collection.fragment_uniform_buffer,
                 &model_uniform_buffer,
                 &buffer_collection.bone_buffers[bone_buffer_index],
-                &texture_displacement.texture,
-                texture_displacement.texture_size,
-                &texture_displacement.texture_rgba,
-                texture_displacement.texture_width,
-                texture_displacement.texture_height,
-                &texture_object.texture,
-                texture_object.texture_size,
-                &texture_object.texture_rgba,
-                texture_object.texture_width,
-                texture_object.texture_height,
+                texture_displacement,
+                texture_object,
                 vertices.len(),
             );
         } else {
@@ -204,16 +196,8 @@ pub fn create_rendered_object(
                     &buffer_collection.fragment_uniform_buffer,
                     &model_uniform_buffer,
                     &buffer_collection.bone_buffers[bone_buffer_index],
-                    &texture_displacement.texture,
-                    texture_displacement.texture_size,
-                    &texture_displacement.texture_rgba,
-                    texture_displacement.texture_width,
-                    texture_displacement.texture_height,
-                    &texture_object.texture,
-                    texture_object.texture_size,
-                    &texture_object.texture_rgba,
-                    texture_object.texture_width,
-                    texture_object.texture_height,
+                    texture_displacement,
+                    texture_object,
                     vertices.len(),
                 );
             } else {

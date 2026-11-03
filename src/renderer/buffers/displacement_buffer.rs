@@ -1,7 +1,8 @@
 use wgpu::BindGroup;
 
-use crate::renderer::vertex::Vertex;
+use crate::renderer::{textures::texture_object::TextureObject, vertex::Vertex};
 
+// TODO: Fix every object having a displacement map
 pub fn create_buffer_displacement(
     queue: &wgpu::Queue,
     device: &wgpu::Device,
@@ -10,53 +11,48 @@ pub fn create_buffer_displacement(
     fragment_uniform_buffer: &wgpu::Buffer,
     model_uniform_buffer: &wgpu::Buffer,
     bones_buffer: &wgpu::Buffer,
-    displacement_texture: &wgpu::Texture,
-    displacement_texture_size: wgpu::Extent3d,
-    displacement_rgba: &Vec<u8>,
-    displacement_width: u32,
-    displacement_height: u32,
-    texture: &wgpu::Texture,
-    texture_size: wgpu::Extent3d,
-    rgba: &Vec<u8>,
-    width: u32,
-    height: u32,
+    displacement_texture_object: &TextureObject,
+    default_texture_object: &TextureObject,
     vertex_num: usize,
 ) -> (BindGroup, wgpu::Buffer) {
     queue.write_texture(
         wgpu::TexelCopyTextureInfo {
-            texture: &texture,
+            texture: &default_texture_object.texture,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
             aspect: wgpu::TextureAspect::All,
         },
-        &rgba,
+        &default_texture_object.texture_rgba,
         wgpu::TexelCopyBufferLayout {
             offset: 0,
-            bytes_per_row: Some(4 * width),
-            rows_per_image: Some(height),
+            bytes_per_row: Some(4 * default_texture_object.texture_width),
+            rows_per_image: Some(default_texture_object.texture_height),
         },
-        texture_size,
+        default_texture_object.texture_size,
     );
 
     queue.write_texture(
         wgpu::TexelCopyTextureInfo {
-            texture: &displacement_texture,
+            texture: &displacement_texture_object.texture,
             mip_level: 0,
             origin: wgpu::Origin3d::ZERO,
             aspect: wgpu::TextureAspect::All,
         },
-        &displacement_rgba,
+        &displacement_texture_object.texture_rgba,
         wgpu::TexelCopyBufferLayout {
             offset: 0,
-            bytes_per_row: Some(4 * displacement_width),
-            rows_per_image: Some(displacement_height),
+            bytes_per_row: Some(4 * displacement_texture_object.texture_width),
+            rows_per_image: Some(displacement_texture_object.texture_height),
         },
-        displacement_texture_size,
+        displacement_texture_object.texture_size,
     );
 
-    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
-    let displacement_texture_view =
-        displacement_texture.create_view(&wgpu::TextureViewDescriptor::default());
+    let texture_view = default_texture_object
+        .texture
+        .create_view(&wgpu::TextureViewDescriptor::default());
+    let displacement_texture_view = displacement_texture_object
+        .texture
+        .create_view(&wgpu::TextureViewDescriptor::default());
     let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
         address_mode_u: wgpu::AddressMode::ClampToEdge,
         address_mode_v: wgpu::AddressMode::ClampToEdge,

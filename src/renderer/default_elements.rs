@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{renderer::texture_object::TextureObject, setup::fonts::load_font_atlas};
+use crate::{renderer::textures::texture_object::TextureObject, setup::fonts::load_font_atlas};
 
 pub fn register_default_textures(
     textures: &mut HashMap<String, TextureObject>,
