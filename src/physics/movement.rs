@@ -38,19 +38,19 @@ pub fn get_camera_movement(
 
     let mut walking_force = Vector3::new(0.0, 0.0, 0.0);
 
-    if input.left {
+    if input.forewards {
         walking_force.x += frame_time * forward_x * player.walking_speed;
         walking_force.z += frame_time * forward_z * player.walking_speed;
     }
-    if input.right {
+    if input.backwards {
         walking_force.x -= frame_time * forward_x * player.walking_speed;
         walking_force.z -= frame_time * forward_z * player.walking_speed;
     }
-    if input.backwards {
+    if input.left {
         walking_force.x += frame_time * right[0] * player.walking_speed;
         walking_force.z += frame_time * right[2] * player.walking_speed;
     }
-    if input.forewards {
+    if input.right {
         walking_force.x -= frame_time * right[0] * player.walking_speed;
         walking_force.z -= frame_time * right[2] * player.walking_speed;
     }
