@@ -1,4 +1,8 @@
-use std::{cell::RefCell, rc::Rc, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use wasmtime::Caller;
 

@@ -9,19 +9,25 @@ use std::{
 use cgmath::{InnerSpace, Matrix, SquareMatrix, Vector3};
 
 use crate::{
-    game::{update_bone::update_bone, update_bones::update_bones}, interract::input_state::InputState, modules::load_module::load_module, network::{
+    game::{update_bone::update_bone, update_bones::update_bones},
+    interract::input_state::InputState,
+    modules::load_module::load_module,
+    network::{
         avatar_updates::AvatarUpdate,
         user_updates::UserUpdate::{self, UpdateAvatarId},
-    }, physics::{
+    },
+    physics::{
         gravity::apply_gravity,
         movement::{get_camera_movement, get_camera_rotation},
-    }, renderer::{
+    },
+    renderer::{
         buffer_collection::BufferCollection,
         create_rendered_object::create_rendered_object,
         transform::Transform,
         transforms::create_transforms,
         vertex::{Vertex, create_vertices_skinned},
-    }, world::{
+    },
+    world::{
         material::Material,
         object::{Object, ObjectType},
         objects::{player::Player, skeleton::create_skeleton},
@@ -92,13 +98,11 @@ impl Engine {
         }
 
         let forward = Vector3::new(
-            (self.player.camera.rotation.y + self.player.camera_offset.rotation.y).cos() *
-            (self.player.camera.rotation.x + self.player.camera_offset.rotation.x).cos(),
-
+            (self.player.camera.rotation.y + self.player.camera_offset.rotation.y).cos()
+                * (self.player.camera.rotation.x + self.player.camera_offset.rotation.x).cos(),
             (self.player.camera.rotation.x + self.player.camera_offset.rotation.x).sin(),
-
-            (self.player.camera.rotation.y + self.player.camera_offset.rotation.y).sin() *
-            (self.player.camera.rotation.x + self.player.camera_offset.rotation.x).cos(),
+            (self.player.camera.rotation.y + self.player.camera_offset.rotation.y).sin()
+                * (self.player.camera.rotation.x + self.player.camera_offset.rotation.x).cos(),
         )
         .normalize();
 
@@ -109,7 +113,8 @@ impl Engine {
         let player_position = [
             self.player.camera.position.x - self.player.camera.rotation.y.cos() * 0.1
                 + self.player.camera_offset.position.x,
-            self.player.camera.position.y - self.player.height + self.player.camera_offset.position.y,
+            self.player.camera.position.y - self.player.height
+                + self.player.camera_offset.position.y,
             self.player.camera.position.z - self.player.camera.rotation.y.sin() * 0.1
                 + self.player.camera_offset.position.z,
         ];
@@ -122,7 +127,9 @@ impl Engine {
                 position: player_position.into(),
                 rotation: Vector3::new(
                     -self.player.camera.rotation.x + self.player.camera_offset.rotation.x,
-                    -self.player.camera.rotation.y + 1.57079633 + self.player.camera_offset.rotation.y,
+                    -self.player.camera.rotation.y
+                        + 1.57079633
+                        + self.player.camera_offset.rotation.y,
                     -self.player.camera.rotation.z + self.player.camera_offset.rotation.z,
                 ),
                 scale: Vector3::new(1.0, 1.0, 1.0),
@@ -132,7 +139,10 @@ impl Engine {
     }
 
     pub fn load_modules(&mut self) {
-        let _ = load_module("assets/modules/caevern_polydural.wasm", self.world_rc.clone());
+        let _ = load_module(
+            "assets/modules/caevern_polydural.wasm",
+            self.world_rc.clone(),
+        );
     }
 
     pub fn set_world(

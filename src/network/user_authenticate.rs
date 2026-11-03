@@ -1,5 +1,5 @@
+use futures_util::{SinkExt, StreamExt};
 use std::println;
-use futures_util::{StreamExt, SinkExt};
 use tokio::net::TcpStream;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use tungstenite::Message;

@@ -14,16 +14,19 @@ impl XrInput {
     pub fn new(instance: &Instance) -> openxr::Result<Self> {
         let action_set = instance.create_action_set("gameplay", "Gameplay Inputs", 0)?;
         let move_action = action_set.create_action::<Vector2f>("move", "Player Movement", &[])?;
-        let rotate_action = action_set.create_action::<Vector2f>("rotate", "Player Rotation", &[])?;
+        let rotate_action =
+            action_set.create_action::<Vector2f>("rotate", "Player Rotation", &[])?;
 
         let menu_action_left = action_set.create_action::<bool>("menu-left", "Menu Left", &[])?;
-        let menu_action_right = action_set.create_action::<bool>("menu-right", "Menu Right", &[])?;
+        let menu_action_right =
+            action_set.create_action::<bool>("menu-right", "Menu Right", &[])?;
 
         let oculus_profile =
             instance.string_to_path("/interaction_profiles/oculus/touch_controller")?;
         let oculus_left_stick = instance.string_to_path("/user/hand/left/input/thumbstick")?;
         let oculus_right_stick = instance.string_to_path("/user/hand/right/input/thumbstick")?;
-        let oculus_left_menu_button = instance.string_to_path("/user/hand/left/input/menu/click")?;
+        let oculus_left_menu_button =
+            instance.string_to_path("/user/hand/left/input/menu/click")?;
 
         instance.suggest_interaction_profile_bindings(
             oculus_profile,
@@ -38,8 +41,10 @@ impl XrInput {
             instance.string_to_path("/interaction_profiles/valve/index_controller")?;
         let index_left_stick = instance.string_to_path("/user/hand/left/input/thumbstick")?;
         let index_right_stick = instance.string_to_path("/user/hand/right/input/thumbstick")?;
-        let index_left_system_button = instance.string_to_path("/user/hand/left/input/system/click")?;
-        let index_right_system_button = instance.string_to_path("/user/hand/right/input/system/click")?;
+        let index_left_system_button =
+            instance.string_to_path("/user/hand/left/input/system/click")?;
+        let index_right_system_button =
+            instance.string_to_path("/user/hand/right/input/system/click")?;
 
         instance.suggest_interaction_profile_bindings(
             index_profile,
@@ -54,8 +59,10 @@ impl XrInput {
         let vive_profile = instance.string_to_path("/interaction_profiles/htc/vive_controller")?;
         let vive_left_trackpad = instance.string_to_path("/user/hand/left/input/trackpad")?;
         let vive_right_trackpad = instance.string_to_path("/user/hand/right/input/trackpad")?;
-        let vive_left_menu_button = instance.string_to_path("/user/hand/left/input/system/click")?;
-        let vive_right_menu_button = instance.string_to_path("/user/hand/right/input/system/click")?;
+        let vive_left_menu_button =
+            instance.string_to_path("/user/hand/left/input/system/click")?;
+        let vive_right_menu_button =
+            instance.string_to_path("/user/hand/right/input/system/click")?;
 
         instance.suggest_interaction_profile_bindings(
             vive_profile,
@@ -73,9 +80,7 @@ impl XrInput {
 
         instance.suggest_interaction_profile_bindings(
             simple_profile,
-            &[
-                Binding::new(&menu_action_left, simple_menu_left),
-            ],
+            &[Binding::new(&menu_action_left, simple_menu_left)],
         )?;
 
         Ok(Self {
@@ -83,7 +88,7 @@ impl XrInput {
             move_action,
             rotate_action,
             menu_action_left,
-            menu_action_right
+            menu_action_right,
         })
     }
 
