@@ -35,6 +35,7 @@ jobs:
             libxinerama-dev \
             libgl1-mesa-dev \
             libpipewire-0.3-dev \
+            libasound2-dev \
             pkg-config
 
       - name: Install Rust
