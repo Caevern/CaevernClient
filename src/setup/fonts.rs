@@ -13,7 +13,10 @@ pub fn load_font_atlas(path: &str) -> DynamicImage {
     let font = Font::from_bytes(font_data.data.as_ref(), fontdue::FontSettings::default()).unwrap();
 
     let size = 48.0;
-    let chars: Vec<char> = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-+_:;.!?[]".chars().collect();
+    let chars: Vec<char> =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-+_:;.!?[]"
+            .chars()
+            .collect();
 
     let mut glyphs = Vec::new();
     let mut atlas_width = 0;
@@ -39,11 +42,7 @@ pub fn load_font_atlas(path: &str) -> DynamicImage {
         for y in 0..glyph_height {
             for x in 0..glyph_width {
                 let alpha = bitmap[(y * glyph_width + x) as usize];
-                atlas.put_pixel(
-                    x_offset + x,
-                    y_offset + y,
-                    Rgba([255, 255, 255, alpha]),
-                );
+                atlas.put_pixel(x_offset + x, y_offset + y, Rgba([255, 255, 255, alpha]));
             }
         }
 
@@ -59,7 +58,10 @@ pub fn load_font_uvs(path: &str) -> HashMap<String, (f32, f32, f32, f32, f32)> {
     let font = Font::from_bytes(font_data.data.as_ref(), fontdue::FontSettings::default()).unwrap();
 
     let size = 48.0;
-    let chars: Vec<char> = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-+_:;.!?[]".chars().collect();
+    let chars: Vec<char> =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-+_:;.!?[]"
+            .chars()
+            .collect();
 
     let mut glyphs = Vec::new();
     let mut atlas_width = 0;
@@ -79,12 +81,15 @@ pub fn load_font_uvs(path: &str) -> HashMap<String, (f32, f32, f32, f32, f32)> {
     for (c, metrics) in glyphs {
         let glyph_width = metrics.width as u32;
 
-        mapped_characters.insert(c.to_string(), (
-            x_offset as f32 / atlas_width as f32,
-            0.0,
-            (x_offset + glyph_width) as f32 / atlas_width as f32,
-            1.0,
-            (metrics.ymin as f32 / atlas_height as f32) * 2.0)
+        mapped_characters.insert(
+            c.to_string(),
+            (
+                x_offset as f32 / atlas_width as f32,
+                0.0,
+                (x_offset + glyph_width) as f32 / atlas_width as f32,
+                1.0,
+                (metrics.ymin as f32 / atlas_height as f32) * 2.0,
+            ),
         );
 
         x_offset += glyph_width;

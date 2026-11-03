@@ -84,8 +84,12 @@ fn read_mesh<R: Read>(
     let uv_count = read_u32(&mut reader).expect("Failed to read uv count") as usize;
     let mut uvs = vec![(0f32, 0f32); uv_count as usize];
     for i in 0..uv_count {
-        let x = read_f32(&mut reader).expect("Failed to read uv x").rem_euclid(1.0);
-        let y = read_f32(&mut reader).expect("Failed to read uv y").rem_euclid(1.0);
+        let x = read_f32(&mut reader)
+            .expect("Failed to read uv x")
+            .rem_euclid(1.0);
+        let y = read_f32(&mut reader)
+            .expect("Failed to read uv y")
+            .rem_euclid(1.0);
         uvs[i] = (x, y);
     }
     println!("uv_count: {uv_count}");
@@ -172,7 +176,9 @@ fn read_object<R: Read>(
         }
 
         let material_name = read_string(&mut reader);
-        let material = materials.get(&material_name).expect("Material doesn't exist");
+        let material = materials
+            .get(&material_name)
+            .expect("Material doesn't exist");
         mesh.4 = material_name;
 
         for color_vert in &mut mesh.2 {
@@ -332,8 +338,7 @@ pub fn parse_cae(path: &str) -> (Vec<Object>, HashMap<String, Material>) {
                 .read_exact(&mut texture_data)
                 .expect("Failed to read texture data");
 
-            let image = image::load_from_memory(&texture_data)
-                .expect("Failed to decode texture");
+            let image = image::load_from_memory(&texture_data).expect("Failed to decode texture");
 
             material_object.set_image(Some(image));
         }

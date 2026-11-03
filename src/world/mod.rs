@@ -1,6 +1,6 @@
-pub mod world;
+pub mod material;
 pub mod object;
 pub mod objects;
-pub mod material;
-pub mod scene;
 pub mod parsers;
+pub mod scene;
+pub mod world;

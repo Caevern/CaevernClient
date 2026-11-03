@@ -57,7 +57,15 @@ impl Widget for Button {
         self.object_id
     }
 
-    fn get_meshes(&self) -> Vec<(Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, String)> {
+    fn get_meshes(
+        &self,
+    ) -> Vec<(
+        Vec<[f32; 3]>,
+        Vec<[f32; 3]>,
+        Vec<[f32; 3]>,
+        Vec<[f32; 2]>,
+        String,
+    )> {
         create_plane_with_text(
             self.position,
             (0.02, 0.02, 1.0),
@@ -66,7 +74,16 @@ impl Widget for Button {
             &self.text,
         )
     }
-    fn get_meshes_from_text(&self, text: &str) -> Vec<(Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, String)> {
+    fn get_meshes_from_text(
+        &self,
+        text: &str,
+    ) -> Vec<(
+        Vec<[f32; 3]>,
+        Vec<[f32; 3]>,
+        Vec<[f32; 3]>,
+        Vec<[f32; 2]>,
+        String,
+    )> {
         create_plane_with_text(
             self.position,
             (0.02, 0.02, 1.0),

@@ -147,13 +147,11 @@ impl RendererOpenXR {
 
         let player = &engine.player;
         let forward = Vector3::new(
-            (player.camera.rotation.y + player.camera_offset.rotation.y).cos() *
-            (player.camera.rotation.x + player.camera_offset.rotation.x).cos(),
-
+            (player.camera.rotation.y + player.camera_offset.rotation.y).cos()
+                * (player.camera.rotation.x + player.camera_offset.rotation.x).cos(),
             (player.camera.rotation.x + player.camera_offset.rotation.x).sin(),
-
-            (player.camera.rotation.y + player.camera_offset.rotation.y).sin() *
-            (player.camera.rotation.x + player.camera_offset.rotation.x).cos(),
+            (player.camera.rotation.y + player.camera_offset.rotation.y).sin()
+                * (player.camera.rotation.x + player.camera_offset.rotation.x).cos(),
         )
         .normalize();
 
@@ -172,7 +170,8 @@ impl RendererOpenXR {
                         ],
                         [
                             -(player.camera.rotation.x + player.camera_offset.rotation.x),
-                            -(player.camera.rotation.y + player.camera_offset.rotation.y) + std::f32::consts::FRAC_PI_2,
+                            -(player.camera.rotation.y + player.camera_offset.rotation.y)
+                                + std::f32::consts::FRAC_PI_2,
                             -(player.camera.rotation.z + player.camera_offset.rotation.z),
                         ],
                         [1.0, 1.0, 1.0],
@@ -227,7 +226,8 @@ impl RendererOpenXR {
                         [0.0, -10.0, 0.0],
                         [
                             -(player.camera.rotation.x + player.camera_offset.rotation.x),
-                            -(player.camera.rotation.y + player.camera_offset.rotation.y) + std::f32::consts::FRAC_PI_2,
+                            -(player.camera.rotation.y + player.camera_offset.rotation.y)
+                                + std::f32::consts::FRAC_PI_2,
                             -(player.camera.rotation.z + player.camera_offset.rotation.z),
                         ],
                         [1.0, 1.0, 1.0],
@@ -418,7 +418,9 @@ impl RendererOpenXR {
             for (_, object) in world.get_objects() {
                 if let Some(canvas) = &object.canvas {
                     for child in &canvas.children {
-                        if !child.needs_update() { continue; }
+                        if !child.needs_update() {
+                            continue;
+                        }
                         let child_id = child.get_id();
                         let child_object = world.get_object(child_id);
 
@@ -426,15 +428,13 @@ impl RendererOpenXR {
 
                         let text_formatted = &text_placeholder.replace(
                             "[RAM]",
-                            &format!("{:.2} MB", ALLOCATOR.allocated() as f32 / 1000000.0)
+                            &format!("{:.2} MB", ALLOCATOR.allocated() as f32 / 1000000.0),
                         );
-                        let text_formatted = &text_formatted.replace(
-                            "[FPS]",
-                            &format!("{}", (1.0 / frame_time).round())
-                        );
+                        let text_formatted = &text_formatted
+                            .replace("[FPS]", &format!("{}", (1.0 / frame_time).round()));
                         let text_formatted = &text_formatted.replace(
                             "[CLOCK]",
-                            &chrono::Local::now().format("%H:%M:%S").to_string()
+                            &chrono::Local::now().format("%H:%M:%S").to_string(),
                         );
 
                         let meshes = child.get_meshes_from_text(text_formatted);
@@ -442,7 +442,8 @@ impl RendererOpenXR {
                         let meshes_created = vertex::create_vertices(&meshes);
                         for (vertices, _) in meshes_created {
                             self.buffer_collection.num_vertices
-                                [child_object.buffer_bindings.num_vertices] = vec![vertices.len() as u32];
+                                [child_object.buffer_bindings.num_vertices] =
+                                vec![vertices.len() as u32];
                             let vertex_buffer =
                                 self.init.device.create_buffer(&wgpu::BufferDescriptor {
                                     label: Some("Vertex Buffer"),

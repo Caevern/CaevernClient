@@ -28,7 +28,14 @@ impl Vertex {
 }
 
 // Convert vertices to set vertex size
-fn vertex(p: [f32; 3], n: [f32; 3], c: [f32; 3], u: [f32; 2], bi: [u32; 4], bw: [f32; 4]) -> Vertex {
+fn vertex(
+    p: [f32; 3],
+    n: [f32; 3],
+    c: [f32; 3],
+    u: [f32; 2],
+    bi: [u32; 4],
+    bw: [f32; 4],
+) -> Vertex {
     return Vertex {
         position: [p[0], p[1], p[2], 1.0],
         normal: [n[0], n[1], n[2], 1.0],

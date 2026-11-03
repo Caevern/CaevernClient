@@ -2,7 +2,16 @@ use std::{cell::RefCell, rc::Rc};
 
 use wasmtime::{Engine, Linker, Module, Store};
 
-use crate::{modules::{api::{game_create_mesh::game_create_mesh, game_create_mesh_indexed::game_create_mesh_indexed, game_get_time::game_get_time, game_log::game_log}, module}, world::world::World};
+use crate::{
+    modules::{
+        api::{
+            game_create_mesh::game_create_mesh, game_create_mesh_indexed::game_create_mesh_indexed,
+            game_get_time::game_get_time, game_log::game_log,
+        },
+        module,
+    },
+    world::world::World,
+};
 
 pub fn load_module(path: &str, world_rc: Rc<RefCell<World>>) -> module::Module {
     let engine = Engine::default();

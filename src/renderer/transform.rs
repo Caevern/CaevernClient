@@ -11,7 +11,7 @@ impl Transform {
         Self {
             position: Vector3::new(0.0, 0.0, 0.0),
             rotation: Vector3::new(0.0, 0.0, 0.0),
-            scale: Vector3::new(1.0, 1.0, 1.0)
+            scale: Vector3::new(1.0, 1.0, 1.0),
         }
     }
 
@@ -19,7 +19,7 @@ impl Transform {
         Self {
             position,
             rotation,
-            scale
+            scale,
         }
     }
 }

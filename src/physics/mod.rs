@@ -1,2 +1,2 @@
-pub mod movement;
 pub mod gravity;
+pub mod movement;

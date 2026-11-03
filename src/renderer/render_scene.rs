@@ -58,14 +58,9 @@ pub fn render_scene(
         }
 
         for i in 0..buffer_collection.vertex_buffers[mesh].len() {
-            render_pass
-                .set_vertex_buffer(0, buffer_collection.vertex_buffers[mesh][i].slice(..));
+            render_pass.set_vertex_buffer(0, buffer_collection.vertex_buffers[mesh][i].slice(..));
 
-            render_pass.set_bind_group(
-                0,
-                &buffer_collection.uniform_bind_groups[mesh][i],
-                &[],
-            );
+            render_pass.set_bind_group(0, &buffer_collection.uniform_bind_groups[mesh][i], &[]);
 
             render_pass.draw(0..buffer_collection.num_vertices[mesh][i], 0..1);
         }

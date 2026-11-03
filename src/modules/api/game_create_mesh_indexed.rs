@@ -2,7 +2,13 @@ use std::{cell::RefCell, rc::Rc};
 
 use wasmtime::Caller;
 
-use crate::{renderer::vertex::Vertex, world::{object::{Object, ObjectType}, world::World}};
+use crate::{
+    renderer::vertex::Vertex,
+    world::{
+        object::{Object, ObjectType},
+        world::World,
+    },
+};
 
 pub fn game_create_mesh_indexed(
     mut caller: Caller<'_, Rc<RefCell<World>>>,
@@ -61,10 +67,20 @@ pub fn game_create_mesh_indexed(
 
     for index in &indices {
         skinned_vertices.push(Vertex {
-            position: [vertices[(*index as usize) * 3], vertices[(*index as usize) * 3 + 1], vertices[(*index as usize) * 3 + 2], 1.0],
+            position: [
+                vertices[(*index as usize) * 3],
+                vertices[(*index as usize) * 3 + 1],
+                vertices[(*index as usize) * 3 + 2],
+                1.0,
+            ],
             normal: [0.0, 1.0, 0.0, 1.0],
             color: [1.0, 1.0, 1.0, 1.0],
-            uv: [uvs[(*index as usize) * 2], uvs[(*index as usize) * 2 + 1], 0.0, 0.0],
+            uv: [
+                uvs[(*index as usize) * 2],
+                uvs[(*index as usize) * 2 + 1],
+                0.0,
+                0.0,
+            ],
             bone_ids: [0.0, 0.0, 0.0, 0.0],
             bone_weights: [0.0, 0.0, 0.0, 0.0],
         });

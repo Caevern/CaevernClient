@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use crate::renderer::{shader_type::ShaderType, texture_object::TextureObject, transform::Transform};
+use crate::renderer::{
+    shader_type::ShaderType, texture_object::TextureObject, transform::Transform,
+};
 
 pub struct BufferCollection {
     pub textures: HashMap<String, TextureObject>,

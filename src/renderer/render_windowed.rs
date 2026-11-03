@@ -443,7 +443,9 @@ impl<'window> RendererWindowed<'window> {
             for (_, object) in world.get_objects() {
                 if let Some(canvas) = &object.canvas {
                     for child in &canvas.children {
-                        if !child.needs_update() { continue; }
+                        if !child.needs_update() {
+                            continue;
+                        }
                         let child_id = child.get_id();
                         let child_object = world.get_object(child_id);
 
@@ -451,15 +453,13 @@ impl<'window> RendererWindowed<'window> {
 
                         let text_formatted = &text_placeholder.replace(
                             "[RAM]",
-                            &format!("{:.2} MB", ALLOCATOR.allocated() as f32 / 1000000.0)
+                            &format!("{:.2} MB", ALLOCATOR.allocated() as f32 / 1000000.0),
                         );
-                        let text_formatted = &text_formatted.replace(
-                            "[FPS]",
-                            &format!("{}", (1.0 / frame_time).round())
-                        );
+                        let text_formatted = &text_formatted
+                            .replace("[FPS]", &format!("{}", (1.0 / frame_time).round()));
                         let text_formatted = &text_formatted.replace(
                             "[CLOCK]",
-                            &chrono::Local::now().format("%H:%M:%S").to_string()
+                            &chrono::Local::now().format("%H:%M:%S").to_string(),
                         );
 
                         let meshes = child.get_meshes_from_text(text_formatted);
@@ -467,7 +467,8 @@ impl<'window> RendererWindowed<'window> {
                         let meshes_created = vertex::create_vertices(&meshes);
                         for (vertices, _) in meshes_created {
                             self.buffer_collection.num_vertices
-                                [child_object.buffer_bindings.num_vertices] = vec![vertices.len() as u32];
+                                [child_object.buffer_bindings.num_vertices] =
+                                vec![vertices.len() as u32];
                             let vertex_buffer =
                                 self.init.device.create_buffer(&wgpu::BufferDescriptor {
                                     label: Some("Vertex Buffer"),

@@ -7,7 +7,24 @@ pub trait Widget {
     fn update(&mut self);
     fn needs_update(&self) -> bool;
     fn get_id(&self) -> usize;
-    fn get_meshes(&self) -> Vec<(Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, String)>;
-    fn get_meshes_from_text(&self, text: &str) -> Vec<(Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<[f32; 3]>, Vec<[f32; 2]>, String)>;
+    fn get_meshes(
+        &self,
+    ) -> Vec<(
+        Vec<[f32; 3]>,
+        Vec<[f32; 3]>,
+        Vec<[f32; 3]>,
+        Vec<[f32; 2]>,
+        String,
+    )>;
+    fn get_meshes_from_text(
+        &self,
+        text: &str,
+    ) -> Vec<(
+        Vec<[f32; 3]>,
+        Vec<[f32; 3]>,
+        Vec<[f32; 3]>,
+        Vec<[f32; 2]>,
+        String,
+    )>;
     fn build(&mut self, id: usize) -> Object;
 }
