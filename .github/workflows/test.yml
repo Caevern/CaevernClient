@@ -2,6 +2,8 @@
 name: Test
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
 
@@ -19,6 +21,21 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev \
+            libxi-dev \
+            libxkbcommon-dev \
+            libwayland-dev \
+            libxrandr-dev \
+            libxcursor-dev \
+            libxinerama-dev \
+            libgl1-mesa-dev \
+            libpipewire-0.3-dev \
+            pkg-config
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
