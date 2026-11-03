@@ -36,8 +36,6 @@ pub fn start_engine(world: World, no_vr: bool) {
         icon: load_icon(),
 
         render_start_time: std::time::Instant::now(),
-        keys: [false; 6],
-        mouse_movement: [0.0; 2],
         input: InputState::default(),
 
         muted: Arc::new(AtomicBool::new(true)),

@@ -654,8 +654,6 @@ impl RendererOpenXR {
             }
 
             engine.update(
-                [0.0; 2],
-                [false; 6],
                 &input,
                 frame_time,
                 &mut self.buffer_collection,

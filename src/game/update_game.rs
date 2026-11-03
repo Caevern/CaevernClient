@@ -79,21 +79,19 @@ impl Engine {
 
     pub fn update(
         &mut self,
-        mouse: [f32; 2],
-        keys: [bool; 6],
         input: &InputState,
         frame_time: f32,
         buffer_collection: &mut BufferCollection,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) {
-        let updated_camera_rotation = get_camera_rotation(&self.player, mouse, frame_time);
+        let updated_camera_rotation = get_camera_rotation(&self.player, &input.mouse, frame_time);
         self.player.camera.rotation.x = updated_camera_rotation.0;
         self.player.camera.rotation.y = updated_camera_rotation.1;
 
-        if input.left {
+        if input.turn_left {
             self.player.camera.rotation.y += 0.5 * frame_time;
-        } else if input.right {
+        } else if input.turn_right {
             self.player.camera.rotation.y -= 0.5 * frame_time;
         }
 
@@ -107,7 +105,7 @@ impl Engine {
         .normalize();
 
         let updated_camera_position =
-            get_camera_movement(&mut self.player, keys, input, forward, frame_time);
+            get_camera_movement(&mut self.player, input, forward, frame_time);
         self.player.camera.position += updated_camera_position;
 
         let player_position = [

@@ -29,7 +29,7 @@ impl Label {
             text_color: [1.0, 1.0, 1.0],
             needs_update: false,
             object_id: 0,
-            font_uvs: font_uvs,
+            font_uvs,
         }
     }
 }

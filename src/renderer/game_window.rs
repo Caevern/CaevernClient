@@ -48,8 +48,6 @@ pub struct GameWindow<'window> {
     pub title: String,
     pub icon: Option<Icon>,
 
-    pub keys: [bool; 6],
-    pub mouse_movement: [f32; 2],
     pub input: InputState,
 
     pub muted: Arc<AtomicBool>,
@@ -248,22 +246,22 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
             } => match event.state {
                 ElementState::Pressed => match event.physical_key {
                     PhysicalKey::Code(KeyCode::KeyW) => {
-                        self.keys[0] = true;
+                        self.input.forewards = true;
                     }
                     PhysicalKey::Code(KeyCode::KeyA) => {
-                        self.keys[1] = true;
+                        self.input.left = true;
                     }
                     PhysicalKey::Code(KeyCode::KeyS) => {
-                        self.keys[2] = true;
+                        self.input.backwards = true;
                     }
                     PhysicalKey::Code(KeyCode::KeyD) => {
-                        self.keys[3] = true;
+                        self.input.right = true;
                     }
                     PhysicalKey::Code(KeyCode::KeyV) => {
                         self.muted.store(false, Ordering::Relaxed);
                     }
                     PhysicalKey::Code(KeyCode::Space) => {
-                        self.keys[4] = true;
+                        self.input.jump = true;
                     }
                     PhysicalKey::Code(KeyCode::SuperLeft)
                     | PhysicalKey::Code(KeyCode::SuperRight) => {
@@ -351,22 +349,22 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 },
                 ElementState::Released => match event.physical_key {
                     PhysicalKey::Code(KeyCode::KeyW) => {
-                        self.keys[0] = false;
+                        self.input.forewards = false;
                     }
                     PhysicalKey::Code(KeyCode::KeyA) => {
-                        self.keys[1] = false;
+                        self.input.left = false;
                     }
                     PhysicalKey::Code(KeyCode::KeyS) => {
-                        self.keys[2] = false;
+                        self.input.backwards = false;
                     }
                     PhysicalKey::Code(KeyCode::KeyD) => {
-                        self.keys[3] = false;
+                        self.input.right = false;
                     }
                     PhysicalKey::Code(KeyCode::KeyV) => {
                         self.muted.store(true, Ordering::Relaxed);
                     }
                     PhysicalKey::Code(KeyCode::Space) => {
-                        self.keys[4] = false;
+                        self.input.jump = false;
                     }
                     _ => {}
                 },
@@ -383,8 +381,6 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 let renderer = self.windowed_renderer.as_mut().unwrap();
 
                 engine.update(
-                    self.mouse_movement,
-                    self.keys,
                     &self.input,
                     frame_time,
                     &mut renderer.buffer_collection,
@@ -399,7 +395,8 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     self.menu_tablet_state = 0;
                 }
 
-                self.mouse_movement = [0.0, 0.0];
+                self.input.mouse.x = 0.0;
+                self.input.mouse.y = 0.0;
 
                 match renderer.render(&self.depth_texture.as_mut().unwrap()) {
                     Ok(_) => {
@@ -421,8 +418,8 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
     ) {
         if let DeviceEvent::MouseMotion { delta } = event {
             if self.mouse_locked {
-                self.mouse_movement[0] -= delta.0 as f32 * 0.3;
-                self.mouse_movement[1] -= delta.1 as f32 * 0.3;
+                self.input.mouse.x -= delta.0 as f32 * 0.3;
+                self.input.mouse.y -= delta.1 as f32 * 0.3;
                 if !self.use_confined {
                     if let Err(err) =
                         self.window
