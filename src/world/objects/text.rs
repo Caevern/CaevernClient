@@ -20,7 +20,7 @@ pub fn create_plane_with_text(
 
             vertices.push(SimpleVertex {
                 position: [
-                    (1.0 * width - i as f32 * 1.25) * scale.0 - position.0,
+                    (width - i as f32 * 1.25) * scale.0 - position.0,
                     (-1.0 + character_bounds.offset) * scale.1 + position.1,
                     position.2,
                 ],
@@ -30,7 +30,7 @@ pub fn create_plane_with_text(
             });
             vertices.push(SimpleVertex {
                 position: [
-                    (-1.0 * width - i as f32 * 1.25) * scale.0 - position.0,
+                    (-width - i as f32 * 1.25) * scale.0 - position.0,
                     (-1.0 + character_bounds.offset) * scale.1 + position.1,
                     position.2,
                 ],
@@ -40,7 +40,7 @@ pub fn create_plane_with_text(
             });
             vertices.push(SimpleVertex {
                 position: [
-                    (1.0 * width - i as f32 * 1.25) * scale.0 - position.0,
+                    (width - i as f32 * 1.25) * scale.0 - position.0,
                     (1.0 + character_bounds.offset) * scale.1 + position.1,
                     position.2,
                 ],
@@ -50,7 +50,7 @@ pub fn create_plane_with_text(
             });
             vertices.push(SimpleVertex {
                 position: [
-                    (1.0 * width - i as f32 * 1.25) * scale.0 - position.0,
+                    (width - i as f32 * 1.25) * scale.0 - position.0,
                     (1.0 + character_bounds.offset) * scale.1 + position.1,
                     position.2,
                 ],
@@ -60,7 +60,7 @@ pub fn create_plane_with_text(
             });
             vertices.push(SimpleVertex {
                 position: [
-                    (-1.0 * width - i as f32 * 1.25) * scale.0 - position.0,
+                    (-width - i as f32 * 1.25) * scale.0 - position.0,
                     (-1.0 + character_bounds.offset) * scale.1 + position.1,
                     position.2,
                 ],
@@ -70,7 +70,7 @@ pub fn create_plane_with_text(
             });
             vertices.push(SimpleVertex {
                 position: [
-                    (-1.0 * width - i as f32 * 1.25) * scale.0 - position.0,
+                    (-width - i as f32 * 1.25) * scale.0 - position.0,
                     (1.0 + character_bounds.offset) * scale.1 + position.1,
                     position.2,
                 ],

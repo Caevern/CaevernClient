@@ -63,7 +63,8 @@ fn main() {
     world.add_object(camera);
 
     //world.load_world("worlds/scene3.cae");
-    world.load_world("worlds/test.json");
+    world.load_world("worlds/home.json");
+    //world.load_world("worlds/test.json");
 
     let mut tablet_canvas = Canvas::new();
 
@@ -103,7 +104,7 @@ fn main() {
     tablet_object.set_position(0.0, -10.0, 0.0);
     tablet_object.set_default_texture("textures/tablet.png");
     tablet_object.set_canvas(tablet_canvas);
-    let last_object = world.get_objects().len() - 1;
+    let last_object = world.get_objects().len();
     tablet_object.build_canvas(&mut world);
     world.add_object_at_index(tablet_object, last_object);
 

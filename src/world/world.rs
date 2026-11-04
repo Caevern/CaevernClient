@@ -40,7 +40,8 @@ impl World {
         if object.get_object_type() == ObjectType::Camera {
             self.cameras.push(object);
         } else {
-            self.objects.insert(self.get_free_object_id(), object);
+            let free_id = self.get_free_object_id();
+            self.objects.insert(free_id, object);
         }
     }
     pub fn add_object_at_index(&mut self, object: Object, index: usize) {
@@ -106,7 +107,7 @@ impl World {
     fn load_from_json(&mut self, path: &str) {
         let scene = load_scene(path);
         if let Ok(scene) = scene {
-            let mut static_world_object = Object::create(ObjectType::StaticMesh, Vec::new());
+            let mut static_world_object = Object::create(ObjectType::Mesh, Vec::new());
 
             for scene_object in scene.objects {
                 if scene_object.is_static {
@@ -239,6 +240,10 @@ impl World {
                             .add_material(Material::from_texture(&material.texture), material.name);
                         self.textures.insert(material.texture);
                     }
+
+                    object.set_default_texture(&scene_object.texture);
+                    self.textures.insert(scene_object.texture);
+
                     self.add_object(object);
                 }
             }

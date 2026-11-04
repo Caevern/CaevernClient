@@ -311,7 +311,7 @@ impl<'window> RendererWindowed<'window> {
                     bytemuck::cast_slice(normal_ref),
                 );
             } else if object_type == ObjectType::SkinnedMesh {
-                if self.frame < 60 {
+                /*if self.frame < 60 {
                     let skeleton = object.get_skeleton();
                     self.buffer_collection.bones[object.buffer_bindings.bones][skeleton["neck"]]
                         .0
@@ -324,7 +324,7 @@ impl<'window> RendererWindowed<'window> {
                         &mut self.buffer_collection,
                         &self.init.queue,
                     );
-                }
+                }*/
 
                 let position = [
                     object.get_position().x + player.camera.position.x

@@ -21,6 +21,8 @@ pub fn start_engine(world: World, no_vr: bool) {
     env_logger::init();
     let event_loop = EventLoop::new().unwrap();
 
+    println!("AMOUNT OF OBJECTS: {}", world.objects.len());
+
     let mut game_window = GameWindow {
         window: None,
 

@@ -55,51 +55,51 @@ fn read_string<R: Read>(reader: &mut R) -> String {
 fn read_mesh<R: Read>(mut reader: &mut R) -> (Vec<SkinnedVertex>, String) {
     let vertex_count = read_u32(&mut reader).expect("Failed to read vertex count") as usize;
     let mut vertices = vec![(0f32, 0f32, 0f32); vertex_count as usize];
-    for i in 0..vertex_count {
+    for vertex in vertices.iter_mut().take(vertex_count) {
         let x = read_f32(&mut reader).expect("Failed to read vertex x");
         let y = read_f32(&mut reader).expect("Failed to read vertex y");
         let z = read_f32(&mut reader).expect("Failed to read vertex z");
-        vertices[i] = (x, y, z);
+        *vertex = (x, y, z);
     }
     println!("vertex_count: {vertex_count}");
 
     let triangle_index_count =
         read_u32(&mut reader).expect("Failed to read triangle count") as usize;
     let mut indices = vec![0u32; triangle_index_count as usize];
-    for i in 0..triangle_index_count {
+    for triangle in indices.iter_mut().take(triangle_index_count) {
         let index = read_u32(&mut reader).expect("Failed to read triangle index");
-        indices[i] = index;
+        *triangle = index;
     }
     let triangle_count = triangle_index_count / 3;
     println!("triangle_count: {triangle_count}");
 
     let uv_count = read_u32(&mut reader).expect("Failed to read uv count") as usize;
     let mut uvs = vec![(0f32, 0f32); uv_count as usize];
-    for i in 0..uv_count {
+    for uv in uvs.iter_mut().take(uv_count) {
         let x = read_f32(&mut reader)
             .expect("Failed to read uv x")
             .rem_euclid(1.0);
         let y = read_f32(&mut reader)
             .expect("Failed to read uv y")
             .rem_euclid(1.0);
-        uvs[i] = (x, y);
+        *uv = (x, y);
     }
     println!("uv_count: {uv_count}");
 
     let normals_count = read_u32(&mut reader).expect("Failed to read normals count") as usize;
     let mut normals = vec![(0f32, 0f32, 0f32); normals_count as usize];
-    for i in 0..normals_count {
+    for normal in normals.iter_mut().take(normals_count) {
         let x = read_f32(&mut reader).expect("Failed to read normals x");
         let y = read_f32(&mut reader).expect("Failed to read normals y");
         let z = read_f32(&mut reader).expect("Failed to read normals z");
-        normals[i] = (x, y, z);
+        *normal = (x, y, z);
     }
     println!("normals_count: {normals_count}");
 
     let mut mesh_data = (Vec::new(), String::new());
 
-    for i in 0..triangle_index_count {
-        let vertex_index = indices[i];
+    for index in indices.iter().take(triangle_index_count) {
+        let vertex_index = *index;
         let vertex = vertices[vertex_index as usize];
         let uv = uvs[vertex_index as usize];
         let normal = normals[vertex_index as usize];
@@ -143,9 +143,9 @@ fn read_object<R: Read>(
         mesh.1 = material_name;
 
         for vertex in &mut mesh.0 {
-            vertex.position = rotate_x(vertex.position, mesh_rotation[0] * 0.0174532925);
-            vertex.position = rotate_y(vertex.position, mesh_rotation[1] * 0.0174532925);
-            vertex.position = rotate_z(vertex.position, mesh_rotation[2] * 0.0174532925);
+            vertex.position = rotate_x(vertex.position, mesh_rotation[0].to_radians());
+            vertex.position = rotate_y(vertex.position, mesh_rotation[1].to_radians());
+            vertex.position = rotate_z(vertex.position, mesh_rotation[2].to_radians());
 
             vertex.position[0] = vertex.position[0] * mesh_scale[0] + mesh_position[0];
             vertex.position[1] = vertex.position[1] * mesh_scale[1] + mesh_position[1];
@@ -212,9 +212,9 @@ fn create_object<R: Read>(
     let mut object = Object::create(ObjectType::Mesh, create_vertices_skinned(&mesh_data.0));
     object.set_position(object_position[0], object_position[1], object_position[2]);
     object.set_rotation(
-        object_rotation[0] * 0.0174532925,
-        object_rotation[1] * 0.0174532925,
-        object_rotation[2] * 0.0174532925,
+        object_rotation[0].to_radians(),
+        object_rotation[1].to_radians(),
+        object_rotation[2].to_radians(),
     );
     object.set_scale(object_scale[0], object_scale[1], object_scale[2]);
     object.set_default_texture("Image");
