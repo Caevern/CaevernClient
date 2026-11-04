@@ -107,19 +107,19 @@ pub fn poll_xr_inputs(
     let move_state = xr_input.move_action.state(session, Path::NULL)?;
     if move_state.is_active {
         let axis = move_state.current_state;
-        input.w = axis.y > 0.5;
-        input.s = axis.y < -0.5;
-        input.d = axis.x > 0.5;
-        input.a = axis.x < -0.5;
+        input.forewards = axis.y > 0.5;
+        input.backwards = axis.y < -0.5;
+        input.right = axis.x > 0.5;
+        input.left = axis.x < -0.5;
     }
 
     let rotate_state = xr_input.rotate_action.state(session, Path::NULL)?;
     if rotate_state.is_active {
         let axis = rotate_state.current_state;
-        input.w = axis.y > 0.5;
-        input.s = axis.y < -0.5;
-        input.right = axis.x > 0.5;
-        input.left = axis.x < -0.5;
+        input.forewards = axis.y > 0.5;
+        input.backwards = axis.y < -0.5;
+        input.turn_right = axis.x > 0.5;
+        input.turn_left = axis.x < -0.5;
     }
 
     let menu_state_left = xr_input.menu_action_left.state(session, Path::NULL)?;
@@ -127,15 +127,11 @@ pub fn poll_xr_inputs(
 
     input.menu = false;
 
-    if menu_state_left.is_active {
-        if menu_state_left.current_state {
-            input.menu = true;
-        }
+    if menu_state_left.is_active && menu_state_left.current_state {
+        input.menu = true;
     }
-    if menu_state_right.is_active {
-        if menu_state_right.current_state {
-            input.menu = true;
-        }
+    if menu_state_right.is_active && menu_state_right.current_state {
+        input.menu = true;
     }
 
     Ok(())

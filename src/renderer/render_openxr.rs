@@ -17,10 +17,11 @@ use crate::renderer::buffers::uniform_buffers::{
 use crate::renderer::default_elements::register_default_textures;
 use crate::renderer::pipelines::displacement_default::create_pipeline;
 use crate::renderer::render_scene::render_scene;
-use crate::renderer::texture_object::TextureObject;
+use crate::renderer::textures::texture_object::TextureObject;
 use crate::renderer::transforms::{fov_to_projection, get_eye_view_matrix, quaternion_to_euler};
 use crate::renderer::vertex::Vertex;
 use crate::renderer::{transforms, vertex};
+use crate::setup::font_character::FontCharacter;
 use crate::setup::fonts::load_font_uvs;
 use crate::world::object::ObjectType;
 use crate::world::objects::player::Player;
@@ -101,8 +102,7 @@ impl RendererOpenXR {
         let mut textures: HashMap<String, TextureObject> = HashMap::new();
         register_default_textures(&mut textures, &init.device);
 
-        let mut font_maps: HashMap<String, HashMap<String, (f32, f32, f32, f32, f32)>> =
-            HashMap::new();
+        let mut font_maps: HashMap<String, HashMap<String, FontCharacter>> = HashMap::new();
 
         font_maps.insert(
             "NotoSansJP".to_string(),
@@ -333,7 +333,7 @@ impl RendererOpenXR {
                 ];
                 let rotation = [
                     object.get_rotation().x,
-                    object.get_rotation().y - player.camera.rotation.y + 1.57079633,
+                    object.get_rotation().y - player.camera.rotation.y + f32::consts::FRAC_PI_2,
                     object.get_rotation().z,
                 ];
 
@@ -375,7 +375,7 @@ impl RendererOpenXR {
         }
 
         // update skybox positions
-        if self.frame % 10 == 0 {
+        if self.frame.is_multiple_of(10) {
             let grabbable_object_index =
                 raycast_grab(world.get_objects(), player.camera.position, forward, 5);
 
@@ -414,8 +414,8 @@ impl RendererOpenXR {
         }
 
         // update ingame fps label when menu tablet is enabled
-        if menu_tablet_state == 1 && self.frame % 60 == 0 {
-            for (_, object) in world.get_objects() {
+        if menu_tablet_state == 1 && self.frame.is_multiple_of(60) {
+            for object in world.get_objects().values() {
                 if let Some(canvas) = &object.canvas {
                     for child in &canvas.children {
                         if !child.needs_update() {
@@ -487,10 +487,10 @@ impl RendererOpenXR {
             let left_eye_orientation = views[0].pose.orientation;
 
             let left_eye_rotation = cgmath::Quaternion::new(
-                left_eye_orientation.w as f32,
-                left_eye_orientation.x as f32,
-                left_eye_orientation.y as f32,
-                left_eye_orientation.z as f32,
+                left_eye_orientation.w,
+                left_eye_orientation.x,
+                left_eye_orientation.y,
+                left_eye_orientation.z,
             );
 
             let left_eye_euler = quaternion_to_euler(left_eye_rotation);
@@ -636,7 +636,6 @@ impl RendererOpenXR {
 
     pub fn run_frame_loop(&mut self, engine: Engine, xr_input: XrInput) {
         let mut engine = engine;
-        let mut xr_input = xr_input;
         let mut last_frame_time = Instant::now();
         let mut input = InputState::default();
         let mut menu_state = 0;
@@ -646,7 +645,7 @@ impl RendererOpenXR {
             let frame_time = now.duration_since(last_frame_time).as_secs_f32();
             last_frame_time = now;
 
-            let _ = poll_xr_inputs(&self.init.session, &mut xr_input, &mut input);
+            let _ = poll_xr_inputs(&self.init.session, &xr_input, &mut input);
             self.init.poll_events().ok();
 
             if input.menu {
@@ -654,8 +653,6 @@ impl RendererOpenXR {
             }
 
             engine.update(
-                [0.0; 2],
-                [false; 6],
                 &input,
                 frame_time,
                 &mut self.buffer_collection,

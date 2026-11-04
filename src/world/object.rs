@@ -56,7 +56,7 @@ impl Object {
             },
         );
         Self {
-            object_type: object_type,
+            object_type,
             transform: Transform::zero(),
             vertices: meshes,
             materials,
@@ -139,9 +139,9 @@ impl Object {
             }
             bones_converted[bone.1.0] = (
                 Transform {
-                    position: position,
-                    rotation: rotation,
-                    scale: scale,
+                    position,
+                    rotation,
+                    scale,
                 },
                 Transform {
                     position: bone.1.1.position,

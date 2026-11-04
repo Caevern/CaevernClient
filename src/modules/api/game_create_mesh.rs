@@ -42,13 +42,17 @@ pub fn game_create_mesh(
     let uvs_bytes = &data[uvs_start..uvs_end];
 
     let vertices: Vec<f32> = vertices_bytes
-        .chunks_exact(4)
-        .map(|bytes| f32::from_le_bytes(bytes.try_into().unwrap()))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|bytes| f32::from_le_bytes(*bytes))
         .collect();
 
     let uvs: Vec<f32> = uvs_bytes
-        .chunks_exact(4)
-        .map(|bytes| f32::from_le_bytes(bytes.try_into().unwrap()))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|bytes| f32::from_le_bytes(*bytes))
         .collect();
 
     let mut skinned_vertices: Vec<Vertex> = Vec::new();
@@ -56,19 +60,14 @@ pub fn game_create_mesh(
     for index in 0..vertices.len() / 3 {
         skinned_vertices.push(Vertex {
             position: [
-                vertices[(index as usize) * 3],
-                vertices[(index as usize) * 3 + 1],
-                vertices[(index as usize) * 3 + 2],
+                vertices[index * 3],
+                vertices[index * 3 + 1],
+                vertices[index * 3 + 2],
                 1.0,
             ],
             normal: [0.0, 1.0, 0.0, 1.0],
             color: [1.0, 1.0, 1.0, 1.0],
-            uv: [
-                uvs[(index as usize) * 2],
-                uvs[(index as usize) * 2 + 1],
-                0.0,
-                0.0,
-            ],
+            uv: [uvs[index * 2], uvs[index * 2 + 1], 0.0, 0.0],
             bone_ids: [0.0, 0.0, 0.0, 0.0],
             bone_weights: [0.0, 0.0, 0.0, 0.0],
         });
@@ -83,5 +82,6 @@ pub fn game_create_mesh(
     caller.data().borrow_mut().add_object(object);
 
     let object_id = caller.data().borrow_mut().get_objects().len() - 1;
-    return object_id as u32;
+
+    object_id as u32
 }

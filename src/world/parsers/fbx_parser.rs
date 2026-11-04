@@ -556,13 +556,7 @@ pub fn parse(
     path: &str,
     global_transform: transform::Transform,
 ) -> (
-    Vec<(
-        Vec<SkinnedVertex>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 2]>,
-        String,
-    )>,
+    Vec<(Vec<SkinnedVertex>, String)>,
     HashMap<i64, (usize, transform::Transform, String, i64, usize)>,
 ) {
     let data = Assets::get(path).expect("Failed to get asset").data;
@@ -570,13 +564,7 @@ pub fn parse(
     let mut reader = BufReader::new(cursor);
     let file = File::read_from(&mut reader).expect("Failed to parse FBX file");
 
-    let mut mesh_data: Vec<(
-        Vec<SkinnedVertex>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 2]>,
-        String,
-    )> = Vec::new();
+    let mut mesh_data: Vec<(Vec<SkinnedVertex>, String)> = Vec::new();
 
     let mut transforms = HashMap::new();
     let mut materials = HashMap::new();
@@ -772,13 +760,7 @@ pub fn parse(
             let mut current_polygon = vec![];
             let mut current_uvs = vec![];
 
-            mesh_data.push((
-                Vec::new(),
-                Vec::new(),
-                Vec::new(),
-                Vec::new(),
-                selected_material.to_string(),
-            ));
+            mesh_data.push((Vec::new(), selected_material.to_string()));
             let mesh_data_index = mesh_data.len() - 1;
 
             for (index_uv, i) in mesh.indices.iter().enumerate() {
@@ -822,15 +804,15 @@ pub fn parse(
 
                 v = rotate_x(
                     v,
-                    (global_transform.rotation.x + transform.rotation.0) * 0.0174532925,
+                    (global_transform.rotation.x + transform.rotation.0).to_radians(),
                 );
                 v = rotate_y(
                     v,
-                    (global_transform.rotation.y + transform.rotation.1) * 0.0174532925,
+                    (global_transform.rotation.y + transform.rotation.1).to_radians(),
                 );
                 v = rotate_z(
                     v,
-                    (global_transform.rotation.z + transform.rotation.2) * 0.0174532925,
+                    (global_transform.rotation.z + transform.rotation.2).to_radians(),
                 );
 
                 // translate
@@ -844,13 +826,13 @@ pub fn parse(
                     position: v,
                     bone_ids,
                     weights,
+                    normal: [0.0, 1.0, 0.0],
+                    color: [1.0, 1.0, 1.0],
+                    uv: [
+                        mesh.uv[tri[3] * 2] as f32,
+                        1.0 - mesh.uv[tri[3] * 2 + 1] as f32,
+                    ],
                 });
-                mesh_data[mesh_data_index].3.push([
-                    mesh.uv[tri[3] * 2] as f32,
-                    1.0 - mesh.uv[tri[3] * 2 + 1] as f32,
-                ]);
-                mesh_data[mesh_data_index].1.push([0.0, 1.0, 0.0]);
-                mesh_data[mesh_data_index].2.push([1.0, 1.0, 1.0]);
 
                 let mut v = [
                     mesh.vertices[tri[1] * 3] as f32
@@ -866,15 +848,15 @@ pub fn parse(
 
                 v = rotate_x(
                     v,
-                    (global_transform.rotation.x + transform.rotation.0) * 0.0174532925,
+                    (global_transform.rotation.x + transform.rotation.0).to_radians(),
                 );
                 v = rotate_y(
                     v,
-                    (global_transform.rotation.y + transform.rotation.1) * 0.0174532925,
+                    (global_transform.rotation.y + transform.rotation.1).to_radians(),
                 );
                 v = rotate_z(
                     v,
-                    (global_transform.rotation.z + transform.rotation.2) * 0.0174532925,
+                    (global_transform.rotation.z + transform.rotation.2).to_radians(),
                 );
 
                 // translate
@@ -888,13 +870,13 @@ pub fn parse(
                     position: v,
                     bone_ids,
                     weights,
+                    normal: [0.0, 1.0, 0.0],
+                    color: [1.0, 1.0, 1.0],
+                    uv: [
+                        mesh.uv[tri[4] * 2] as f32,
+                        1.0 - mesh.uv[tri[4] * 2 + 1] as f32,
+                    ],
                 });
-                mesh_data[mesh_data_index].3.push([
-                    mesh.uv[tri[4] * 2] as f32,
-                    1.0 - mesh.uv[tri[4] * 2 + 1] as f32,
-                ]);
-                mesh_data[mesh_data_index].1.push([0.0, 1.0, 0.0]);
-                mesh_data[mesh_data_index].2.push([1.0, 1.0, 1.0]);
 
                 let mut v = [
                     mesh.vertices[tri[2] * 3] as f32
@@ -910,15 +892,15 @@ pub fn parse(
 
                 v = rotate_x(
                     v,
-                    (global_transform.rotation.x + transform.rotation.0) * 0.0174532925,
+                    (global_transform.rotation.x + transform.rotation.0).to_radians(),
                 );
                 v = rotate_y(
                     v,
-                    (global_transform.rotation.y + transform.rotation.1) * 0.0174532925,
+                    (global_transform.rotation.y + transform.rotation.1).to_radians(),
                 );
                 v = rotate_z(
                     v,
-                    (global_transform.rotation.z + transform.rotation.2) * 0.0174532925,
+                    (global_transform.rotation.z + transform.rotation.2).to_radians(),
                 );
 
                 // translate
@@ -932,13 +914,13 @@ pub fn parse(
                     position: v,
                     bone_ids,
                     weights,
+                    normal: [0.0, 1.0, 0.0],
+                    color: [1.0, 1.0, 1.0],
+                    uv: [
+                        mesh.uv[tri[5] * 2] as f32,
+                        1.0 - mesh.uv[tri[5] * 2 + 1] as f32,
+                    ],
                 });
-                mesh_data[mesh_data_index].3.push([
-                    mesh.uv[tri[5] * 2] as f32,
-                    1.0 - mesh.uv[tri[5] * 2 + 1] as f32,
-                ]);
-                mesh_data[mesh_data_index].1.push([0.0, 1.0, 0.0]);
-                mesh_data[mesh_data_index].2.push([1.0, 1.0, 1.0]);
             }
 
             if mesh_data[mesh_data_index].0.len() == 0 {

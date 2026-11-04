@@ -1,4 +1,4 @@
-use crate::renderer::vertex::Vertex;
+/*use crate::renderer::vertex::Vertex;
 
 pub fn create_cube(
     position: (f32, f32, f32),
@@ -350,5 +350,5 @@ pub fn create_cube(
     colors.push([1.0, 1.0, 1.0]);
     colors.push([1.0, 1.0, 1.0]);
 
-    return vec![(skinned_vertices, "default".to_string())];
-}
+    vec![(skinned_vertices, "default".to_string())]
+}*/

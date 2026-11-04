@@ -1,4 +1,4 @@
-use crate::world::object::Object;
+use crate::{renderer::simple_vertex::SimpleVertex, world::object::Object};
 
 pub trait Widget {
     fn set_position(&mut self, x: f32, y: f32, z: f32);
@@ -7,24 +7,7 @@ pub trait Widget {
     fn update(&mut self);
     fn needs_update(&self) -> bool;
     fn get_id(&self) -> usize;
-    fn get_meshes(
-        &self,
-    ) -> Vec<(
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 2]>,
-        String,
-    )>;
-    fn get_meshes_from_text(
-        &self,
-        text: &str,
-    ) -> Vec<(
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 2]>,
-        String,
-    )>;
+    fn get_meshes(&self) -> Vec<(Vec<SimpleVertex>, String)>;
+    fn get_meshes_from_text(&self, text: &str) -> Vec<(Vec<SimpleVertex>, String)>;
     fn build(&mut self, id: usize) -> Object;
 }

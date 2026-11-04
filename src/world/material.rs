@@ -36,7 +36,7 @@ impl Material {
         &self.texture
     }
     pub fn get_displacement(&self) -> Option<&str> {
-        if self.displacement != "".to_string() {
+        if !self.displacement.is_empty() {
             Some(&self.displacement)
         } else {
             None

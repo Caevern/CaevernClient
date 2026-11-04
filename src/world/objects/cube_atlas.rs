@@ -1,4 +1,4 @@
-pub fn create_cube(
+/*pub fn create_cube(
     position: (f64, f64, f64),
     scale: (f64, f64, f64),
 ) -> (Vec<[f64; 3]>, Vec<[f32; 2]>, Vec<[i8; 3]>, Vec<[f32; 3]>) {
@@ -451,5 +451,5 @@ pub fn create_cube(
     colors.push([1.0, 1.0, 1.0]);
     colors.push([1.0, 1.0, 1.0]);
 
-    return (vertices, uvs, normals, colors);
-}
+    (vertices, uvs, normals, colors)
+}*/

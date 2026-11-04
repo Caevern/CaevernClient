@@ -4,6 +4,11 @@ pub struct Canvas {
     pub children: Vec<Box<dyn Widget>>,
 }
 
+impl Default for Canvas {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl Canvas {
     pub fn new() -> Self {
         Self {
@@ -17,8 +22,8 @@ impl Canvas {
 
     pub fn build(&mut self, world: &mut World) {
         for child in self.children.iter_mut() {
-            let object = child.build(world.get_objects().len());
-            world.add_object_at_index(object, world.get_objects().len());
+            let object = child.build(world.get_objects().len() + 1);
+            world.add_object_at_index(object, world.get_objects().len() + 1);
         }
     }
 }

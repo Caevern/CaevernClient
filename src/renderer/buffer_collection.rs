@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 
-use crate::renderer::{
-    shader_type::ShaderType, texture_object::TextureObject, transform::Transform,
+use crate::{
+    renderer::{
+        shader_type::ShaderType, textures::texture_object::TextureObject, transform::Transform,
+    },
+    setup::font_character::FontCharacter,
 };
 
 pub struct BufferCollection {
     pub textures: HashMap<String, TextureObject>,
-    pub font_maps: HashMap<String, HashMap<String, (f32, f32, f32, f32, f32)>>,
+    pub font_maps: HashMap<String, HashMap<String, FontCharacter>>,
 
     pub final_matrices: Vec<Vec<[[f32; 4]; 4]>>,
 

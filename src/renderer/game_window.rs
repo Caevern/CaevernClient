@@ -48,8 +48,6 @@ pub struct GameWindow<'window> {
     pub title: String,
     pub icon: Option<Icon>,
 
-    pub keys: [bool; 6],
-    pub mouse_movement: [f32; 2],
     pub input: InputState,
 
     pub muted: Arc<AtomicBool>,
@@ -201,43 +199,37 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 state,
                 button,
             } => {
-                if state.is_pressed() {
-                    match button {
-                        MouseButton::Left => {
-                            if !self.mouse_locked {
-                                if let Err(err) = self
-                                    .window
-                                    .as_mut()
-                                    .unwrap()
-                                    .set_cursor_grab(winit::window::CursorGrabMode::Locked)
-                                {
-                                    eprintln!("Failed to lock the cursor: {:?}", err);
-                                    self.use_confined = true;
+                if state.is_pressed() && button == MouseButton::Left && !self.mouse_locked {
+                    if let Err(err) = self
+                        .window
+                        .as_mut()
+                        .unwrap()
+                        .set_cursor_grab(winit::window::CursorGrabMode::Locked)
+                    {
+                        eprintln!("Failed to lock the cursor: {:?}", err);
+                        self.use_confined = true;
 
-                                    if let Err(err) =
-                                        self.window.as_ref().unwrap().set_cursor_grab(
-                                            winit::window::CursorGrabMode::Confined,
-                                        )
-                                    {
-                                        eprintln!("Failed to confine the cursor: {:?}", err);
-                                    }
-                                    let window_size = self.window.as_ref().unwrap().inner_size();
-                                    let center_x = window_size.width as f64 / 2.0;
-                                    let center_y = window_size.height as f64 / 2.0;
-                                    self.window
-                                        .as_ref()
-                                        .unwrap()
-                                        .set_cursor_position(winit::dpi::PhysicalPosition::new(
-                                            center_x, center_y,
-                                        ))
-                                        .expect("Failed to set cursor position");
-                                }
-                                self.window.as_mut().unwrap().set_cursor_visible(false);
-                                self.mouse_locked = true;
-                            }
+                        if let Err(err) = self
+                            .window
+                            .as_ref()
+                            .unwrap()
+                            .set_cursor_grab(winit::window::CursorGrabMode::Confined)
+                        {
+                            eprintln!("Failed to confine the cursor: {:?}", err);
                         }
-                        _ => {}
+                        let window_size = self.window.as_ref().unwrap().inner_size();
+                        let center_x = window_size.width as f64 / 2.0;
+                        let center_y = window_size.height as f64 / 2.0;
+                        self.window
+                            .as_ref()
+                            .unwrap()
+                            .set_cursor_position(winit::dpi::PhysicalPosition::new(
+                                center_x, center_y,
+                            ))
+                            .expect("Failed to set cursor position");
                     }
+                    self.window.as_mut().unwrap().set_cursor_visible(false);
+                    self.mouse_locked = true;
                 }
             }
 
@@ -248,22 +240,22 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
             } => match event.state {
                 ElementState::Pressed => match event.physical_key {
                     PhysicalKey::Code(KeyCode::KeyW) => {
-                        self.keys[0] = true;
+                        self.input.forewards = true;
                     }
                     PhysicalKey::Code(KeyCode::KeyA) => {
-                        self.keys[1] = true;
+                        self.input.left = true;
                     }
                     PhysicalKey::Code(KeyCode::KeyS) => {
-                        self.keys[2] = true;
+                        self.input.backwards = true;
                     }
                     PhysicalKey::Code(KeyCode::KeyD) => {
-                        self.keys[3] = true;
+                        self.input.right = true;
                     }
                     PhysicalKey::Code(KeyCode::KeyV) => {
                         self.muted.store(false, Ordering::Relaxed);
                     }
                     PhysicalKey::Code(KeyCode::Space) => {
-                        self.keys[4] = true;
+                        self.input.jump = true;
                     }
                     PhysicalKey::Code(KeyCode::SuperLeft)
                     | PhysicalKey::Code(KeyCode::SuperRight) => {
@@ -351,22 +343,22 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 },
                 ElementState::Released => match event.physical_key {
                     PhysicalKey::Code(KeyCode::KeyW) => {
-                        self.keys[0] = false;
+                        self.input.forewards = false;
                     }
                     PhysicalKey::Code(KeyCode::KeyA) => {
-                        self.keys[1] = false;
+                        self.input.left = false;
                     }
                     PhysicalKey::Code(KeyCode::KeyS) => {
-                        self.keys[2] = false;
+                        self.input.backwards = false;
                     }
                     PhysicalKey::Code(KeyCode::KeyD) => {
-                        self.keys[3] = false;
+                        self.input.right = false;
                     }
                     PhysicalKey::Code(KeyCode::KeyV) => {
                         self.muted.store(true, Ordering::Relaxed);
                     }
                     PhysicalKey::Code(KeyCode::Space) => {
-                        self.keys[4] = false;
+                        self.input.jump = false;
                     }
                     _ => {}
                 },
@@ -383,8 +375,6 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 let renderer = self.windowed_renderer.as_mut().unwrap();
 
                 engine.update(
-                    self.mouse_movement,
-                    self.keys,
                     &self.input,
                     frame_time,
                     &mut renderer.buffer_collection,
@@ -399,9 +389,10 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     self.menu_tablet_state = 0;
                 }
 
-                self.mouse_movement = [0.0, 0.0];
+                self.input.mouse.x = 0.0;
+                self.input.mouse.y = 0.0;
 
-                match renderer.render(&self.depth_texture.as_mut().unwrap()) {
+                match renderer.render(self.depth_texture.as_mut().unwrap()) {
                     Ok(_) => {
                         self.window.as_ref().unwrap().request_redraw();
                     }
@@ -419,23 +410,22 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         _device_id: DeviceId,
         event: DeviceEvent,
     ) {
-        if let DeviceEvent::MouseMotion { delta } = event {
-            if self.mouse_locked {
-                self.mouse_movement[0] -= delta.0 as f32 * 0.3;
-                self.mouse_movement[1] -= delta.1 as f32 * 0.3;
-                if !self.use_confined {
-                    if let Err(err) =
-                        self.window
-                            .as_ref()
-                            .unwrap()
-                            .set_cursor_position(LogicalPosition {
-                                x: self.window_size.0 / 2,
-                                y: self.window_size.1 / 2,
-                            })
-                    {
-                        eprint!("Failed to move back cursor {:?}", err);
-                    }
-                }
+        if let DeviceEvent::MouseMotion { delta } = event
+            && self.mouse_locked
+        {
+            self.input.mouse.x -= delta.0 as f32 * 0.3;
+            self.input.mouse.y -= delta.1 as f32 * 0.3;
+            if !self.use_confined
+                && let Err(err) =
+                    self.window
+                        .as_ref()
+                        .unwrap()
+                        .set_cursor_position(LogicalPosition {
+                            x: self.window_size.0 / 2,
+                            y: self.window_size.1 / 2,
+                        })
+            {
+                eprint!("Failed to move back cursor {:?}", err);
             }
         }
     }

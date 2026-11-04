@@ -11,7 +11,6 @@ use cgmath::{InnerSpace, Matrix, SquareMatrix, Vector3};
 use crate::{
     game::{update_bone::update_bone, update_bones::update_bones},
     interract::input_state::InputState,
-    modules::load_module::load_module,
     network::{
         avatar_updates::AvatarUpdate,
         user_updates::UserUpdate::{self, UpdateAvatarId},
@@ -67,7 +66,7 @@ impl Engine {
         let world_rc = Rc::new(RefCell::new(World::new()));
 
         Self {
-            player: Player::new(),
+            player: Player::default(),
             fallback_vertices,
             fallback_bones,
             fallback_skeleton,
@@ -79,21 +78,19 @@ impl Engine {
 
     pub fn update(
         &mut self,
-        mouse: [f32; 2],
-        keys: [bool; 6],
         input: &InputState,
         frame_time: f32,
         buffer_collection: &mut BufferCollection,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) {
-        let updated_camera_rotation = get_camera_rotation(&self.player, mouse, frame_time);
+        let updated_camera_rotation = get_camera_rotation(&self.player, &input.mouse, frame_time);
         self.player.camera.rotation.x = updated_camera_rotation.0;
         self.player.camera.rotation.y = updated_camera_rotation.1;
 
-        if input.left {
+        if input.turn_left {
             self.player.camera.rotation.y += 0.5 * frame_time;
-        } else if input.right {
+        } else if input.turn_right {
             self.player.camera.rotation.y -= 0.5 * frame_time;
         }
 
@@ -107,7 +104,7 @@ impl Engine {
         .normalize();
 
         let updated_camera_position =
-            get_camera_movement(&mut self.player, keys, input, forward, frame_time);
+            get_camera_movement(&mut self.player, input, forward, frame_time);
         self.player.camera.position += updated_camera_position;
 
         let player_position = [
@@ -128,7 +125,7 @@ impl Engine {
                 rotation: Vector3::new(
                     -self.player.camera.rotation.x + self.player.camera_offset.rotation.x,
                     -self.player.camera.rotation.y
-                        + 1.57079633
+                        + f32::consts::PI / 2.0
                         + self.player.camera_offset.rotation.y,
                     -self.player.camera.rotation.z + self.player.camera_offset.rotation.z,
                 ),
@@ -139,10 +136,10 @@ impl Engine {
     }
 
     pub fn load_modules(&mut self) {
-        let _ = load_module(
+        /*let _ = load_module(
             "assets/modules/caevern_polydural.wasm",
             self.world_rc.clone(),
-        );
+        );*/
     }
 
     pub fn set_world(
@@ -158,9 +155,10 @@ impl Engine {
 
         let mut world = self.world_rc.borrow_mut();
         let textures = world.get_textures().clone();
+        let images = world.get_images().clone();
         for object_index in 0..world.objects.len() {
-            let mut object = world.objects.get_mut(&object_index).unwrap();
-            create_rendered_object(&textures, &mut object, buffer_collection, device, queue);
+            let object = world.objects.get_mut(&object_index).unwrap();
+            create_rendered_object(&textures, &images, object, buffer_collection, device, queue);
         }
     }
 
@@ -221,7 +219,8 @@ impl Engine {
                     let object_id = world.get_objects().len();
 
                     create_rendered_object(
-                        &world.get_textures(),
+                        world.get_textures(),
+                        world.get_images(),
                         &mut object,
                         buffer_collection,
                         device,

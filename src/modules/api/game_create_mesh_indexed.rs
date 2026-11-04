@@ -49,18 +49,24 @@ pub fn game_create_mesh_indexed(
     let indices_bytes = &data[indices_start..indices_end];
 
     let vertices: Vec<f32> = vertices_bytes
-        .chunks_exact(4)
-        .map(|bytes| f32::from_le_bytes(bytes.try_into().unwrap()))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|bytes| f32::from_le_bytes(*bytes))
         .collect();
 
     let uvs: Vec<f32> = uvs_bytes
-        .chunks_exact(4)
-        .map(|bytes| f32::from_le_bytes(bytes.try_into().unwrap()))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|bytes| f32::from_le_bytes(*bytes))
         .collect();
 
     let indices: Vec<u32> = indices_bytes
-        .chunks_exact(4)
-        .map(|bytes| u32::from_le_bytes(bytes.try_into().unwrap()))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .map(|bytes| u32::from_le_bytes(*bytes))
         .collect();
 
     let mut skinned_vertices: Vec<Vertex> = Vec::new();
@@ -102,5 +108,6 @@ pub fn game_create_mesh_indexed(
     caller.data().borrow_mut().add_object(object);
 
     let object_id = caller.data().borrow_mut().get_objects().len() - 1;
-    return object_id as u32;
+
+    object_id as u32
 }
