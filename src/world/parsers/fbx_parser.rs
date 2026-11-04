@@ -804,15 +804,15 @@ pub fn parse(
 
                 v = rotate_x(
                     v,
-                    (global_transform.rotation.x + transform.rotation.0) * 0.0174532925,
+                    (global_transform.rotation.x + transform.rotation.0).to_radians(),
                 );
                 v = rotate_y(
                     v,
-                    (global_transform.rotation.y + transform.rotation.1) * 0.0174532925,
+                    (global_transform.rotation.y + transform.rotation.1).to_radians(),
                 );
                 v = rotate_z(
                     v,
-                    (global_transform.rotation.z + transform.rotation.2) * 0.0174532925,
+                    (global_transform.rotation.z + transform.rotation.2).to_radians(),
                 );
 
                 // translate
@@ -848,15 +848,15 @@ pub fn parse(
 
                 v = rotate_x(
                     v,
-                    (global_transform.rotation.x + transform.rotation.0) * 0.0174532925,
+                    (global_transform.rotation.x + transform.rotation.0).to_radians(),
                 );
                 v = rotate_y(
                     v,
-                    (global_transform.rotation.y + transform.rotation.1) * 0.0174532925,
+                    (global_transform.rotation.y + transform.rotation.1).to_radians(),
                 );
                 v = rotate_z(
                     v,
-                    (global_transform.rotation.z + transform.rotation.2) * 0.0174532925,
+                    (global_transform.rotation.z + transform.rotation.2).to_radians(),
                 );
 
                 // translate
@@ -892,15 +892,15 @@ pub fn parse(
 
                 v = rotate_x(
                     v,
-                    (global_transform.rotation.x + transform.rotation.0) * 0.0174532925,
+                    (global_transform.rotation.x + transform.rotation.0).to_radians(),
                 );
                 v = rotate_y(
                     v,
-                    (global_transform.rotation.y + transform.rotation.1) * 0.0174532925,
+                    (global_transform.rotation.y + transform.rotation.1).to_radians(),
                 );
                 v = rotate_z(
                     v,
-                    (global_transform.rotation.z + transform.rotation.2) * 0.0174532925,
+                    (global_transform.rotation.z + transform.rotation.2).to_radians(),
                 );
 
                 // translate
