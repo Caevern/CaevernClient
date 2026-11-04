@@ -155,9 +155,10 @@ impl Engine {
 
         let mut world = self.world_rc.borrow_mut();
         let textures = world.get_textures().clone();
+        let images = world.get_images().clone();
         for object_index in 0..world.objects.len() {
             let object = world.objects.get_mut(&object_index).unwrap();
-            create_rendered_object(&textures, object, buffer_collection, device, queue);
+            create_rendered_object(&textures, &images, object, buffer_collection, device, queue);
         }
     }
 
@@ -219,6 +220,7 @@ impl Engine {
 
                     create_rendered_object(
                         world.get_textures(),
+                        world.get_images(),
                         &mut object,
                         buffer_collection,
                         device,

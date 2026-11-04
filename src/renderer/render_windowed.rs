@@ -5,7 +5,6 @@ use std::sync::Arc;
 use winit::window::Window;
 
 use crate::ALLOCATOR;
-use crate::game::update_bone::update_bone;
 use crate::game::update_bones::update_bones;
 use crate::game::update_game::Engine;
 use crate::interract::raycast::raycast_grab;

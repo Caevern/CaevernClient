@@ -271,8 +271,9 @@ pub fn parse_cae(path: &str) -> (Vec<Object>, HashMap<String, Material>) {
 
         let texture_exists = read_bool(&mut reader).expect("Failed to read texture_exists");
         if texture_exists {
-            let texture_length = read_u32(&mut reader).expect("Failed to read texture_length");
-            let mut texture_data = vec![0u8; texture_length as usize];
+            let texture_length =
+                read_u32(&mut reader).expect("Failed to read texture_length") as usize;
+            let mut texture_data = vec![0u8; texture_length];
             reader
                 .read_exact(&mut texture_data)
                 .expect("Failed to read texture data");

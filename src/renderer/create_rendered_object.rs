@@ -1,8 +1,10 @@
+use std::collections::HashMap;
 use std::collections::HashSet;
 
 use cgmath::Matrix;
 use cgmath::Matrix4;
 use cgmath::SquareMatrix;
+use image::DynamicImage;
 
 use crate::renderer::buffer_bindings::BufferBindings;
 use crate::renderer::buffer_collection::BufferCollection;
@@ -12,8 +14,10 @@ use crate::renderer::textures::texture_object::TextureObject;
 use crate::renderer::transforms;
 use crate::world::object::Object;
 
+// TODO: split into different functions
 pub fn create_rendered_object(
     textures: &HashSet<String>,
+    images: &HashMap<String, DynamicImage>,
     object: &mut Object,
     buffer_collection: &mut BufferCollection,
     device: &wgpu::Device,
@@ -30,6 +34,11 @@ pub fn create_rendered_object(
         buffer_collection
             .textures
             .insert(texture.to_string(), TextureObject::create(texture, device));
+    }
+    for (name, image) in images {
+        buffer_collection
+            .textures
+            .insert(name.to_string(), TextureObject::from_image(&image, device));
     }
 
     let meshes = object.get_vertices();
@@ -150,7 +159,17 @@ pub fn create_rendered_object(
         );
 
         let texture_object;
-        if let Some(texture) = buffer_collection.textures.get(material_found_texture) {
+        if material_found_texture == "Image"
+            && let Some(texture) = buffer_collection.textures.get(material_string.as_str())
+        {
+            texture_object = texture;
+        } else if material_found_texture == "Image"
+            && let Some(texture) = buffer_collection.textures.get("textures/white.png")
+        {
+            texture_object = texture;
+        } else if let Some(texture) = buffer_collection.textures.get(material_found_texture) {
+            texture_object = texture;
+        } else if let Some(texture) = buffer_collection.textures.get("textures/missing.png") {
             texture_object = texture;
         } else {
             continue;
