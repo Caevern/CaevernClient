@@ -21,6 +21,11 @@ pub struct World {
     pub images: HashMap<String, image::DynamicImage>,
     cameras: Vec<Object>,
 }
+impl Default for World {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl World {
     pub fn new() -> Self {
         Self {
@@ -47,8 +52,7 @@ impl World {
     }
 
     pub fn get_object(&self, index: usize) -> &Object {
-        &self
-            .objects
+        self.objects
             .get(&index)
             .expect("Object doesn't exist at this index")
     }
@@ -142,7 +146,7 @@ impl World {
                     );
                     let mut object_material = Material::from_texture(&scene_object.texture);
                     self.textures.insert(scene_object.texture);
-                    if scene_object.displace != "".to_string() {
+                    if !scene_object.displace.is_empty() {
                         object_material.set_displacement(&scene_object.displace);
                         self.textures.insert(scene_object.displace);
                     }
@@ -175,7 +179,7 @@ impl World {
                         scene_object.transform.scale[2],
                     );
 
-                    if scene_object.skeleton.len() > 0 {
+                    if !scene_object.skeleton.is_empty() {
                         let mut skeleton = HashMap::new();
                         for bone_identifier in scene_object.skeleton {
                             for bone in &model_parsed.1 {
@@ -189,7 +193,7 @@ impl World {
                         }
                         object.set_skeleton(skeleton);
                     }
-                    if model_parsed.1.len() > 0 {
+                    if !model_parsed.1.is_empty() {
                         let mut bone_values = model_parsed.1;
 
                         if scene_object.render_bones {

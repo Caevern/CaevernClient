@@ -127,15 +127,11 @@ pub fn poll_xr_inputs(
 
     input.menu = false;
 
-    if menu_state_left.is_active {
-        if menu_state_left.current_state {
-            input.menu = true;
-        }
+    if menu_state_left.is_active && menu_state_left.current_state {
+        input.menu = true;
     }
-    if menu_state_right.is_active {
-        if menu_state_right.current_state {
-            input.menu = true;
-        }
+    if menu_state_right.is_active && menu_state_right.current_state {
+        input.menu = true;
     }
 
     Ok(())
