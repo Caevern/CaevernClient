@@ -1,4 +1,5 @@
 pub mod avatar_updates;
+pub mod is_reachable;
 pub mod start_microphone;
 pub mod user_authenticate;
 pub mod user_handler;

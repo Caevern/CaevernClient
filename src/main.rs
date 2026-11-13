@@ -18,6 +18,7 @@ use std::alloc;
 
 use crate::game_objects::{object::ObjectType, parsers::fbx_parser::parse};
 use crate::renderer::transform::Transform;
+use crate::setup::engine_arguments::EngineArguments;
 use crate::setup::fonts::load_font_uvs;
 use crate::ui::canvas::Canvas;
 use crate::ui::widget::Widget;
@@ -29,14 +30,7 @@ static ALLOCATOR: Cap<alloc::System> = Cap::new(alloc::System, usize::MAX);
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
-
-    let no_vr = args.contains(&"--no-vr".to_string());
-
-    if no_vr {
-        println!("Running desktop mode");
-    } else {
-        println!("Running VR mode");
-    }
+    let engine_arguments = EngineArguments::from(&args);
 
     let mut world = game_objects::world::create_world();
 
@@ -113,5 +107,5 @@ fn main() {
         ALLOCATOR.allocated() as f32 / 1000000.0
     );
 
-    renderer::eventloop::start_engine(world, no_vr);
+    renderer::eventloop::start_engine(world, engine_arguments);
 }

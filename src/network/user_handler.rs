@@ -65,7 +65,7 @@ pub async fn start_user_handler(
                     }
 
                     UserUpdate::SendReadySignal => {
-                        println!("SENT 2");
+                        println!("SENT READY SIGNAL");
                         let _ = socket.send(Message::Binary(vec![2].into())).await;
                     }
                 }

@@ -51,7 +51,6 @@ pub fn load_font_atlas(path: &str) -> DynamicImage {
         x_offset += glyph_width;
     }
 
-    println!("Created Font!");
     DynamicImage::ImageRgba8(atlas)
 }
 
@@ -95,6 +94,5 @@ pub fn load_font_uvs(path: &str) -> HashMap<String, FontCharacter> {
         x_offset += glyph_width;
     }
 
-    println!("Mapped Font!");
     mapped_characters
 }
