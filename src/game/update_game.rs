@@ -57,8 +57,8 @@ impl Engine {
         avatar_thread_rx: Receiver<AvatarUpdate>,
     ) -> Self {
         let model_parsed = parse("models/fallback.fbx", Transform::zero());
-        let fallback_vertices = create_vertices_skinned(&model_parsed.0);
-        let fallback_bones = model_parsed.1;
+        let fallback_vertices = create_vertices_skinned(&model_parsed.vertices);
+        let fallback_bones = model_parsed.bones;
 
         let bone_bindings = vec![("head".to_string(), "head.xModel")];
         let fallback_skeleton = create_skeleton(bone_bindings, &fallback_bones);

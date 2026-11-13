@@ -132,7 +132,7 @@ impl World {
                         ),
                     );
 
-                    let mut vertices = create_vertices_skinned(&model_parsed.0);
+                    let mut vertices = create_vertices_skinned(&model_parsed.vertices);
                     for mesh in &mut vertices {
                         if mesh.1 == "default" {
                             mesh.1 = format!(
@@ -161,8 +161,10 @@ impl World {
                 } else {
                     let model_parsed = parse(&scene_object.reference, Transform::zero());
 
-                    let mut object =
-                        Object::create(ObjectType::Mesh, create_vertices_skinned(&model_parsed.0));
+                    let mut object = Object::create(
+                        ObjectType::Mesh,
+                        create_vertices_skinned(&model_parsed.vertices),
+                    );
 
                     object.set_position(
                         scene_object.transform.position[0],
@@ -183,7 +185,7 @@ impl World {
                     if !scene_object.skeleton.is_empty() {
                         let mut skeleton = HashMap::new();
                         for bone_identifier in scene_object.skeleton {
-                            for bone in &model_parsed.1 {
+                            for bone in &model_parsed.bones {
                                 let filtered: String =
                                     bone.1.2.chars().filter(|c| (*c as u32) >= 32).collect();
                                 if filtered == bone_identifier.bone_name {
@@ -194,8 +196,8 @@ impl World {
                         }
                         object.set_skeleton(skeleton);
                     }
-                    if !model_parsed.1.is_empty() {
-                        let mut bone_values = model_parsed.1;
+                    if !model_parsed.bones.is_empty() {
+                        let mut bone_values = model_parsed.bones;
 
                         if scene_object.render_bones {
                             for bone in bone_values.iter_mut() {
@@ -209,7 +211,7 @@ impl World {
                                 );
                                 let mut bone_object = Object::create(
                                     ObjectType::Mesh,
-                                    create_vertices_skinned(&bone_model_parsed.0),
+                                    create_vertices_skinned(&bone_model_parsed.vertices),
                                 );
 
                                 bone_object.set_position(

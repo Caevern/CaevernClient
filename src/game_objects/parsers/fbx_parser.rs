@@ -5,6 +5,7 @@ use rust_embed::RustEmbed;
 use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, Cursor};
 
+use crate::game_objects::parsers::parsed_mesh::ParsedMesh;
 use crate::game_objects::parsers::transforms::{rotate_x, rotate_y, rotate_z};
 use crate::renderer::skinned_vertex::SkinnedVertex;
 use crate::renderer::transform;
@@ -549,13 +550,7 @@ fn pack_weights(
     (ids, weights)
 }
 
-pub fn parse(
-    path: &str,
-    global_transform: transform::Transform,
-) -> (
-    Vec<(Vec<SkinnedVertex>, String)>,
-    HashMap<i64, (usize, transform::Transform, String, i64, usize)>,
-) {
+pub fn parse(path: &str, global_transform: transform::Transform) -> ParsedMesh {
     let data = Assets::get(path).expect("Failed to get asset").data;
     let cursor = Cursor::new(data);
     let mut reader = BufReader::new(cursor);
@@ -589,18 +584,6 @@ pub fn parse(
             println!("{}", animation.0);
         }
     }
-    /*for node in &file.children {
-        let animation_curve_node = parse_curve_nodes(node);
-        for animation in animation_curve_node {
-            println!("{} {}", animation.0, animation.1.property);
-        }
-    }
-    for node in &file.children {
-        let animation_curve = parse_animation_curves(node);
-        for animation in animation_curve {
-            println!("{} {} {}", animation.0, animation.1.times.len(), animation.1.values.len());
-        }
-    }*/
 
     for node in &file.children {
         if node.name == "Objects" {
@@ -923,5 +906,8 @@ pub fn parse(
         }
     }
 
-    (mesh_data, bone_map)
+    ParsedMesh {
+        vertices: mesh_data,
+        bones: bone_map,
+    }
 }

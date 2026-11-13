@@ -172,6 +172,7 @@ fn read_object_data<R: Read>(
 ) {
     let mesh_count = read_u32(&mut reader).expect("Failed to read mesh count");
     let mut meshes = Vec::new();
+
     for j in 0..mesh_count {
         let mesh = read_object(&mut reader, j, meshes_found, materials, color);
         meshes.push(mesh);

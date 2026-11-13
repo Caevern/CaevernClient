@@ -50,7 +50,7 @@ fn main() {
     );
     let mut skybox_object = Object::create(
         ObjectType::Skybox,
-        renderer::vertex::create_vertices_skinned(&skybox.0),
+        renderer::vertex::create_vertices_skinned(&skybox.vertices),
     );
     world.textures.insert("textures/skybox_2.png".to_string());
     skybox_object.set_default_texture("textures/skybox_2.png");
@@ -99,7 +99,7 @@ fn main() {
     );
     let mut tablet_object = Object::create(
         ObjectType::TabletMenu,
-        renderer::vertex::create_vertices_skinned(&tablet.0),
+        renderer::vertex::create_vertices_skinned(&tablet.vertices),
     );
     tablet_object.set_position(0.0, -10.0, 0.0);
     tablet_object.set_default_texture("textures/tablet.png");
