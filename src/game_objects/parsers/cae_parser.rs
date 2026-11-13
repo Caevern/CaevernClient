@@ -3,11 +3,11 @@ use std::io::Cursor;
 use std::io::{self, Read};
 use std::{collections::HashMap, println};
 
+use crate::game_objects::material::Material;
+use crate::game_objects::object::{Object, ObjectType};
+use crate::game_objects::parsers::transforms::{rotate_x, rotate_y, rotate_z};
 use crate::renderer::vertex::create_vertices_skinned;
 use crate::renderer::{skinned_vertex::SkinnedVertex, transform::Transform};
-use crate::world::material::Material;
-use crate::world::object::{Object, ObjectType};
-use crate::world::parsers::transforms::{rotate_x, rotate_y, rotate_z};
 
 #[derive(RustEmbed)]
 #[folder = "assets/"]

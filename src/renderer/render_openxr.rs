@@ -7,6 +7,8 @@ use crate::ALLOCATOR;
 use crate::game::update_bone::update_bone;
 use crate::game::update_bones::update_bones;
 use crate::game::update_game::Engine;
+use crate::game_objects::object::ObjectType;
+use crate::game_objects::objects::player::Player;
 use crate::interract::input_state::InputState;
 use crate::interract::raycast::raycast_grab;
 use crate::renderer::buffer_collection::BufferCollection;
@@ -23,8 +25,6 @@ use crate::renderer::vertex::Vertex;
 use crate::renderer::{transforms, vertex};
 use crate::setup::font_character::FontCharacter;
 use crate::setup::fonts::load_font_uvs;
-use crate::world::object::ObjectType;
-use crate::world::objects::player::Player;
 use crate::xr::xr_input::{XrInput, poll_xr_inputs};
 use crate::xr::xr_manager::XRManager;
 

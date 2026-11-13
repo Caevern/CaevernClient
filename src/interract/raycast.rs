@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use cgmath::Vector3;
 
-use crate::world::object::{Object, ObjectType};
+use crate::game_objects::object::{Object, ObjectType};
 
 pub fn distance(position_1: Vector3<f32>, position_2: Vector3<f32>) -> f32 {
     let dx = position_1.x - position_2.x;

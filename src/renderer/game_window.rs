@@ -20,6 +20,7 @@ use winit::window::WindowAttributes;
 use winit::window::{Icon, Window};
 
 use crate::game::update_game::Engine;
+use crate::game_objects::world::World;
 use crate::interract::input_state::InputState;
 use crate::network::avatar_updates::AvatarUpdate;
 use crate::network::user_authenticate::authenticate_user;
@@ -28,7 +29,6 @@ use crate::network::user_updates::UserUpdate;
 use crate::network::voice::start_voice_handler;
 use crate::renderer::render_openxr::RendererOpenXR;
 use crate::renderer::render_windowed::RendererWindowed;
-use crate::world::world::World;
 use crate::xr::xr_input::XrInput;
 use crate::xr::xr_manager::XRManager;
 

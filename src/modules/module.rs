@@ -4,7 +4,7 @@ use std::rc::Rc;
 use wasmtime::Store;
 use wasmtime::TypedFunc;
 
-use crate::world::world::World;
+use crate::game_objects::world::World;
 
 pub struct Module {
     init: TypedFunc<(), ()>,

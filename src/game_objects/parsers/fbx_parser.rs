@@ -5,9 +5,9 @@ use rust_embed::RustEmbed;
 use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, Cursor};
 
+use crate::game_objects::parsers::transforms::{rotate_x, rotate_y, rotate_z};
 use crate::renderer::skinned_vertex::SkinnedVertex;
 use crate::renderer::transform;
-use crate::world::parsers::transforms::{rotate_x, rotate_y, rotate_z};
 
 #[derive(RustEmbed)]
 #[folder = "assets/"]
@@ -94,7 +94,7 @@ struct Cluster {
 }
 
 fn get_id(node: &Node) -> Option<i64> {
-    match node.properties.get(0) {
+    match node.properties.first() {
         Some(Property::I64(id)) => Some(*id),
         Some(Property::I32(id)) => Some(*id as i64),
         _ => None,
@@ -379,15 +379,12 @@ fn traverse_nodes(node: &Node) -> Vec<Mesh> {
                 }
                 "LayerElementNormal" => {
                     for sub in &child.children {
-                        match sub.name.as_str() {
-                            "Normals" => {
-                                for prop in &sub.properties {
-                                    if let Property::F64Array(arr) = prop {
-                                        normals.extend(arr);
-                                    }
+                        if sub.name.as_str() == "Normals" {
+                            for prop in &sub.properties {
+                                if let Property::F64Array(arr) = prop {
+                                    normals.extend(arr);
                                 }
                             }
-                            _ => {}
                         }
                     }
                 }
@@ -620,10 +617,8 @@ pub fn parse(
         clusters.extend(parse_clusters(node));
     }
     for conn in &connections {
-        if clusters.contains_key(&conn.to) {
-            if let Some(cluster) = clusters.get_mut(&conn.to) {
-                cluster.bone_id = conn.from;
-            }
+        if let Some(cluster) = clusters.get_mut(&conn.to) {
+            cluster.bone_id = conn.from;
         }
     }
 
@@ -631,11 +626,9 @@ pub fn parse(
         let mut skin_id = None;
 
         for conn in &connections {
-            if conn.from == cluster.id {
-                if skins.contains(&conn.to) {
-                    skin_id = Some(conn.to);
-                    break;
-                }
+            if conn.from == cluster.id && skins.contains(&conn.to) {
+                skin_id = Some(conn.to);
+                break;
             }
         }
 
@@ -660,10 +653,11 @@ pub fn parse(
     let existing_keys: HashSet<_> = transforms.keys().cloned().collect();
     for transform in transforms.iter_mut() {
         for connection in &connections {
-            if &connection.from == transform.0 && transform.1.object == ObjectType::Bone {
-                if existing_keys.contains(&connection.to) {
-                    transform.1.parent = connection.to;
-                }
+            if &connection.from == transform.0
+                && transform.1.object == ObjectType::Bone
+                && existing_keys.contains(&connection.to)
+            {
+                transform.1.parent = connection.to;
             }
         }
     }
@@ -729,10 +723,10 @@ pub fn parse(
 
             if let Some(model_id) = model_id {
                 for connection in &connections {
-                    if connection.to == model_id {
-                        if let Some(mat) = materials.get(&connection.from) {
-                            material = Some(mat);
-                        }
+                    if connection.to == model_id
+                        && let Some(mat) = materials.get(&connection.from)
+                    {
+                        material = Some(mat);
                     }
                 }
             }
@@ -770,7 +764,7 @@ pub fn parse(
                     *i as usize
                 };
                 current_polygon.push(index);
-                current_uvs.push(mesh.uv_indices[index_uv as usize]);
+                current_uvs.push(mesh.uv_indices[index_uv]);
 
                 if *i < 0 {
                     // polygon ended, triangulate
@@ -923,7 +917,7 @@ pub fn parse(
                 });
             }
 
-            if mesh_data[mesh_data_index].0.len() == 0 {
+            if mesh_data[mesh_data_index].0.is_empty() {
                 mesh_data.remove(mesh_data_index);
             }
         }

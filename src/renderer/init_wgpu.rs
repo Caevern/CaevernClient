@@ -14,7 +14,6 @@ pub struct InitWgpu<'window> {
 impl<'window> InitWgpu<'window> {
     pub async fn init_wgpu(window: &Arc<Window>) -> Self {
         let size = window.inner_size();
-        //let instance = wgpu::Instance::default();
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::VULKAN,
             flags: wgpu::InstanceFlags::empty(),

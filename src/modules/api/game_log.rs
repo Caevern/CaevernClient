@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use wasmtime::Caller;
 
-use crate::world::world::World;
+use crate::game_objects::world::World;
 
 pub fn game_log(mut caller: Caller<'_, Rc<RefCell<World>>>, ptr: u32, len: u32) {
     let memory = match caller

@@ -10,7 +10,7 @@ use crate::{
         },
         module,
     },
-    world::world::World,
+    game_objects::world::World,
 };
 
 pub fn load_module(path: &str, world_rc: Rc<RefCell<World>>) -> module::Module {

@@ -1,4 +1,4 @@
-use crate::{renderer::simple_vertex::SimpleVertex, world::object::Object};
+use crate::{game_objects::object::Object, renderer::simple_vertex::SimpleVertex};
 
 pub trait Widget {
     fn set_position(&mut self, x: f32, y: f32, z: f32);

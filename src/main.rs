@@ -1,6 +1,7 @@
 // Copyright 2026 Charli van Nood
 
 pub mod game;
+pub mod game_objects;
 pub mod interract;
 pub mod modules;
 pub mod network;
@@ -8,21 +9,20 @@ pub mod physics;
 pub mod renderer;
 pub mod setup;
 pub mod ui;
-pub mod world;
 pub mod xr;
 
 use cap::Cap;
 use cgmath::Vector3;
+use game_objects::object::Object;
 use std::alloc;
-use world::object::Object;
 
+use crate::game_objects::{object::ObjectType, parsers::fbx_parser::parse};
 use crate::renderer::transform::Transform;
 use crate::setup::fonts::load_font_uvs;
 use crate::ui::canvas::Canvas;
 use crate::ui::widget::Widget;
 use crate::ui::widgets::button::Button;
 use crate::ui::widgets::label::Label;
-use crate::world::{object::ObjectType, parsers::fbx_parser::parse};
 
 #[global_allocator]
 static ALLOCATOR: Cap<alloc::System> = Cap::new(alloc::System, usize::MAX);
@@ -38,7 +38,7 @@ fn main() {
         println!("Running VR mode");
     }
 
-    let mut world = world::world::create_world();
+    let mut world = game_objects::world::create_world();
 
     let skybox = parse(
         "models/skybox.fbx",

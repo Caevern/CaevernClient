@@ -1,6 +1,6 @@
 use cgmath::*;
 
-use crate::{interract::input_state::InputState, world::objects::player::Player};
+use crate::{game_objects::objects::player::Player, interract::input_state::InputState};
 
 pub fn get_camera_rotation(player: &Player, mouse: &Vector2<f32>, frame_time: f32) -> (f32, f32) {
     let mut rotation_x =

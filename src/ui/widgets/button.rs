@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
 use crate::{
-    renderer::{self, simple_vertex::SimpleVertex},
-    setup::font_character::FontCharacter,
-    ui::widget::Widget,
-    world::{
+    game_objects::{
         object::{Object, ObjectType},
         objects::text::create_plane_with_text,
     },
+    renderer::{self, simple_vertex::SimpleVertex},
+    setup::font_character::FontCharacter,
+    ui::widget::Widget,
 };
 
 #[derive(Clone)]

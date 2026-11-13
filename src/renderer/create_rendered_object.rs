@@ -6,13 +6,13 @@ use cgmath::Matrix4;
 use cgmath::SquareMatrix;
 use image::DynamicImage;
 
+use crate::game_objects::object::Object;
 use crate::renderer::buffer_bindings::BufferBindings;
 use crate::renderer::buffer_collection::BufferCollection;
 use crate::renderer::buffers::displacement_buffer::create_buffer_displacement;
 use crate::renderer::shader_type::ShaderType;
 use crate::renderer::textures::texture_object::TextureObject;
 use crate::renderer::transforms;
-use crate::world::object::Object;
 
 // TODO: split into different functions
 pub fn create_rendered_object(
@@ -38,7 +38,7 @@ pub fn create_rendered_object(
     for (name, image) in images {
         buffer_collection
             .textures
-            .insert(name.to_string(), TextureObject::from_image(&image, device));
+            .insert(name.to_string(), TextureObject::from_image(image, device));
     }
 
     let meshes = object.get_vertices();

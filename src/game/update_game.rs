@@ -10,6 +10,13 @@ use cgmath::{InnerSpace, Matrix, SquareMatrix, Vector3};
 
 use crate::{
     game::{update_bone::update_bone, update_bones::update_bones},
+    game_objects::{
+        material::Material,
+        object::{Object, ObjectType},
+        objects::{player::Player, skeleton::create_skeleton},
+        parsers::fbx_parser::parse,
+        world::World,
+    },
     interract::input_state::InputState,
     network::{
         avatar_updates::AvatarUpdate,
@@ -25,13 +32,6 @@ use crate::{
         transform::Transform,
         transforms::create_transforms,
         vertex::{Vertex, create_vertices_skinned},
-    },
-    world::{
-        material::Material,
-        object::{Object, ObjectType},
-        objects::{player::Player, skeleton::create_skeleton},
-        parsers::fbx_parser::parse,
-        world::World,
     },
 };
 

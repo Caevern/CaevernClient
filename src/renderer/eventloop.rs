@@ -4,9 +4,9 @@ use std::sync::atomic::AtomicBool;
 use winit::event_loop::EventLoop;
 use winit::window::Icon;
 
+use crate::game_objects::world::World;
 use crate::interract::input_state::InputState;
 use crate::renderer::game_window::GameWindow;
-use crate::world::world::World;
 
 fn load_icon() -> Option<Icon> {
     let image = image::open("assets/icons/icon-small.png")

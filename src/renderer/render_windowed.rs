@@ -7,6 +7,7 @@ use winit::window::Window;
 use crate::ALLOCATOR;
 use crate::game::update_bones::update_bones;
 use crate::game::update_game::Engine;
+use crate::game_objects::object::ObjectType;
 use crate::interract::raycast::raycast_grab;
 use crate::renderer::buffer_collection::BufferCollection;
 use crate::renderer::buffers::bind_group_layout::create_bind_group_layout;
@@ -21,7 +22,6 @@ use crate::renderer::vertex::Vertex;
 use crate::renderer::{init_wgpu, transforms, vertex};
 use crate::setup::font_character::FontCharacter;
 use crate::setup::fonts::load_font_uvs;
-use crate::world::object::ObjectType;
 
 pub struct RendererWindowed<'window> {
     pub init: init_wgpu::InitWgpu<'window>,

@@ -6,13 +6,13 @@ use std::{
 use cgmath::Vector3;
 
 use crate::{
-    renderer::{transform::Transform, vertex::create_vertices_skinned},
-    world::{
+    game_objects::{
         material::Material,
         object::{Object, ObjectType},
         parsers::{cae_parser::parse_cae, fbx_parser::parse},
         scene::load_scene,
     },
+    renderer::{transform::Transform, vertex::create_vertices_skinned},
 };
 
 pub struct World {

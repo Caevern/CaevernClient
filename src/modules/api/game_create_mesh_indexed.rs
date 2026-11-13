@@ -3,11 +3,11 @@ use std::{cell::RefCell, rc::Rc};
 use wasmtime::Caller;
 
 use crate::{
-    renderer::vertex::Vertex,
-    world::{
+    game_objects::{
         object::{Object, ObjectType},
         world::World,
     },
+    renderer::vertex::Vertex,
 };
 
 pub fn game_create_mesh_indexed(

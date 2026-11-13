@@ -4,8 +4,8 @@ use cgmath::Vector3;
 
 use crate::renderer::buffer_bindings::BufferBindings;
 use crate::{
+    game_objects::world::World,
     renderer::{buffer_collection::BufferCollection, transforms::create_transforms},
-    world::world::World,
 };
 
 pub fn update_bones(

@@ -1,7 +1,7 @@
 use cgmath::Vector3;
 use futures_util::{FutureExt, SinkExt, StreamExt, TryStreamExt};
 use std::{
-    collections::HashMap,
+    collections::{HashMap, hash_map::Entry},
     f32, println,
     sync::mpsc::{Receiver, Sender},
 };
@@ -134,28 +134,30 @@ pub async fn start_user_handler(
                                     Vector3::new(1.0, 1.0, 1.0),
                                 );
 
-                                if !users_loaded.contains_key(&player_id) {
-                                    users_loaded.insert(player_id, 0);
-                                    println!("Registering user with id: {}", player_id);
-                                    avatar_thread_tx
-                                        .send(AvatarUpdate::RegisterUser(transform, player_id))
-                                        .expect(
-                                            "Registering user with game has FAILED (somehow...)",
-                                        );
-                                } else if users_loaded.contains_key(&player_id) {
-                                    let object_id = *users_loaded.get(&player_id).unwrap();
-                                    if object_id == 0 {
-                                        continue;
+                                match users_loaded.entry(player_id) {
+                                    Entry::Vacant(entry) => {
+                                        entry.insert(0);
+
+                                        println!("Registering user with id: {}", player_id);
+
+                                        avatar_thread_tx
+                                            .send(AvatarUpdate::RegisterUser(transform, player_id))
+                                            .expect("Registering user failed");
                                     }
 
-                                    avatar_thread_tx
-                                        .send(AvatarUpdate::SetUserPosition(
-                                            transform,
-                                            object_id,
-                                        ))
-                                        .expect(
-                                            "Setting avatar position in game thread has FAILED (somehow...)",
-                                        );
+                                    Entry::Occupied(entry) => {
+                                        let object_id = *entry.get();
+
+                                        if object_id == 0 {
+                                            continue;
+                                        }
+
+                                        avatar_thread_tx
+                                            .send(AvatarUpdate::SetUserPosition(
+                                                transform, object_id,
+                                            ))
+                                            .expect("Setting avatar position failed");
+                                    }
                                 }
                             }
                         }

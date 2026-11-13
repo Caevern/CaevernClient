@@ -3,9 +3,9 @@ use std::collections::HashMap;
 use cgmath::Vector3;
 
 use crate::{
+    game_objects::{material::Material, world::World},
     renderer::{buffer_bindings::BufferBindings, transform::Transform, vertex::Vertex},
     ui::canvas::Canvas,
-    world::{material::Material, world::World},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

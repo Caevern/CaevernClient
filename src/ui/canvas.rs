@@ -1,4 +1,4 @@
-use crate::{ui::widget::Widget, world::world::World};
+use crate::{game_objects::world::World, ui::widget::Widget};
 
 pub struct Canvas {
     pub children: Vec<Box<dyn Widget>>,
