@@ -1,4 +1,5 @@
 pub mod eventloop;
+pub mod simple_vertex;
 pub mod skinned_vertex;
 pub mod transform;
 pub mod vertex;
@@ -9,7 +10,7 @@ pub mod buffer_bindings;
 pub mod buffer_collection;
 
 pub mod shader_type;
-pub mod texture_object;
+pub mod textures;
 pub mod transforms;
 
 mod buffers;

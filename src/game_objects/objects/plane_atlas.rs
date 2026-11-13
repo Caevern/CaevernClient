@@ -1,4 +1,4 @@
-pub fn create_plane_with_index(
+/*pub fn create_plane_with_index(
     position: (f32, f32, f32),
     scale: (f32, f32, f32),
     atlas_size: (f32, f32),
@@ -150,5 +150,5 @@ pub fn create_plane_with_uv(
     colors.push([1.0, 1.0, 1.0]);
     colors.push([1.0, 1.0, 1.0]);
 
-    return (vertices, uvs, normals, colors);
-}
+    (vertices, uvs, normals, colors)
+}*/

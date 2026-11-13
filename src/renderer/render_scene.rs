@@ -38,7 +38,7 @@ pub fn render_scene(
     });
 
     let mut current_shader = ShaderType::Displacement;
-    render_pass.set_pipeline(&pipeline_displacement);
+    render_pass.set_pipeline(pipeline_displacement);
 
     for mesh in 0..buffer_collection.vertex_buffers.len() {
         let shader_type = &buffer_collection.shader_type[mesh];
@@ -46,12 +46,12 @@ pub fn render_scene(
         if shader_type != &current_shader {
             match shader_type {
                 ShaderType::Displacement => {
-                    render_pass.set_pipeline(&pipeline_displacement);
+                    render_pass.set_pipeline(pipeline_displacement);
                     current_shader = ShaderType::Displacement;
                 }
 
                 ShaderType::DisplacementBones => {
-                    render_pass.set_pipeline(&pipeline_displacement_bones);
+                    render_pass.set_pipeline(pipeline_displacement_bones);
                     current_shader = ShaderType::DisplacementBones;
                 }
             }

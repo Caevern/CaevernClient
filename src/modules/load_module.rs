@@ -3,6 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use wasmtime::{Engine, Linker, Module, Store};
 
 use crate::{
+    game_objects::world::World,
     modules::{
         api::{
             game_create_mesh::game_create_mesh, game_create_mesh_indexed::game_create_mesh_indexed,
@@ -10,7 +11,6 @@ use crate::{
         },
         module,
     },
-    world::world::World,
 };
 
 pub fn load_module(path: &str, world_rc: Rc<RefCell<World>>) -> module::Module {

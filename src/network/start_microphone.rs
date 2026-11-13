@@ -23,7 +23,7 @@ pub fn start_microphone() -> (cpal::Stream, mpsc::Receiver<Vec<f32>>, u32) {
         supported.sample_format()
     );
 
-    let config: cpal::StreamConfig = supported.clone().into();
+    let config: cpal::StreamConfig = supported.into();
 
     let (tx, rx) = mpsc::channel::<Vec<f32>>();
 

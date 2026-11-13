@@ -98,7 +98,18 @@ impl XRManager {
             let vk_instance = instance
                 .create_vulkan_instance(
                     system,
-                    std::mem::transmute(vk_entry.static_fn().get_instance_proc_addr),
+                    std::mem::transmute::<
+                        unsafe extern "system" fn(
+                            ash::vk::Instance,
+                            *const i8,
+                        )
+                            -> Option<unsafe extern "system" fn()>,
+                        unsafe extern "system" fn(
+                            *const std::ffi::c_void,
+                            *const i8,
+                        )
+                            -> Option<unsafe extern "system" fn()>,
+                    >(vk_entry.static_fn().get_instance_proc_addr),
                     &vk::InstanceCreateInfo::default().application_info(&vk_app_info) as *const _
                         as *const _,
                 )
@@ -197,7 +208,18 @@ impl XRManager {
             instance
                 .create_vulkan_device(
                     system,
-                    std::mem::transmute(vk_entry.static_fn().get_instance_proc_addr),
+                    std::mem::transmute::<
+                        unsafe extern "system" fn(
+                            ash::vk::Instance,
+                            *const i8,
+                        )
+                            -> Option<unsafe extern "system" fn()>,
+                        unsafe extern "system" fn(
+                            *const std::ffi::c_void,
+                            *const i8,
+                        )
+                            -> Option<unsafe extern "system" fn()>,
+                    >(vk_entry.static_fn().get_instance_proc_addr),
                     vk_physical_device.as_raw() as _,
                     &device_create_info as *const _ as *const _,
                 )
@@ -267,21 +289,21 @@ impl XRManager {
             .create_reference_space(openxr::ReferenceSpaceType::LOCAL, openxr::Posef::IDENTITY)?;
 
         Ok(Self {
-            instance: instance,
-            system: system,
-            session: session,
-            frame_waiter: frame_waiter,
-            frame_stream: frame_stream,
-            views: views,
-            device: device,
-            queue: queue,
-            view_config: view_config,
+            instance,
+            system,
+            session,
+            frame_waiter,
+            frame_stream,
+            views,
+            device,
+            queue,
+            view_config,
             swapchains: Vec::new(),
             swapchain_images: Vec::new(),
             swapchain_textures: Vec::new(),
             swapchain_views: Vec::new(),
             depth_views: Vec::new(),
-            reference_space: reference_space,
+            reference_space,
             event_buffer: openxr::EventDataBuffer::new(),
             session_running: false,
         })
@@ -416,8 +438,8 @@ impl XRManager {
 
     pub fn poll_events(&mut self) -> Result<(), openxr::sys::Result> {
         while let Some(event) = self.instance.poll_event(&mut self.event_buffer)? {
-            match event {
-                openxr::Event::SessionStateChanged(event) => match event.state() {
+            if let openxr::Event::SessionStateChanged(event) = event {
+                match event.state() {
                     openxr::SessionState::READY => {
                         self.session.begin(self.view_config)?;
                         println!("XR session started");
@@ -436,9 +458,7 @@ impl XRManager {
                     state => {
                         println!("XR session state: {state:?}");
                     }
-                },
-
-                _ => {}
+                }
             }
         }
 

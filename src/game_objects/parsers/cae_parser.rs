@@ -3,11 +3,12 @@ use std::io::Cursor;
 use std::io::{self, Read};
 use std::{collections::HashMap, println};
 
+use crate::game_objects::material::Material;
+use crate::game_objects::object::{Object, ObjectType};
+use crate::game_objects::parsers::parsed_mesh::ParsedMesh;
+use crate::game_objects::parsers::transforms::{rotate_x, rotate_y, rotate_z};
+use crate::renderer::skinned_vertex::SkinnedVertex;
 use crate::renderer::vertex::create_vertices_skinned;
-use crate::renderer::{skinned_vertex::SkinnedVertex, transform::Transform};
-use crate::world::material::Material;
-use crate::world::object::{Object, ObjectType};
-use crate::world::parsers::transforms::{rotate_x, rotate_y, rotate_z};
 
 #[derive(RustEmbed)]
 #[folder = "assets/"]
@@ -52,68 +53,54 @@ fn read_string<R: Read>(reader: &mut R) -> String {
         .expect("Failed to create string")
 }
 
-fn read_mesh<R: Read>(
-    mut reader: &mut R,
-) -> (
-    Vec<SkinnedVertex>,
-    Vec<[f32; 3]>,
-    Vec<[f32; 3]>,
-    Vec<[f32; 2]>,
-    String,
-) {
+fn read_mesh<R: Read>(mut reader: &mut R) -> (Vec<SkinnedVertex>, String) {
     let vertex_count = read_u32(&mut reader).expect("Failed to read vertex count") as usize;
     let mut vertices = vec![(0f32, 0f32, 0f32); vertex_count as usize];
-    for i in 0..vertex_count {
+    for vertex in vertices.iter_mut().take(vertex_count) {
         let x = read_f32(&mut reader).expect("Failed to read vertex x");
         let y = read_f32(&mut reader).expect("Failed to read vertex y");
         let z = read_f32(&mut reader).expect("Failed to read vertex z");
-        vertices[i] = (x, y, z);
+        *vertex = (x, y, z);
     }
     println!("vertex_count: {vertex_count}");
 
     let triangle_index_count =
         read_u32(&mut reader).expect("Failed to read triangle count") as usize;
     let mut indices = vec![0u32; triangle_index_count as usize];
-    for i in 0..triangle_index_count {
+    for triangle in indices.iter_mut().take(triangle_index_count) {
         let index = read_u32(&mut reader).expect("Failed to read triangle index");
-        indices[i] = index;
+        *triangle = index;
     }
     let triangle_count = triangle_index_count / 3;
     println!("triangle_count: {triangle_count}");
 
     let uv_count = read_u32(&mut reader).expect("Failed to read uv count") as usize;
     let mut uvs = vec![(0f32, 0f32); uv_count as usize];
-    for i in 0..uv_count {
+    for uv in uvs.iter_mut().take(uv_count) {
         let x = read_f32(&mut reader)
             .expect("Failed to read uv x")
             .rem_euclid(1.0);
         let y = read_f32(&mut reader)
             .expect("Failed to read uv y")
             .rem_euclid(1.0);
-        uvs[i] = (x, y);
+        *uv = (x, y);
     }
     println!("uv_count: {uv_count}");
 
     let normals_count = read_u32(&mut reader).expect("Failed to read normals count") as usize;
     let mut normals = vec![(0f32, 0f32, 0f32); normals_count as usize];
-    for i in 0..normals_count {
+    for normal in normals.iter_mut().take(normals_count) {
         let x = read_f32(&mut reader).expect("Failed to read normals x");
         let y = read_f32(&mut reader).expect("Failed to read normals y");
         let z = read_f32(&mut reader).expect("Failed to read normals z");
-        normals[i] = (x, y, z);
+        *normal = (x, y, z);
     }
     println!("normals_count: {normals_count}");
 
-    let mut mesh_data = (
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        String::new(),
-    );
+    let mut mesh_data = (Vec::new(), String::new());
 
-    for i in 0..triangle_index_count {
-        let vertex_index = indices[i];
+    for index in indices.iter().take(triangle_index_count) {
+        let vertex_index = *index;
         let vertex = vertices[vertex_index as usize];
         let uv = uvs[vertex_index as usize];
         let normal = normals[vertex_index as usize];
@@ -122,12 +109,12 @@ fn read_mesh<R: Read>(
             position: [vertex.0, vertex.1, vertex.2],
             bone_ids: [0, 0, 0, 0],
             weights: [0.0, 0.0, 0.0, 0.0],
+            normal: [normal.0, normal.1, normal.2],
+            color: [1.0, 1.0, 1.0],
+            uv: [uv.0, uv.1],
         };
 
         mesh_data.0.push(skinned_vertex);
-        mesh_data.1.push([normal.0, normal.1, normal.2]);
-        mesh_data.2.push([1.0, 1.0, 1.0]);
-        mesh_data.3.push([uv.0, uv.1]);
     }
 
     mesh_data
@@ -136,25 +123,10 @@ fn read_mesh<R: Read>(
 fn read_object<R: Read>(
     mut reader: &mut R,
     i: u32,
-    meshes: &HashMap<
-        String,
-        (
-            Vec<SkinnedVertex>,
-            Vec<[f32; 3]>,
-            Vec<[f32; 3]>,
-            Vec<[f32; 2]>,
-            String,
-        ),
-    >,
+    meshes: &HashMap<String, (Vec<SkinnedVertex>, String)>,
     materials: &HashMap<String, Material>,
     _color: (f32, f32, f32),
-) -> (
-    Vec<SkinnedVertex>,
-    Vec<[f32; 3]>,
-    Vec<[f32; 3]>,
-    Vec<[f32; 2]>,
-    String,
-) {
+) -> (Vec<SkinnedVertex>, String) {
     let mesh_name = read_string(&mut reader);
     println!("mesh {i}: {mesh_name}");
 
@@ -165,85 +137,54 @@ fn read_object<R: Read>(
         let mesh_rotation = read_vec3(&mut reader);
         let mesh_scale = read_vec3(&mut reader);
 
-        for vertex in &mut mesh.0 {
-            vertex.position = rotate_x(vertex.position, mesh_rotation[0] * 0.0174532925);
-            vertex.position = rotate_y(vertex.position, mesh_rotation[1] * 0.0174532925);
-            vertex.position = rotate_z(vertex.position, mesh_rotation[2] * 0.0174532925);
-
-            vertex.position[0] = vertex.position[0] * mesh_scale[0] + mesh_position[0];
-            vertex.position[1] = vertex.position[1] * mesh_scale[1] + mesh_position[1];
-            vertex.position[2] = vertex.position[2] * mesh_scale[2] + mesh_position[2];
-        }
-
         let material_name = read_string(&mut reader);
         let material = materials
             .get(&material_name)
             .expect("Material doesn't exist");
-        mesh.4 = material_name;
+        mesh.1 = material_name;
 
-        for color_vert in &mut mesh.2 {
-            color_vert[0] = material.color.0;
-            color_vert[1] = material.color.1;
-            color_vert[2] = material.color.2;
+        for vertex in &mut mesh.0 {
+            vertex.position = rotate_x(vertex.position, mesh_rotation[0].to_radians());
+            vertex.position = rotate_y(vertex.position, mesh_rotation[1].to_radians());
+            vertex.position = rotate_z(vertex.position, mesh_rotation[2].to_radians());
+
+            vertex.position[0] = vertex.position[0] * mesh_scale[0] + mesh_position[0];
+            vertex.position[1] = vertex.position[1] * mesh_scale[1] + mesh_position[1];
+            vertex.position[2] = vertex.position[2] * mesh_scale[2] + mesh_position[2];
+
+            vertex.color[0] = material.color.0;
+            vertex.color[1] = material.color.1;
+            vertex.color[2] = material.color.2;
         }
 
         return mesh;
     }
-    (
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        "default".to_string(),
-    )
+    (Vec::new(), "default".to_string())
 }
 
 fn read_object_data<R: Read>(
     mut reader: &mut R,
-    meshes_found: &HashMap<
-        String,
-        (
-            Vec<SkinnedVertex>,
-            Vec<[f32; 3]>,
-            Vec<[f32; 3]>,
-            Vec<[f32; 2]>,
-            String,
-        ),
-    >,
+    meshes_found: &HashMap<String, (Vec<SkinnedVertex>, String)>,
     materials: &HashMap<String, Material>,
     color: (f32, f32, f32),
-) -> (
-    Vec<(
-        Vec<SkinnedVertex>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 2]>,
-        String,
-    )>,
-    HashMap<i64, (usize, Transform, String, i64, usize)>,
-) {
+) -> ParsedMesh {
     let mesh_count = read_u32(&mut reader).expect("Failed to read mesh count");
     let mut meshes = Vec::new();
+
     for j in 0..mesh_count {
         let mesh = read_object(&mut reader, j, meshes_found, materials, color);
         meshes.push(mesh);
     }
 
-    (meshes, HashMap::new())
+    ParsedMesh {
+        vertices: meshes,
+        bones: HashMap::new(),
+    }
 }
 
 fn create_object<R: Read>(
     mut reader: &mut R,
-    meshes: &HashMap<
-        String,
-        (
-            Vec<SkinnedVertex>,
-            Vec<[f32; 3]>,
-            Vec<[f32; 3]>,
-            Vec<[f32; 2]>,
-            String,
-        ),
-    >,
+    meshes: &HashMap<String, (Vec<SkinnedVertex>, String)>,
     materials: &HashMap<String, Material>,
 ) -> Object {
     let object_name = read_string(&mut reader);
@@ -270,12 +211,15 @@ fn create_object<R: Read>(
 
     let mesh_data = read_object_data(reader, meshes, materials, color);
 
-    let mut object = Object::create(ObjectType::Mesh, create_vertices_skinned(&mesh_data.0));
+    let mut object = Object::create(
+        ObjectType::Mesh,
+        create_vertices_skinned(&mesh_data.vertices),
+    );
     object.set_position(object_position[0], object_position[1], object_position[2]);
     object.set_rotation(
-        object_rotation[0] * 0.0174532925,
-        object_rotation[1] * 0.0174532925,
-        object_rotation[2] * 0.0174532925,
+        object_rotation[0].to_radians(),
+        object_rotation[1].to_radians(),
+        object_rotation[2].to_radians(),
     );
     object.set_scale(object_scale[0], object_scale[1], object_scale[2]);
     object.set_default_texture("Image");
@@ -332,8 +276,9 @@ pub fn parse_cae(path: &str) -> (Vec<Object>, HashMap<String, Material>) {
 
         let texture_exists = read_bool(&mut reader).expect("Failed to read texture_exists");
         if texture_exists {
-            let texture_length = read_u32(&mut reader).expect("Failed to read texture_length");
-            let mut texture_data = vec![0u8; texture_length as usize];
+            let texture_length =
+                read_u32(&mut reader).expect("Failed to read texture_length") as usize;
+            let mut texture_data = vec![0u8; texture_length];
             reader
                 .read_exact(&mut texture_data)
                 .expect("Failed to read texture data");

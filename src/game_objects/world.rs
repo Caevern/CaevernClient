@@ -6,13 +6,13 @@ use std::{
 use cgmath::Vector3;
 
 use crate::{
-    renderer::{transform::Transform, vertex::create_vertices_skinned},
-    world::{
+    game_objects::{
         material::Material,
         object::{Object, ObjectType},
         parsers::{cae_parser::parse_cae, fbx_parser::parse},
         scene::load_scene,
     },
+    renderer::{transform::Transform, vertex::create_vertices_skinned},
 };
 
 pub struct World {
@@ -20,6 +20,11 @@ pub struct World {
     pub textures: HashSet<String>,
     pub images: HashMap<String, image::DynamicImage>,
     cameras: Vec<Object>,
+}
+impl Default for World {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 impl World {
     pub fn new() -> Self {
@@ -35,7 +40,8 @@ impl World {
         if object.get_object_type() == ObjectType::Camera {
             self.cameras.push(object);
         } else {
-            self.objects.insert(self.get_free_object_id(), object);
+            let free_id = self.get_free_object_id();
+            self.objects.insert(free_id, object);
         }
     }
     pub fn add_object_at_index(&mut self, object: Object, index: usize) {
@@ -47,8 +53,7 @@ impl World {
     }
 
     pub fn get_object(&self, index: usize) -> &Object {
-        &self
-            .objects
+        self.objects
             .get(&index)
             .expect("Object doesn't exist at this index")
     }
@@ -102,7 +107,7 @@ impl World {
     fn load_from_json(&mut self, path: &str) {
         let scene = load_scene(path);
         if let Ok(scene) = scene {
-            let mut static_world_object = Object::create(ObjectType::StaticMesh, Vec::new());
+            let mut static_world_object = Object::create(ObjectType::Mesh, Vec::new());
 
             for scene_object in scene.objects {
                 if scene_object.is_static {
@@ -127,7 +132,7 @@ impl World {
                         ),
                     );
 
-                    let mut vertices = create_vertices_skinned(&model_parsed.0);
+                    let mut vertices = create_vertices_skinned(&model_parsed.vertices);
                     for mesh in &mut vertices {
                         if mesh.1 == "default" {
                             mesh.1 = format!(
@@ -142,7 +147,7 @@ impl World {
                     );
                     let mut object_material = Material::from_texture(&scene_object.texture);
                     self.textures.insert(scene_object.texture);
-                    if scene_object.displace != "".to_string() {
+                    if !scene_object.displace.is_empty() {
                         object_material.set_displacement(&scene_object.displace);
                         self.textures.insert(scene_object.displace);
                     }
@@ -156,8 +161,10 @@ impl World {
                 } else {
                     let model_parsed = parse(&scene_object.reference, Transform::zero());
 
-                    let mut object =
-                        Object::create(ObjectType::Mesh, create_vertices_skinned(&model_parsed.0));
+                    let mut object = Object::create(
+                        ObjectType::Mesh,
+                        create_vertices_skinned(&model_parsed.vertices),
+                    );
 
                     object.set_position(
                         scene_object.transform.position[0],
@@ -175,10 +182,10 @@ impl World {
                         scene_object.transform.scale[2],
                     );
 
-                    if scene_object.skeleton.len() > 0 {
+                    if !scene_object.skeleton.is_empty() {
                         let mut skeleton = HashMap::new();
                         for bone_identifier in scene_object.skeleton {
-                            for bone in &model_parsed.1 {
+                            for bone in &model_parsed.bones {
                                 let filtered: String =
                                     bone.1.2.chars().filter(|c| (*c as u32) >= 32).collect();
                                 if filtered == bone_identifier.bone_name {
@@ -189,8 +196,8 @@ impl World {
                         }
                         object.set_skeleton(skeleton);
                     }
-                    if model_parsed.1.len() > 0 {
-                        let mut bone_values = model_parsed.1;
+                    if !model_parsed.bones.is_empty() {
+                        let mut bone_values = model_parsed.bones;
 
                         if scene_object.render_bones {
                             for bone in bone_values.iter_mut() {
@@ -204,7 +211,7 @@ impl World {
                                 );
                                 let mut bone_object = Object::create(
                                     ObjectType::Mesh,
-                                    create_vertices_skinned(&bone_model_parsed.0),
+                                    create_vertices_skinned(&bone_model_parsed.vertices),
                                 );
 
                                 bone_object.set_position(
@@ -235,6 +242,10 @@ impl World {
                             .add_material(Material::from_texture(&material.texture), material.name);
                         self.textures.insert(material.texture);
                     }
+
+                    object.set_default_texture(&scene_object.texture);
+                    self.textures.insert(scene_object.texture);
+
                     self.add_object(object);
                 }
             }

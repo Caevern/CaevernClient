@@ -4,9 +4,9 @@ use std::sync::atomic::AtomicBool;
 use winit::event_loop::EventLoop;
 use winit::window::Icon;
 
+use crate::game_objects::world::World;
 use crate::interract::input_state::InputState;
 use crate::renderer::game_window::GameWindow;
-use crate::world::world::World;
 
 fn load_icon() -> Option<Icon> {
     let image = image::open("assets/icons/icon-small.png")
@@ -20,6 +20,8 @@ fn load_icon() -> Option<Icon> {
 pub fn start_engine(world: World, no_vr: bool) {
     env_logger::init();
     let event_loop = EventLoop::new().unwrap();
+
+    println!("AMOUNT OF OBJECTS: {}", world.objects.len());
 
     let mut game_window = GameWindow {
         window: None,
@@ -36,8 +38,6 @@ pub fn start_engine(world: World, no_vr: bool) {
         icon: load_icon(),
 
         render_start_time: std::time::Instant::now(),
-        keys: [false; 6],
-        mouse_movement: [0.0; 2],
         input: InputState::default(),
 
         muted: Arc::new(AtomicBool::new(true)),

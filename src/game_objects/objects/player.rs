@@ -18,8 +18,8 @@ pub struct Player {
     pub sensitivity: f32,
     pub muted: bool,
 }
-impl Player {
-    pub fn new() -> Self {
+impl Default for Player {
+    fn default() -> Self {
         Self {
             transform: Transform::zero(),
             camera: Transform::zero(),
@@ -37,7 +37,8 @@ impl Player {
             muted: false,
         }
     }
-
+}
+impl Player {
     pub fn get_camera_transform(&self) -> &Transform {
         &self.camera
     }

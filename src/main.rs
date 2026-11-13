@@ -1,6 +1,7 @@
 // Copyright 2026 Charli van Nood
 
 pub mod game;
+pub mod game_objects;
 pub mod interract;
 pub mod modules;
 pub mod network;
@@ -8,21 +9,20 @@ pub mod physics;
 pub mod renderer;
 pub mod setup;
 pub mod ui;
-pub mod world;
 pub mod xr;
 
 use cap::Cap;
 use cgmath::Vector3;
+use game_objects::object::Object;
 use std::alloc;
-use world::object::Object;
 
+use crate::game_objects::{object::ObjectType, parsers::fbx_parser::parse};
 use crate::renderer::transform::Transform;
 use crate::setup::fonts::load_font_uvs;
 use crate::ui::canvas::Canvas;
 use crate::ui::widget::Widget;
 use crate::ui::widgets::button::Button;
 use crate::ui::widgets::label::Label;
-use crate::world::{object::ObjectType, parsers::fbx_parser::parse};
 
 #[global_allocator]
 static ALLOCATOR: Cap<alloc::System> = Cap::new(alloc::System, usize::MAX);
@@ -38,7 +38,7 @@ fn main() {
         println!("Running VR mode");
     }
 
-    let mut world = world::world::create_world();
+    let mut world = game_objects::world::create_world();
 
     let skybox = parse(
         "models/skybox.fbx",
@@ -50,7 +50,7 @@ fn main() {
     );
     let mut skybox_object = Object::create(
         ObjectType::Skybox,
-        renderer::vertex::create_vertices_skinned(&skybox.0),
+        renderer::vertex::create_vertices_skinned(&skybox.vertices),
     );
     world.textures.insert("textures/skybox_2.png".to_string());
     skybox_object.set_default_texture("textures/skybox_2.png");
@@ -62,8 +62,9 @@ fn main() {
     camera.set_rotation(0.0, -45.0, 0.0);
     world.add_object(camera);
 
-    //world.load_world("worlds/scene3.cae");
-    world.load_world("worlds/test.json");
+    world.load_world("worlds/scene3.cae");
+    //world.load_world("worlds/home.json");
+    //world.load_world("worlds/test.json");
 
     let mut tablet_canvas = Canvas::new();
 
@@ -98,12 +99,12 @@ fn main() {
     );
     let mut tablet_object = Object::create(
         ObjectType::TabletMenu,
-        renderer::vertex::create_vertices_skinned(&tablet.0),
+        renderer::vertex::create_vertices_skinned(&tablet.vertices),
     );
     tablet_object.set_position(0.0, -10.0, 0.0);
     tablet_object.set_default_texture("textures/tablet.png");
     tablet_object.set_canvas(tablet_canvas);
-    let last_object = world.get_objects().len() - 1;
+    let last_object = world.get_objects().len();
     tablet_object.build_canvas(&mut world);
     world.add_object_at_index(tablet_object, last_object);
 

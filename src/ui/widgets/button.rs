@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
 use crate::{
-    renderer,
-    ui::widget::Widget,
-    world::{
+    game_objects::{
         object::{Object, ObjectType},
         objects::text::create_plane_with_text,
     },
+    renderer::{self, simple_vertex::SimpleVertex},
+    setup::font_character::FontCharacter,
+    ui::widget::Widget,
 };
 
 #[derive(Clone)]
@@ -17,11 +18,11 @@ pub struct Button {
     pub text_color: [f32; 3],
     pub needs_update: bool,
     object_id: usize,
-    font_uvs: HashMap<String, (f32, f32, f32, f32, f32)>,
+    font_uvs: HashMap<String, FontCharacter>,
 }
 
 impl Button {
-    pub fn with_text(text: String, font_uvs: HashMap<String, (f32, f32, f32, f32, f32)>) -> Self {
+    pub fn with_text(text: String, font_uvs: HashMap<String, FontCharacter>) -> Self {
         Self {
             text: text.clone(),
             text_placeholder: text,
@@ -29,7 +30,7 @@ impl Button {
             text_color: [1.0, 1.0, 1.0],
             needs_update: false,
             object_id: 0,
-            font_uvs: font_uvs,
+            font_uvs,
         }
     }
 }
@@ -57,15 +58,7 @@ impl Widget for Button {
         self.object_id
     }
 
-    fn get_meshes(
-        &self,
-    ) -> Vec<(
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 2]>,
-        String,
-    )> {
+    fn get_meshes(&self) -> Vec<(Vec<SimpleVertex>, String)> {
         create_plane_with_text(
             self.position,
             (0.02, 0.02, 1.0),
@@ -74,16 +67,7 @@ impl Widget for Button {
             &self.text,
         )
     }
-    fn get_meshes_from_text(
-        &self,
-        text: &str,
-    ) -> Vec<(
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 2]>,
-        String,
-    )> {
+    fn get_meshes_from_text(&self, text: &str) -> Vec<(Vec<SimpleVertex>, String)> {
         create_plane_with_text(
             self.position,
             (0.02, 0.02, 1.0),

@@ -5,9 +5,10 @@ use rust_embed::RustEmbed;
 use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, Cursor};
 
+use crate::game_objects::parsers::parsed_mesh::ParsedMesh;
+use crate::game_objects::parsers::transforms::{rotate_x, rotate_y, rotate_z};
 use crate::renderer::skinned_vertex::SkinnedVertex;
 use crate::renderer::transform;
-use crate::world::parsers::transforms::{rotate_x, rotate_y, rotate_z};
 
 #[derive(RustEmbed)]
 #[folder = "assets/"]
@@ -94,7 +95,7 @@ struct Cluster {
 }
 
 fn get_id(node: &Node) -> Option<i64> {
-    match node.properties.get(0) {
+    match node.properties.first() {
         Some(Property::I64(id)) => Some(*id),
         Some(Property::I32(id)) => Some(*id as i64),
         _ => None,
@@ -379,15 +380,12 @@ fn traverse_nodes(node: &Node) -> Vec<Mesh> {
                 }
                 "LayerElementNormal" => {
                     for sub in &child.children {
-                        match sub.name.as_str() {
-                            "Normals" => {
-                                for prop in &sub.properties {
-                                    if let Property::F64Array(arr) = prop {
-                                        normals.extend(arr);
-                                    }
+                        if sub.name.as_str() == "Normals" {
+                            for prop in &sub.properties {
+                                if let Property::F64Array(arr) = prop {
+                                    normals.extend(arr);
                                 }
                             }
-                            _ => {}
                         }
                     }
                 }
@@ -552,31 +550,13 @@ fn pack_weights(
     (ids, weights)
 }
 
-pub fn parse(
-    path: &str,
-    global_transform: transform::Transform,
-) -> (
-    Vec<(
-        Vec<SkinnedVertex>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 2]>,
-        String,
-    )>,
-    HashMap<i64, (usize, transform::Transform, String, i64, usize)>,
-) {
+pub fn parse(path: &str, global_transform: transform::Transform) -> ParsedMesh {
     let data = Assets::get(path).expect("Failed to get asset").data;
     let cursor = Cursor::new(data);
     let mut reader = BufReader::new(cursor);
     let file = File::read_from(&mut reader).expect("Failed to parse FBX file");
 
-    let mut mesh_data: Vec<(
-        Vec<SkinnedVertex>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 3]>,
-        Vec<[f32; 2]>,
-        String,
-    )> = Vec::new();
+    let mut mesh_data: Vec<(Vec<SkinnedVertex>, String)> = Vec::new();
 
     let mut transforms = HashMap::new();
     let mut materials = HashMap::new();
@@ -604,18 +584,6 @@ pub fn parse(
             println!("{}", animation.0);
         }
     }
-    /*for node in &file.children {
-        let animation_curve_node = parse_curve_nodes(node);
-        for animation in animation_curve_node {
-            println!("{} {}", animation.0, animation.1.property);
-        }
-    }
-    for node in &file.children {
-        let animation_curve = parse_animation_curves(node);
-        for animation in animation_curve {
-            println!("{} {} {}", animation.0, animation.1.times.len(), animation.1.values.len());
-        }
-    }*/
 
     for node in &file.children {
         if node.name == "Objects" {
@@ -632,10 +600,8 @@ pub fn parse(
         clusters.extend(parse_clusters(node));
     }
     for conn in &connections {
-        if clusters.contains_key(&conn.to) {
-            if let Some(cluster) = clusters.get_mut(&conn.to) {
-                cluster.bone_id = conn.from;
-            }
+        if let Some(cluster) = clusters.get_mut(&conn.to) {
+            cluster.bone_id = conn.from;
         }
     }
 
@@ -643,11 +609,9 @@ pub fn parse(
         let mut skin_id = None;
 
         for conn in &connections {
-            if conn.from == cluster.id {
-                if skins.contains(&conn.to) {
-                    skin_id = Some(conn.to);
-                    break;
-                }
+            if conn.from == cluster.id && skins.contains(&conn.to) {
+                skin_id = Some(conn.to);
+                break;
             }
         }
 
@@ -672,10 +636,11 @@ pub fn parse(
     let existing_keys: HashSet<_> = transforms.keys().cloned().collect();
     for transform in transforms.iter_mut() {
         for connection in &connections {
-            if &connection.from == transform.0 && transform.1.object == ObjectType::Bone {
-                if existing_keys.contains(&connection.to) {
-                    transform.1.parent = connection.to;
-                }
+            if &connection.from == transform.0
+                && transform.1.object == ObjectType::Bone
+                && existing_keys.contains(&connection.to)
+            {
+                transform.1.parent = connection.to;
             }
         }
     }
@@ -741,10 +706,10 @@ pub fn parse(
 
             if let Some(model_id) = model_id {
                 for connection in &connections {
-                    if connection.to == model_id {
-                        if let Some(mat) = materials.get(&connection.from) {
-                            material = Some(mat);
-                        }
+                    if connection.to == model_id
+                        && let Some(mat) = materials.get(&connection.from)
+                    {
+                        material = Some(mat);
                     }
                 }
             }
@@ -772,13 +737,7 @@ pub fn parse(
             let mut current_polygon = vec![];
             let mut current_uvs = vec![];
 
-            mesh_data.push((
-                Vec::new(),
-                Vec::new(),
-                Vec::new(),
-                Vec::new(),
-                selected_material.to_string(),
-            ));
+            mesh_data.push((Vec::new(), selected_material.to_string()));
             let mesh_data_index = mesh_data.len() - 1;
 
             for (index_uv, i) in mesh.indices.iter().enumerate() {
@@ -788,7 +747,7 @@ pub fn parse(
                     *i as usize
                 };
                 current_polygon.push(index);
-                current_uvs.push(mesh.uv_indices[index_uv as usize]);
+                current_uvs.push(mesh.uv_indices[index_uv]);
 
                 if *i < 0 {
                     // polygon ended, triangulate
@@ -822,15 +781,15 @@ pub fn parse(
 
                 v = rotate_x(
                     v,
-                    (global_transform.rotation.x + transform.rotation.0) * 0.0174532925,
+                    (global_transform.rotation.x + transform.rotation.0).to_radians(),
                 );
                 v = rotate_y(
                     v,
-                    (global_transform.rotation.y + transform.rotation.1) * 0.0174532925,
+                    (global_transform.rotation.y + transform.rotation.1).to_radians(),
                 );
                 v = rotate_z(
                     v,
-                    (global_transform.rotation.z + transform.rotation.2) * 0.0174532925,
+                    (global_transform.rotation.z + transform.rotation.2).to_radians(),
                 );
 
                 // translate
@@ -844,13 +803,13 @@ pub fn parse(
                     position: v,
                     bone_ids,
                     weights,
+                    normal: [0.0, 1.0, 0.0],
+                    color: [1.0, 1.0, 1.0],
+                    uv: [
+                        mesh.uv[tri[3] * 2] as f32,
+                        1.0 - mesh.uv[tri[3] * 2 + 1] as f32,
+                    ],
                 });
-                mesh_data[mesh_data_index].3.push([
-                    mesh.uv[tri[3] * 2] as f32,
-                    1.0 - mesh.uv[tri[3] * 2 + 1] as f32,
-                ]);
-                mesh_data[mesh_data_index].1.push([0.0, 1.0, 0.0]);
-                mesh_data[mesh_data_index].2.push([1.0, 1.0, 1.0]);
 
                 let mut v = [
                     mesh.vertices[tri[1] * 3] as f32
@@ -866,15 +825,15 @@ pub fn parse(
 
                 v = rotate_x(
                     v,
-                    (global_transform.rotation.x + transform.rotation.0) * 0.0174532925,
+                    (global_transform.rotation.x + transform.rotation.0).to_radians(),
                 );
                 v = rotate_y(
                     v,
-                    (global_transform.rotation.y + transform.rotation.1) * 0.0174532925,
+                    (global_transform.rotation.y + transform.rotation.1).to_radians(),
                 );
                 v = rotate_z(
                     v,
-                    (global_transform.rotation.z + transform.rotation.2) * 0.0174532925,
+                    (global_transform.rotation.z + transform.rotation.2).to_radians(),
                 );
 
                 // translate
@@ -888,13 +847,13 @@ pub fn parse(
                     position: v,
                     bone_ids,
                     weights,
+                    normal: [0.0, 1.0, 0.0],
+                    color: [1.0, 1.0, 1.0],
+                    uv: [
+                        mesh.uv[tri[4] * 2] as f32,
+                        1.0 - mesh.uv[tri[4] * 2 + 1] as f32,
+                    ],
                 });
-                mesh_data[mesh_data_index].3.push([
-                    mesh.uv[tri[4] * 2] as f32,
-                    1.0 - mesh.uv[tri[4] * 2 + 1] as f32,
-                ]);
-                mesh_data[mesh_data_index].1.push([0.0, 1.0, 0.0]);
-                mesh_data[mesh_data_index].2.push([1.0, 1.0, 1.0]);
 
                 let mut v = [
                     mesh.vertices[tri[2] * 3] as f32
@@ -910,15 +869,15 @@ pub fn parse(
 
                 v = rotate_x(
                     v,
-                    (global_transform.rotation.x + transform.rotation.0) * 0.0174532925,
+                    (global_transform.rotation.x + transform.rotation.0).to_radians(),
                 );
                 v = rotate_y(
                     v,
-                    (global_transform.rotation.y + transform.rotation.1) * 0.0174532925,
+                    (global_transform.rotation.y + transform.rotation.1).to_radians(),
                 );
                 v = rotate_z(
                     v,
-                    (global_transform.rotation.z + transform.rotation.2) * 0.0174532925,
+                    (global_transform.rotation.z + transform.rotation.2).to_radians(),
                 );
 
                 // translate
@@ -932,20 +891,23 @@ pub fn parse(
                     position: v,
                     bone_ids,
                     weights,
+                    normal: [0.0, 1.0, 0.0],
+                    color: [1.0, 1.0, 1.0],
+                    uv: [
+                        mesh.uv[tri[5] * 2] as f32,
+                        1.0 - mesh.uv[tri[5] * 2 + 1] as f32,
+                    ],
                 });
-                mesh_data[mesh_data_index].3.push([
-                    mesh.uv[tri[5] * 2] as f32,
-                    1.0 - mesh.uv[tri[5] * 2 + 1] as f32,
-                ]);
-                mesh_data[mesh_data_index].1.push([0.0, 1.0, 0.0]);
-                mesh_data[mesh_data_index].2.push([1.0, 1.0, 1.0]);
             }
 
-            if mesh_data[mesh_data_index].0.len() == 0 {
+            if mesh_data[mesh_data_index].0.is_empty() {
                 mesh_data.remove(mesh_data_index);
             }
         }
     }
 
-    (mesh_data, bone_map)
+    ParsedMesh {
+        vertices: mesh_data,
+        bones: bone_map,
+    }
 }

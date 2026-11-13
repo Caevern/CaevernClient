@@ -6,7 +6,7 @@ use std::{
 
 use wasmtime::Caller;
 
-use crate::world::world::World;
+use crate::game_objects::world::World;
 
 pub fn game_get_time(mut _caller: Caller<'_, Rc<RefCell<World>>>) -> u32 {
     SystemTime::now()

@@ -2,10 +2,10 @@ use cgmath::Matrix;
 use cgmath::SquareMatrix;
 use cgmath::Vector3;
 
+use crate::game_objects::world::World;
 use crate::renderer::buffer_bindings::BufferBindings;
 use crate::renderer::buffer_collection::BufferCollection;
 use crate::renderer::transforms::create_transforms;
-use crate::world::world::World;
 
 pub fn update_bone(
     world: &World,
