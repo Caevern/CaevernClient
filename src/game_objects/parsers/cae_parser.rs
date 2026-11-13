@@ -62,7 +62,6 @@ fn read_mesh<R: Read>(mut reader: &mut R) -> (Vec<SkinnedVertex>, String) {
         let z = read_f32(&mut reader).expect("Failed to read vertex z");
         *vertex = (x, y, z);
     }
-    println!("vertex_count: {vertex_count}");
 
     let triangle_index_count =
         read_u32(&mut reader).expect("Failed to read triangle count") as usize;
@@ -71,8 +70,6 @@ fn read_mesh<R: Read>(mut reader: &mut R) -> (Vec<SkinnedVertex>, String) {
         let index = read_u32(&mut reader).expect("Failed to read triangle index");
         *triangle = index;
     }
-    let triangle_count = triangle_index_count / 3;
-    println!("triangle_count: {triangle_count}");
 
     let uv_count = read_u32(&mut reader).expect("Failed to read uv count") as usize;
     let mut uvs = vec![(0f32, 0f32); uv_count as usize];
@@ -85,7 +82,6 @@ fn read_mesh<R: Read>(mut reader: &mut R) -> (Vec<SkinnedVertex>, String) {
             .rem_euclid(1.0);
         *uv = (x, y);
     }
-    println!("uv_count: {uv_count}");
 
     let normals_count = read_u32(&mut reader).expect("Failed to read normals count") as usize;
     let mut normals = vec![(0f32, 0f32, 0f32); normals_count as usize];
@@ -95,7 +91,6 @@ fn read_mesh<R: Read>(mut reader: &mut R) -> (Vec<SkinnedVertex>, String) {
         let z = read_f32(&mut reader).expect("Failed to read normals z");
         *normal = (x, y, z);
     }
-    println!("normals_count: {normals_count}");
 
     let mut mesh_data = (Vec::new(), String::new());
 
@@ -240,26 +235,23 @@ pub fn parse_cae(path: &str) -> (Vec<Object>, HashMap<String, Material>) {
     if &header != b"CAEV" {
         panic!("Not a Caevern file!");
     }
-    println!("----------------- LOADING CAEVERN FILE -----------------");
+    println!("----------------- LOADING CAEVERN FILE -----------------\n");
 
     let version = read_u32(&mut reader).expect("Failed to read version");
     println!("version: {version}");
 
     let mesh_count = read_u32(&mut reader).expect("Failed to read mesh count");
-    println!("\nmesh_count: {mesh_count}");
     let mut meshes = HashMap::new();
     for i in 0..mesh_count {
         let original_name = read_string(&mut reader);
         let mesh_name = format!("{}@{}", original_name, i);
-        println!("mesh_name: {mesh_name}");
-
         let mesh = read_mesh(&mut reader);
+
+        println!("mesh_name: {mesh_name}");
         meshes.insert(mesh_name, mesh);
     }
 
     let material_count = read_u32(&mut reader).expect("Failed to read material count");
-    println!("\nmaterial_count: {material_count}");
-
     let mut materials = HashMap::new();
     for _ in 0..material_count {
         let material_name = read_string(&mut reader);

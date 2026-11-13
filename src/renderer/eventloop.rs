@@ -7,6 +7,7 @@ use winit::window::Icon;
 use crate::game_objects::world::World;
 use crate::interract::input_state::InputState;
 use crate::renderer::game_window::GameWindow;
+use crate::setup::engine_arguments::EngineArguments;
 
 fn load_icon() -> Option<Icon> {
     let image = image::open("assets/icons/icon-small.png")
@@ -17,7 +18,7 @@ fn load_icon() -> Option<Icon> {
     Icon::from_rgba(image.into_raw(), width, height).ok()
 }
 
-pub fn start_engine(world: World, no_vr: bool) {
+pub fn start_engine(world: World, engine_arguments: EngineArguments) {
     env_logger::init();
     let event_loop = EventLoop::new().unwrap();
 
@@ -44,7 +45,8 @@ pub fn start_engine(world: World, no_vr: bool) {
         mouse_locked: false,
         use_confined: false,
 
-        xr_enabled: !no_vr,
+        xr_enabled: !engine_arguments.no_vr,
+        server_url: engine_arguments.server_url,
 
         menu_tablet_state: 0,
 

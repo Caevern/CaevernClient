@@ -629,10 +629,6 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> ParsedMesh {
         }
     }
 
-    for (geom, cluster_ids) in &geometry_clusters {
-        println!("Geometry {} has {} clusters", geom, cluster_ids.len());
-    }
-
     let existing_keys: HashSet<_> = transforms.keys().cloned().collect();
     for transform in transforms.iter_mut() {
         for connection in &connections {
@@ -730,7 +726,6 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> ParsedMesh {
 
             if let Some(mat) = material {
                 selected_material = &mat.name;
-                println!("{} uses material: {}", transform.name, mat.name);
             }
 
             let mut triangles = vec![];

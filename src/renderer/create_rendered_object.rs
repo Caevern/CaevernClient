@@ -153,11 +153,6 @@ pub fn create_rendered_object(
         let material_found_texture = material_found.get_texture();
         let material_found_displacement = material_found.get_displacement();
 
-        println!(
-            "loading: {} from: {}",
-            material_found_texture, material_string
-        );
-
         let texture_object;
         if material_found_texture == "Image"
             && let Some(texture) = buffer_collection.textures.get(material_string.as_str())

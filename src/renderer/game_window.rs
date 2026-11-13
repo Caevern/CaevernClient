@@ -5,6 +5,7 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::thread;
 
+use tokio::runtime::Runtime;
 use tokio_tungstenite::connect_async;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalPosition;
@@ -23,6 +24,7 @@ use crate::game::update_game::Engine;
 use crate::game_objects::world::World;
 use crate::interract::input_state::InputState;
 use crate::network::avatar_updates::AvatarUpdate;
+use crate::network::is_reachable::is_server_reachable;
 use crate::network::user_authenticate::authenticate_user;
 use crate::network::user_handler::start_user_handler;
 use crate::network::user_updates::UserUpdate;
@@ -55,9 +57,9 @@ pub struct GameWindow<'window> {
     pub use_confined: bool,
 
     pub xr_enabled: bool,
+    pub server_url: String,
 
     pub menu_tablet_state: usize,
-
     pub home_world: Option<World>,
 }
 
@@ -66,13 +68,25 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
         let (data_thread_tx, data_thread_rx) = mpsc::channel::<UserUpdate>();
         let (avatar_thread_tx, avatar_thread_rx) = mpsc::channel::<AvatarUpdate>();
 
+        let server_url = self.server_url.clone();
+        let check_runtime = Runtime::new().expect("Failed to create Tokio runtime");
+
+        if !check_runtime.block_on(is_server_reachable(&server_url)) {
+            println!("Server is unreachable: {}", server_url);
+            event_loop.exit();
+            return;
+        }
+
+        drop(check_runtime);
+
         let muted = Arc::clone(&self.muted);
         thread::spawn(move || {
             println!("Starting webserver connection");
 
             let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
             runtime.block_on(async {
-                if let Ok((socket, _)) = connect_async("ws://178.128.158.197:5000/ws/user").await {
+                if let Ok((socket, _)) = connect_async(format!("ws://{}/ws/user", server_url)).await
+                {
                     let (socket, user_id) = authenticate_user(socket).await;
                     println!("User ID: {}", user_id);
 
