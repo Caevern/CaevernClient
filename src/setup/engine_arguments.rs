@@ -17,8 +17,8 @@ impl EngineArguments {
         for arg in args {
             if arg.starts_with("--no-vr") {
                 engine_arguments.set_no_vr(true);
-            } else if arg.starts_with("--server=") {
-                engine_arguments.set_server_url(arg[9..].to_string());
+            } else if let Some(stripped) = arg.strip_prefix("--server=") {
+                engine_arguments.set_server_url(stripped.to_string());
             }
         }
 

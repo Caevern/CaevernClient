@@ -8,8 +8,8 @@ pub async fn is_server_reachable(server_addr: &str) -> bool {
         format!("{}:5000", server_addr)
     };
 
-    match tokio::time::timeout(Duration::from_secs(3), TcpStream::connect(&addr)).await {
-        Ok(Ok(_)) => true,
-        _ => false,
-    }
+    matches!(
+        tokio::time::timeout(Duration::from_secs(3), TcpStream::connect(&addr)).await,
+        Ok(Ok(_))
+    )
 }
