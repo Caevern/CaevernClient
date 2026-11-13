@@ -1,16 +1,15 @@
 use wgpu::BindGroup;
 
-use crate::renderer::{textures::texture_object::TextureObject, vertex::Vertex};
+use crate::renderer::{
+    buffer_collection::BufferCollection, textures::texture_object::TextureObject, vertex::Vertex,
+};
 
 // TODO: Fix every object having a displacement map
 pub fn create_buffer_displacement(
     queue: &wgpu::Queue,
     device: &wgpu::Device,
-    uniform_bind_group_layout: &wgpu::BindGroupLayout,
-    vertex_uniform_buffer: &wgpu::Buffer,
-    fragment_uniform_buffer: &wgpu::Buffer,
+    buffer_collection: &BufferCollection,
     model_uniform_buffer: &wgpu::Buffer,
-    bones_buffer: &wgpu::Buffer,
     displacement_texture_object: &TextureObject,
     default_texture_object: &TextureObject,
     vertex_num: usize,
@@ -63,16 +62,19 @@ pub fn create_buffer_displacement(
         ..Default::default()
     });
 
+    let bone_buffer_index = buffer_collection.bone_buffers.len() - 1;
     let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-        layout: uniform_bind_group_layout,
+        layout: &buffer_collection.uniform_bind_group_layout,
         entries: &[
             wgpu::BindGroupEntry {
                 binding: 0,
-                resource: vertex_uniform_buffer.as_entire_binding(),
+                resource: buffer_collection.vertex_uniform_buffer.as_entire_binding(),
             },
             wgpu::BindGroupEntry {
                 binding: 1,
-                resource: fragment_uniform_buffer.as_entire_binding(),
+                resource: buffer_collection
+                    .fragment_uniform_buffer
+                    .as_entire_binding(),
             },
             wgpu::BindGroupEntry {
                 binding: 2,
@@ -96,7 +98,7 @@ pub fn create_buffer_displacement(
             },
             wgpu::BindGroupEntry {
                 binding: 7,
-                resource: bones_buffer.as_entire_binding(),
+                resource: buffer_collection.bone_buffers[bone_buffer_index].as_entire_binding(),
             },
         ],
         label: Some("Uniform Bind Group"),

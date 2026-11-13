@@ -5,9 +5,10 @@ use std::{collections::HashMap, println};
 
 use crate::game_objects::material::Material;
 use crate::game_objects::object::{Object, ObjectType};
+use crate::game_objects::parsers::parsed_mesh::ParsedMesh;
 use crate::game_objects::parsers::transforms::{rotate_x, rotate_y, rotate_z};
+use crate::renderer::skinned_vertex::SkinnedVertex;
 use crate::renderer::vertex::create_vertices_skinned;
-use crate::renderer::{skinned_vertex::SkinnedVertex, transform::Transform};
 
 #[derive(RustEmbed)]
 #[folder = "assets/"]
@@ -166,10 +167,7 @@ fn read_object_data<R: Read>(
     meshes_found: &HashMap<String, (Vec<SkinnedVertex>, String)>,
     materials: &HashMap<String, Material>,
     color: (f32, f32, f32),
-) -> (
-    Vec<(Vec<SkinnedVertex>, String)>,
-    HashMap<i64, (usize, Transform, String, i64, usize)>,
-) {
+) -> ParsedMesh {
     let mesh_count = read_u32(&mut reader).expect("Failed to read mesh count");
     let mut meshes = Vec::new();
 
@@ -178,7 +176,10 @@ fn read_object_data<R: Read>(
         meshes.push(mesh);
     }
 
-    (meshes, HashMap::new())
+    ParsedMesh {
+        vertices: meshes,
+        bones: HashMap::new(),
+    }
 }
 
 fn create_object<R: Read>(
@@ -210,7 +211,10 @@ fn create_object<R: Read>(
 
     let mesh_data = read_object_data(reader, meshes, materials, color);
 
-    let mut object = Object::create(ObjectType::Mesh, create_vertices_skinned(&mesh_data.0));
+    let mut object = Object::create(
+        ObjectType::Mesh,
+        create_vertices_skinned(&mesh_data.vertices),
+    );
     object.set_position(object_position[0], object_position[1], object_position[2]);
     object.set_rotation(
         object_rotation[0].to_radians(),
