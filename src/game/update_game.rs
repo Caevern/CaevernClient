@@ -56,7 +56,7 @@ impl Engine {
         data_thread_tx: Sender<UserUpdate>,
         avatar_thread_rx: Receiver<AvatarUpdate>,
     ) -> Self {
-        let model_parsed = parse("models/fallback.fbx", Transform::zero());
+        let model_parsed = parse("models/fallback.fbx", Transform::zero(), [1.0, 1.0, 1.0]);
         let fallback_vertices = create_vertices_skinned(&model_parsed.vertices);
         let fallback_bones = model_parsed.bones;
 

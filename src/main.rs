@@ -41,6 +41,7 @@ fn main() {
             Vector3::new(0.0, 0.0, 0.0),
             Vector3::new(1.5, 1.5, 1.5),
         ),
+        [1.0, 1.0, 1.0],
     );
     let mut skybox_object = Object::create(
         ObjectType::Skybox,
@@ -88,6 +89,7 @@ fn main() {
             Vector3::new(0.0, 90.0, 0.0),
             Vector3::new(0.001, 0.005, 0.005),
         ),
+        [1.0, 1.0, 1.0],
     );
     let mut tablet_object = Object::create(
         ObjectType::TabletMenu,

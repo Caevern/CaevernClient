@@ -134,6 +134,7 @@ impl World {
                                 scene_object.transform.scale[2],
                             ),
                         ),
+                        scene_object.color,
                     );
 
                     let mut vertices = create_vertices_skinned(&model_parsed.vertices);
@@ -163,12 +164,17 @@ impl World {
                     static_world_object.add_material(object_material, material_name);
                     static_world_object.add_meshes(vertices);
                 } else {
-                    let model_parsed = parse(&scene_object.reference, Transform::zero());
+                    let model_parsed = parse(
+                        &scene_object.reference,
+                        Transform::zero(),
+                        scene_object.color,
+                    );
 
                     let mut object = Object::create(
                         ObjectType::Mesh,
                         create_vertices_skinned(&model_parsed.vertices),
                     );
+                    object.set_name(&scene_object.name);
 
                     object.set_position(
                         scene_object.transform.position[0],
@@ -212,6 +218,7 @@ impl World {
                                         Vector3::new(0.0, 0.0, 0.0),
                                         Vector3::new(0.001, 0.001, 0.001),
                                     ),
+                                    [1.0, 1.0, 1.0],
                                 );
                                 let mut bone_object = Object::create(
                                     ObjectType::Mesh,

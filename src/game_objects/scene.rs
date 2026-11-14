@@ -20,6 +20,8 @@ pub struct Scene {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Object {
+    #[serde(default = "default_name")]
+    pub name: String,
     #[serde(default = "default_on")]
     pub is_static: bool,
     #[serde(default = "default_off")]
@@ -32,6 +34,8 @@ pub struct Object {
 
     #[serde(default = "default_materials")]
     pub materials: Vec<Material>,
+    #[serde(default = "default_color")]
+    pub color: [f32; 3],
 
     #[serde(default = "default_skeleton")]
     pub skeleton: Vec<BoneIdentifier>,
@@ -40,6 +44,10 @@ pub struct Object {
     pub displace: String,
 
     pub transform: Transform,
+}
+
+fn default_name() -> String {
+    "unnamed".to_string()
 }
 
 fn default_off() -> bool {
@@ -100,6 +108,10 @@ fn default_rotation() -> [f32; 3] {
 }
 
 fn default_scale() -> [f32; 3] {
+    [1.0, 1.0, 1.0]
+}
+
+fn default_color() -> [f32; 3] {
     [1.0, 1.0, 1.0]
 }
 

@@ -550,7 +550,11 @@ fn pack_weights(
     (ids, weights)
 }
 
-pub fn parse(path: &str, global_transform: transform::Transform) -> ParsedMesh {
+pub fn parse(
+    path: &str,
+    global_transform: transform::Transform,
+    global_color: [f32; 3],
+) -> ParsedMesh {
     let data = Assets::get(path).expect("Failed to get asset").data;
     let cursor = Cursor::new(data);
     let mut reader = BufReader::new(cursor);
@@ -799,7 +803,7 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> ParsedMesh {
                     bone_ids,
                     weights,
                     normal: [0.0, 1.0, 0.0],
-                    color: [1.0, 1.0, 1.0],
+                    color: global_color,
                     uv: [
                         mesh.uv[tri[3] * 2] as f32,
                         1.0 - mesh.uv[tri[3] * 2 + 1] as f32,
@@ -843,7 +847,7 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> ParsedMesh {
                     bone_ids,
                     weights,
                     normal: [0.0, 1.0, 0.0],
-                    color: [1.0, 1.0, 1.0],
+                    color: global_color,
                     uv: [
                         mesh.uv[tri[4] * 2] as f32,
                         1.0 - mesh.uv[tri[4] * 2 + 1] as f32,
@@ -887,7 +891,7 @@ pub fn parse(path: &str, global_transform: transform::Transform) -> ParsedMesh {
                     bone_ids,
                     weights,
                     normal: [0.0, 1.0, 0.0],
-                    color: [1.0, 1.0, 1.0],
+                    color: global_color,
                     uv: [
                         mesh.uv[tri[5] * 2] as f32,
                         1.0 - mesh.uv[tri[5] * 2 + 1] as f32,
