@@ -1,22 +1,16 @@
 {
     "name": "home",
-    "id": 0,
     "creator": "theCaely",
 
+    "cae_files": [
+        "cae_files/scene3.cae"
+    ],
+    "module_files": [],
     "objects": [
         {
-          "is_static": true, "reference": "models/base.fbx",
-            "texture": "textures/brick.jpg", "transform": {"position": [0, -0.5, 0], "scale": [0.01, 0.005, 0.01]}
-        },
-        {
             "is_static": false, "reference": "models/table.fbx",
-            "transform": {"position": [0, 2, 0], "scale": [0.01, 0.01, 0.02]},
+            "transform": {"position": [8, -0.2, 2], "scale": [0.01, 0.01, 0.02]},
             "texture": "textures/table.png"
-        },
-        {
-            "is_static": false, "reference": "models/sphere.fbx",
-            "transform": {"position": [0, 4, 0], "scale": [0.01, 0.01, 0.01]},
-            "texture": "textures/bigratexe.jpg"
         }
     ]
 }

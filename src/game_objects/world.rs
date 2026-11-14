@@ -107,6 +107,10 @@ impl World {
     fn load_from_json(&mut self, path: &str) {
         let scene = load_scene(path);
         if let Ok(scene) = scene {
+            for cae_file in &scene.cae_files {
+                self.load_from_cae(cae_file);
+            }
+
             let mut static_world_object = Object::create(ObjectType::Mesh, Vec::new());
 
             for scene_object in scene.objects {

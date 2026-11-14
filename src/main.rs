@@ -56,9 +56,7 @@ fn main() {
     camera.set_rotation(0.0, -45.0, 0.0);
     world.add_object(camera);
 
-    world.load_world("worlds/scene3.cae");
-    //world.load_world("worlds/home.json");
-    //world.load_world("worlds/test.json");
+    world.load_world("worlds/home.json");
 
     let mut tablet_canvas = Canvas::new();
 

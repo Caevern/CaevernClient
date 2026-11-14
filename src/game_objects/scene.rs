@@ -8,8 +8,13 @@ struct Assets;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Scene {
     pub name: String,
-    pub id: u32,
     pub creator: String,
+
+    #[serde(default = "default_strings")]
+    pub cae_files: Vec<String>,
+    #[serde(default = "default_strings")]
+    pub module_files: Vec<String>,
+
     pub objects: Vec<Object>,
 }
 
@@ -48,6 +53,9 @@ fn default_texture() -> String {
     "textures/missing.png".to_string()
 }
 
+fn default_strings() -> Vec<String> {
+    Vec::new()
+}
 fn default_materials() -> Vec<Material> {
     Vec::new()
 }
