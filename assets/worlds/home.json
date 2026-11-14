@@ -5,7 +5,9 @@
     "cae_files": [
         "cae_files/scene3.cae"
     ],
-    "module_files": [],
+    "module_files": [
+        "modules/caevern_portal_module.wasm"
+    ],
     "objects": [
         {
             "reference": "models/table.fbx",

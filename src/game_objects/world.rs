@@ -19,6 +19,7 @@ pub struct World {
     pub objects: HashMap<usize, Object>,
     pub textures: HashSet<String>,
     pub images: HashMap<String, image::DynamicImage>,
+    pub modules: Vec<String>,
     cameras: Vec<Object>,
 }
 impl Default for World {
@@ -32,6 +33,7 @@ impl World {
             objects: HashMap::new(),
             textures: HashSet::new(),
             images: HashMap::new(),
+            modules: Vec::new(),
             cameras: Vec::new(),
         }
     }
@@ -107,6 +109,8 @@ impl World {
     fn load_from_json(&mut self, path: &str) {
         let scene = load_scene(path);
         if let Ok(scene) = scene {
+            self.modules = scene.module_files.clone();
+
             for cae_file in &scene.cae_files {
                 self.load_from_cae(cae_file);
             }

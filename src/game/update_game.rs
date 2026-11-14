@@ -18,6 +18,7 @@ use crate::{
         world::World,
     },
     interract::input_state::InputState,
+    modules::load_module::load_module,
     network::{
         avatar_updates::AvatarUpdate,
         user_updates::UserUpdate::{self, UpdateAvatarId},
@@ -135,11 +136,10 @@ impl Engine {
         self.check_avatar_thread(buffer_collection, device, queue);
     }
 
-    pub fn load_modules(&mut self) {
-        /*let _ = load_module(
-            "assets/modules/caevern_polydural.wasm",
-            self.world_rc.clone(),
-        );*/
+    pub fn load_modules(&mut self, modules: Vec<String>) {
+        for module in modules {
+            let _ = load_module(&format!("assets/{}", module), self.world_rc.clone());
+        }
     }
 
     pub fn set_world(
@@ -149,9 +149,8 @@ impl Engine {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) {
+        let modules = new_world.modules.clone();
         *self.world_rc.borrow_mut() = new_world;
-
-        self.load_modules();
 
         let mut world = self.world_rc.borrow_mut();
         let textures = world.get_textures().clone();
@@ -160,6 +159,9 @@ impl Engine {
             let object = world.objects.get_mut(&object_index).unwrap();
             create_rendered_object(&textures, &images, object, buffer_collection, device, queue);
         }
+        drop(world);
+
+        self.load_modules(modules);
     }
 
     fn check_avatar_thread(
