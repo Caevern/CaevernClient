@@ -187,8 +187,8 @@ pub fn start_speaker(mut rx: Receiver<Vec<f32>>) -> cpal::Stream {
     stream
 }
 
-pub async fn start_voice_handler(user_id: u32, mic_state_arc: Arc<AtomicBool>) {
-    let (mut socket, _) = connect_async("ws://178.128.158.197:5000/ws/voice")
+pub async fn start_voice_handler(user_id: u32, mic_state_arc: Arc<AtomicBool>, server_url: &str) {
+    let (mut socket, _) = connect_async(format!("ws://{}/ws/voice", server_url))
         .await
         .expect("Can't connect");
     println!("Connected to websocket /ws/voice");

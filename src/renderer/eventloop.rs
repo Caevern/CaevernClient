@@ -10,9 +10,7 @@ use crate::renderer::game_window::GameWindow;
 use crate::setup::engine_arguments::EngineArguments;
 
 fn load_icon() -> Option<Icon> {
-    let image = image::open("assets/icons/icon-small.png")
-        .ok()?
-        .into_rgba8();
+    let image = image::open("assets/icons/icon.png").ok()?.into_rgba8();
     let (width, height) = image.dimensions();
 
     Icon::from_rgba(image.into_raw(), width, height).ok()

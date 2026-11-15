@@ -91,7 +91,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     println!("User ID: {}", user_id);
 
                     start_user_handler(socket, data_thread_rx, avatar_thread_tx, user_id).await;
-                    start_voice_handler(user_id, muted).await;
+                    start_voice_handler(user_id, muted, &server_url).await;
                 } else {
                     println!(
                         "Failed to connect to websocket /ws/user, not connected to any server"

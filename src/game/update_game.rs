@@ -177,8 +177,8 @@ impl Engine {
             create_rendered_object(&textures, &images, object, buffer_collection, device, queue);
         }
 
-        world.clear_images();
-        world.clear_vertices();
+        //world.clear_images();
+        //world.clear_vertices();
 
         drop(world);
 

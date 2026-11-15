@@ -19,7 +19,7 @@ fontdue = "0.9.5"
 tokio-tungstenite = { version = "0.30.0", features = ["native-tls"] }
 futures-util = "0.3.34"
 url = "2.5.8"
-tokio = "1.54.1"
+tokio = { version = "1.54.1", features = ["full"] }
 tungstenite = { version = "0.30.0", features = ["native-tls"] }
 cap = "0.1.2"
 serde = { version = "1", features = ["derive"] }
@@ -27,7 +27,7 @@ serde_json = "1"
 webrtc = "0.21.1"
 async-trait = "0.1.92"
 rtc = "0.21.1"
-rand = "0.10.3"
+rand = "0.10.4"
 cpal = { version = "0.18.2", features = ["pipewire"] }
 opus = "0.4.0"
 ash = "0.38.0"
