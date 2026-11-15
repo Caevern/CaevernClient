@@ -119,7 +119,7 @@ impl Engine {
 
         apply_gravity(&mut self.player, frame_time);
 
-        for (_, object) in self.world_rc.borrow_mut().objects.iter_mut() {
+        for object in self.world_rc.borrow_mut().objects.values_mut() {
             if object.needs_update() {
                 update_object(object, queue, buffer_collection);
                 object.set_needs_update(false);

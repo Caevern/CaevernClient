@@ -29,19 +29,15 @@ pub fn game_get_element_by_name(
 
     match std::str::from_utf8(bytes) {
         Ok(name) => {
-            let element_id = {
-                let data = caller.data();
-                let objects = data.borrow_mut();
+            let data = caller.data();
+            let objects = data.borrow_mut();
 
-                objects
-                    .get_objects()
-                    .iter()
-                    .find(|element| element.1.get_name() == name)
-                    .map(|element| *element.0 as u32)
-                    .unwrap_or(0)
-            };
-
-            element_id
+            objects
+                .get_objects()
+                .iter()
+                .find(|element| element.1.get_name() == name)
+                .map(|element| *element.0 as u32)
+                .unwrap_or(0)
         }
         Err(_) => {
             eprintln!("[MOD] Invalid UTF-8");
