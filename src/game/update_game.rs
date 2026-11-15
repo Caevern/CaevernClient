@@ -160,6 +160,8 @@ impl Engine {
             let object = world.objects.get_mut(&object_index).unwrap();
             create_rendered_object(&textures, &images, object, buffer_collection, device, queue);
         }
+        world.clear_images();
+        world.clear_vertices();
     }
 
     fn check_avatar_thread(
