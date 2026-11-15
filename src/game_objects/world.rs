@@ -82,6 +82,15 @@ impl World {
         &self.images
     }
 
+    pub fn clear_images(&mut self) {
+        self.images.clear();
+    }
+    pub fn clear_vertices(&mut self) {
+        for object in self.objects.values_mut() {
+            object.clear_vertices();
+        }
+    }
+
     pub fn load_world(&mut self, path: &str) {
         if path.ends_with(".json") {
             self.load_from_json(path);
