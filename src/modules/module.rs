@@ -8,16 +8,30 @@ use crate::game_objects::world::World;
 
 pub struct Module {
     init: TypedFunc<(), ()>,
+    update: TypedFunc<(f32,), ()>,
     store: Store<Rc<RefCell<World>>>,
 }
 impl Module {
-    pub fn new(init: TypedFunc<(), ()>, store: Store<Rc<RefCell<World>>>) -> Self {
-        Self { init, store }
+    pub fn new(
+        init: TypedFunc<(), ()>,
+        update: TypedFunc<(f32,), ()>,
+        store: Store<Rc<RefCell<World>>>,
+    ) -> Self {
+        Self {
+            init,
+            update,
+            store,
+        }
     }
 
     pub fn init(&mut self) {
         self.init
             .call(&mut self.store, ())
             .expect("Failed to call init function");
+    }
+    pub fn update(&mut self, dt: f32) {
+        self.update
+            .call(&mut self.store, (dt,))
+            .expect("Failed to call update function");
     }
 }

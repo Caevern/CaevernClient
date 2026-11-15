@@ -54,8 +54,11 @@ pub fn load_module(path: &str, world_rc: Rc<RefCell<World>>) -> module::Module {
     let init = instance
         .get_typed_func::<(), ()>(&mut store, "init")
         .expect("Failed to get init function");
+    let update = instance
+        .get_typed_func::<(f32,), ()>(&mut store, "update")
+        .expect("Failed to get update function");
 
-    let mut module = module::Module::new(init, store);
+    let mut module = module::Module::new(init, update, store);
     module.init();
 
     module

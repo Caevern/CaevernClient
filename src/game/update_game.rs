@@ -18,7 +18,7 @@ use crate::{
         world::World,
     },
     interract::input_state::InputState,
-    modules::load_module::load_module,
+    modules::{load_module::load_module, module::Module},
     network::{
         avatar_updates::AvatarUpdate,
         user_updates::UserUpdate::{self, UpdateAvatarId},
@@ -42,6 +42,7 @@ pub struct Engine {
 
     // world
     pub world_rc: Rc<RefCell<World>>,
+    pub modules: Vec<Module>,
 
     // fallback model
     fallback_vertices: Vec<(Vec<Vertex>, String)>,
@@ -74,6 +75,7 @@ impl Engine {
             data_thread_tx,
             avatar_thread_rx,
             world_rc,
+            modules: Vec::new(),
         }
     }
 
@@ -119,12 +121,19 @@ impl Engine {
 
         apply_gravity(&mut self.player, frame_time);
 
-        for object in self.world_rc.borrow_mut().objects.values_mut() {
+        for module in self.modules.iter_mut() {
+            module.update(frame_time);
+        }
+
+        let mut world = self.world_rc.borrow_mut();
+        world.player_position = self.player.camera.position;
+        for object in world.objects.values_mut() {
             if object.needs_update() {
                 update_object(object, queue, buffer_collection);
                 object.set_needs_update(false);
             }
         }
+        drop(world);
 
         let _ = self
             .data_thread_tx
@@ -144,8 +153,9 @@ impl Engine {
     }
 
     pub fn load_modules(&mut self, modules: Vec<String>) {
-        for module in modules {
-            let _ = load_module(&format!("assets/{}", module), self.world_rc.clone());
+        for module_path in modules {
+            let module = load_module(&format!("assets/{}", module_path), self.world_rc.clone());
+            self.modules.push(module);
         }
     }
 

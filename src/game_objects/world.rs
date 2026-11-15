@@ -19,6 +19,7 @@ pub struct World {
     pub objects: HashMap<usize, Object>,
     pub textures: HashSet<String>,
     pub images: HashMap<String, image::DynamicImage>,
+    pub player_position: Vector3<f32>,
     pub modules: Vec<String>,
     cameras: Vec<Object>,
 }
@@ -33,6 +34,7 @@ impl World {
             objects: HashMap::new(),
             textures: HashSet::new(),
             images: HashMap::new(),
+            player_position: Vector3::new(0.0, 0.0, 0.0),
             modules: Vec::new(),
             cameras: Vec::new(),
         }
