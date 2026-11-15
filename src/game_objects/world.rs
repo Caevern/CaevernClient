@@ -84,7 +84,7 @@ impl World {
         self.images.clear();
     }
     pub fn clear_vertices(&mut self) {
-        for (_, object) in self.objects.iter_mut() {
+        for object in self.objects.values_mut() {
             object.clear_vertices();
         }
     }
