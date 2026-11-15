@@ -9,7 +9,7 @@ use std::{
 use cgmath::{InnerSpace, Matrix, SquareMatrix, Vector3};
 
 use crate::{
-    game::{update_bone::update_bone, update_bones::update_bones},
+    game::{update_bone::update_bone, update_bones::update_bones, update_position::update_object},
     game_objects::{
         material::Material,
         object::{Object, ObjectType},
@@ -118,6 +118,13 @@ impl Engine {
         ];
 
         apply_gravity(&mut self.player, frame_time);
+
+        for (_, object) in self.world_rc.borrow_mut().objects.iter_mut() {
+            if object.needs_update() {
+                update_object(object, queue, buffer_collection);
+                object.set_needs_update(false);
+            }
+        }
 
         let _ = self
             .data_thread_tx

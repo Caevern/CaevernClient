@@ -40,6 +40,7 @@ pub struct Object {
     skeleton: HashMap<String, usize>,
     movable: bool,
     name: String,
+    needs_update: bool,
     pub canvas: Option<Canvas>,
     pub buffer_bindings: BufferBindings,
 }
@@ -64,9 +65,17 @@ impl Object {
             skeleton: HashMap::new(),
             movable: false,
             name: "unnamed".to_string(),
+            needs_update: false,
             canvas: None,
             buffer_bindings: BufferBindings::empty(),
         }
+    }
+
+    pub fn set_needs_update(&mut self, needs_update: bool) {
+        self.needs_update = needs_update;
+    }
+    pub fn needs_update(&self) -> bool {
+        self.needs_update
     }
 
     pub fn add_material(&mut self, material: Material, name: String) {
