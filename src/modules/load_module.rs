@@ -7,7 +7,8 @@ use crate::{
     modules::{
         api::{
             game_create_mesh::game_create_mesh, game_create_mesh_indexed::game_create_mesh_indexed,
-            game_get_time::game_get_time, game_log::game_log,
+            game_get_element_by_name::game_get_element_by_name, game_get_time::game_get_time,
+            game_log::game_log,
         },
         module,
     },
@@ -20,16 +21,19 @@ pub fn load_module(path: &str, world_rc: Rc<RefCell<World>>) -> module::Module {
     let mut linker = Linker::new(&engine);
     linker
         .func_wrap("env", "log", game_log)
-        .expect("Failed to add function");
+        .expect("Failed to add function log");
     linker
         .func_wrap("env", "get_time", game_get_time)
-        .expect("Failed to add function");
+        .expect("Failed to add function get_time");
+    linker
+        .func_wrap("env", "get_element_by_name", game_get_element_by_name)
+        .expect("Failed to add function get_element_by_name");
     linker
         .func_wrap("env", "create_mesh", game_create_mesh)
-        .expect("Failed to add function");
+        .expect("Failed to add function create_mesh");
     linker
         .func_wrap("env", "create_mesh_indexed", game_create_mesh_indexed)
-        .expect("Failed to add function");
+        .expect("Failed to add function create_mesh_indexed");
 
     let mut store = Store::new(&engine, world_rc);
     let instance = linker
