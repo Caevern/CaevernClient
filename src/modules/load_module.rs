@@ -8,6 +8,7 @@ use crate::{
         api::{
             game_create_mesh::game_create_mesh, game_create_mesh_indexed::game_create_mesh_indexed,
             game_get_element_by_name::game_get_element_by_name,
+            game_get_player_position::game_get_player_position,
             game_get_position::game_get_position, game_get_time::game_get_time, game_log::game_log,
             game_set_position::game_set_position,
         },
@@ -38,6 +39,9 @@ pub fn load_module(path: &str, world_rc: Rc<RefCell<World>>) -> module::Module {
     linker
         .func_wrap("env", "get_position", game_get_position)
         .expect("Failed to add function game_get_position");
+    linker
+        .func_wrap("env", "get_player_position", game_get_player_position)
+        .expect("Failed to add function game_get_player_position");
     linker
         .func_wrap("env", "set_position", game_set_position)
         .expect("Failed to add function game_set_position");
