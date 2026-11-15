@@ -13,6 +13,7 @@ use crate::{
         scene::load_scene,
     },
     renderer::{transform::Transform, vertex::create_vertices_skinned},
+    ui::tablet_frame::create_tablet_frame,
 };
 
 pub struct World {
@@ -25,11 +26,6 @@ pub struct World {
 }
 impl Default for World {
     fn default() -> Self {
-        Self::new()
-    }
-}
-impl World {
-    pub fn new() -> Self {
         Self {
             objects: HashMap::new(),
             textures: HashSet::new(),
@@ -38,6 +34,14 @@ impl World {
             modules: Vec::new(),
             cameras: Vec::new(),
         }
+    }
+}
+impl World {
+    pub fn new() -> Self {
+        let mut default = Self::default();
+        default.load_from_json("worlds/default.json");
+        create_tablet_frame(&mut default);
+        default
     }
 
     pub fn add_object(&mut self, object: Object) {
@@ -75,6 +79,10 @@ impl World {
     }
     pub fn get_cameras(&self) -> &Vec<Object> {
         &self.cameras
+    }
+
+    pub fn get_player_position(&self) -> Vector3<f32> {
+        self.player_position
     }
 
     pub fn get_textures(&self) -> &HashSet<String> {
@@ -185,8 +193,14 @@ impl World {
                         scene_object.color,
                     );
 
+                    let object_type = if scene_object.name == "skybox" {
+                        ObjectType::Skybox
+                    } else {
+                        ObjectType::Mesh
+                    };
+
                     let mut object = Object::create(
-                        ObjectType::Mesh,
+                        object_type,
                         create_vertices_skinned(&model_parsed.vertices),
                     );
                     object.set_name(&scene_object.name);
@@ -277,13 +291,21 @@ impl World {
             }
 
             self.add_object(static_world_object);
+
+            let mut spawn = Object::create(ObjectType::Camera, Vec::new());
+            spawn.set_position(
+                scene.spawn.position[0],
+                scene.spawn.position[1],
+                scene.spawn.position[2],
+            );
+            spawn.set_rotation(
+                scene.spawn.rotation[0],
+                scene.spawn.rotation[1],
+                scene.spawn.rotation[2],
+            );
+            self.add_object(spawn);
         } else {
             println!("Error while loading scene");
         }
     }
-}
-
-pub fn create_world() -> World {
-    let world: World = World::new();
-    world
 }

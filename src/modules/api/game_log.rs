@@ -1,10 +1,8 @@
-use std::{cell::RefCell, rc::Rc};
-
 use wasmtime::Caller;
 
-use crate::game_objects::world::World;
+use crate::modules::host::HostState;
 
-pub fn game_log(mut caller: Caller<'_, Rc<RefCell<World>>>, ptr: u32, len: u32) {
+pub fn game_log(mut caller: Caller<'_, HostState>, ptr: u32, len: u32) {
     let memory = match caller
         .get_export("memory")
         .and_then(|export| export.into_memory())

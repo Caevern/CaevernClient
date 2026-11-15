@@ -2,6 +2,11 @@
     "name": "home",
     "creator": "theCaely",
 
+    "spawn": {
+        "position": [-3, 4, 3],
+        "rotation": [0, -45, 0]
+    },
+
     "cae_files": [
         "cae_files/scene3.cae"
     ],

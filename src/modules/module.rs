@@ -1,21 +1,18 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use wasmtime::Store;
 use wasmtime::TypedFunc;
 
-use crate::game_objects::world::World;
+use crate::modules::host::HostState;
 
 pub struct Module {
     init: TypedFunc<(), ()>,
     update: TypedFunc<(f32,), ()>,
-    store: Store<Rc<RefCell<World>>>,
+    store: Store<HostState>,
 }
 impl Module {
     pub fn new(
         init: TypedFunc<(), ()>,
         update: TypedFunc<(f32,), ()>,
-        store: Store<Rc<RefCell<World>>>,
+        store: Store<HostState>,
     ) -> Self {
         Self {
             init,

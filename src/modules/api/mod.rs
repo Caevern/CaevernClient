@@ -6,3 +6,4 @@ pub mod game_get_position;
 pub mod game_get_time;
 pub mod game_log;
 pub mod game_set_position;
+pub mod network_connect;

@@ -1,5 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
-
+use std::{cell::RefCell, rc::Rc, sync::mpsc::Sender};
 use wasmtime::{Engine, Linker, Module, Store};
 
 use crate::{
@@ -10,13 +9,18 @@ use crate::{
             game_get_element_by_name::game_get_element_by_name,
             game_get_player_position::game_get_player_position,
             game_get_position::game_get_position, game_get_time::game_get_time, game_log::game_log,
-            game_set_position::game_set_position,
+            game_set_position::game_set_position, network_connect::network_connect,
         },
+        host::{EngineCommand, HostState},
         module,
     },
 };
 
-pub fn load_module(path: &str, world_rc: Rc<RefCell<World>>) -> module::Module {
+pub fn load_module(
+    path: &str,
+    world_rc: Rc<RefCell<World>>,
+    engine_tx: Sender<EngineCommand>,
+) -> module::Module {
     let engine = Engine::default();
     let module = Module::from_file(&engine, path).expect("Failed to load module");
 
@@ -45,8 +49,16 @@ pub fn load_module(path: &str, world_rc: Rc<RefCell<World>>) -> module::Module {
     linker
         .func_wrap("env", "set_position", game_set_position)
         .expect("Failed to add function game_set_position");
+    linker
+        .func_wrap("env", "connect", network_connect)
+        .expect("Failed to add function network_connect");
 
-    let mut store = Store::new(&engine, world_rc);
+    let host_state = HostState {
+        world: world_rc,
+        engine_tx,
+    };
+
+    let mut store = Store::new(&engine, host_state);
     let instance = linker
         .instantiate(&mut store, &module)
         .expect("Failed to instantiate module");

@@ -1,17 +1,11 @@
-use std::{cell::RefCell, rc::Rc};
-
 use wasmtime::{Caller, anyhow};
 
-use crate::game_objects::world::World;
+use crate::modules::host::HostState;
 
-pub fn game_get_position(
-    mut caller: Caller<'_, Rc<RefCell<World>>>,
-    object_id: u32,
-    out_position_ptr: u32,
-) {
+pub fn game_get_position(mut caller: Caller<'_, HostState>, object_id: u32, out_position_ptr: u32) {
     let position = {
         let data = caller.data();
-        let world = data.borrow();
+        let world = data.world.borrow();
 
         let object = world.get_object(object_id as usize);
         object.get_position()

@@ -1,0 +1,17 @@
+{
+    "name": "default",
+    "creator": "theCaely",
+
+    "spawn": {
+        "position": [0, 0, 0],
+        "rotation": [0, 0, 0]
+    },
+
+    "objects": [
+        {
+            "is_static": false, "reference": "models/skybox.fbx",
+            "transform": {"position": [0, 0, 0], "scale": [1.5, 1.5, 1.5]},
+            "texture": "textures/skybox_2.png", "name": "skybox"
+        }
+    ]
+}

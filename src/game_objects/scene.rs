@@ -10,12 +10,22 @@ pub struct Scene {
     pub name: String,
     pub creator: String,
 
+    pub spawn: Spawn,
+
     #[serde(default = "default_strings")]
     pub cae_files: Vec<String>,
     #[serde(default = "default_strings")]
     pub module_files: Vec<String>,
 
     pub objects: Vec<Object>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Spawn {
+    #[serde(default = "default_position")]
+    pub position: [f32; 3],
+    #[serde(default = "default_rotation")]
+    pub rotation: [f32; 3],
 }
 
 #[derive(Debug, Serialize, Deserialize)]

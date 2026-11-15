@@ -3,7 +3,7 @@ use std::{
     collections::HashMap,
     f32,
     rc::Rc,
-    sync::mpsc::{Receiver, Sender},
+    sync::mpsc::{self, Receiver, Sender},
 };
 
 use cgmath::{InnerSpace, Matrix, SquareMatrix, Vector3};
@@ -18,7 +18,7 @@ use crate::{
         world::World,
     },
     interract::input_state::InputState,
-    modules::{load_module::load_module, module::Module},
+    modules::{host::EngineCommand, load_module::load_module, module::Module},
     network::{
         avatar_updates::AvatarUpdate,
         user_updates::UserUpdate::{self, UpdateAvatarId},
@@ -42,6 +42,8 @@ pub struct Engine {
 
     // world
     pub world_rc: Rc<RefCell<World>>,
+    pub engine_command_tx: Sender<EngineCommand>,
+    pub engine_command_rx: Receiver<EngineCommand>,
     pub modules: Vec<Module>,
 
     // fallback model
@@ -66,6 +68,7 @@ impl Engine {
         let fallback_skeleton = create_skeleton(bone_bindings, &fallback_bones);
 
         let world_rc = Rc::new(RefCell::new(World::new()));
+        let (engine_command_tx, engine_command_rx) = mpsc::channel();
 
         Self {
             player: Player::default(),
@@ -75,6 +78,8 @@ impl Engine {
             data_thread_tx,
             avatar_thread_rx,
             world_rc,
+            engine_command_tx,
+            engine_command_rx,
             modules: Vec::new(),
         }
     }
@@ -135,6 +140,8 @@ impl Engine {
         }
         drop(world);
 
+        self.process_engine_commands();
+
         let _ = self
             .data_thread_tx
             .send(UserUpdate::SendUserPosition(Transform {
@@ -152,11 +159,32 @@ impl Engine {
         self.check_avatar_thread(buffer_collection, device, queue);
     }
 
+    fn process_engine_commands(&mut self) {
+        while let Ok(command) = self.engine_command_rx.try_recv() {
+            match command {
+                EngineCommand::ConnectWorld(address) => {
+                    println!("Module requested world connection: {address}");
+
+                    self.unload_world();
+                }
+            }
+        }
+    }
+
     pub fn load_modules(&mut self, modules: Vec<String>) {
         for module_path in modules {
-            let module = load_module(&format!("assets/{}", module_path), self.world_rc.clone());
+            let module = load_module(
+                &format!("assets/{}", module_path),
+                self.world_rc.clone(),
+                self.engine_command_tx.clone(),
+            );
             self.modules.push(module);
         }
+    }
+
+    pub fn unload_world(&mut self) {
+        self.modules.clear();
+        //*self.world_rc.borrow_mut() = World::default();
     }
 
     pub fn set_world(

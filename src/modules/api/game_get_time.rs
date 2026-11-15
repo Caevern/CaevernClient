@@ -1,14 +1,10 @@
-use std::{
-    cell::RefCell,
-    rc::Rc,
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use wasmtime::Caller;
 
-use crate::game_objects::world::World;
+use crate::modules::host::HostState;
 
-pub fn game_get_time(mut _caller: Caller<'_, Rc<RefCell<World>>>) -> u32 {
+pub fn game_get_time(mut _caller: Caller<'_, HostState>) -> u32 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
