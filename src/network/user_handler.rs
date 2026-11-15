@@ -71,20 +71,16 @@ pub async fn start_user_handler(
                 }
             }
 
-            println!("POLLING");
             if let Some(Ok(mut result)) = socket.next().await {
-                println!("RECEIVED MESSAGE");
                 while let Some(Ok(Some(newest))) = socket.try_next().now_or_never() {
                     result = newest;
                 }
 
                 let data = result.into_data();
                 if !data.is_empty() {
-                    println!("Received data: {:?}", data);
                     match data[0] {
                         3 => {
                             let player_amount = (data.len() - 1) / 28;
-                            println!("Received player data: player_amount = {}", player_amount);
 
                             for i in 0..player_amount {
                                 let player_id = u32::from_be_bytes([
@@ -151,12 +147,6 @@ pub async fn start_user_handler(
 
                                     Entry::Occupied(entry) => {
                                         let object_id = *entry.get();
-
-                                        println!(
-                                            "User {} already registered, updating position",
-                                            player_id
-                                        );
-
                                         if object_id == 0 {
                                             continue;
                                         }
@@ -179,7 +169,6 @@ pub async fn start_user_handler(
             } else {
                 println!("Socket has closed, removed client: {}", user_id);
             }
-            println!("POLLING DONE");
         }
     });
 }

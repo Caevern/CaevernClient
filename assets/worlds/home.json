@@ -2,7 +2,9 @@
     "name": "home",
     "creator": "theCaely",
 
-    "cae_files": [],
+    "cae_files": [
+        "cae_files/scene3.cae"
+    ],
     "module_files": [
         "modules/caevern_portal_module.wasm"
     ],
