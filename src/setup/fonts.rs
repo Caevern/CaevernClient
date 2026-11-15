@@ -2,13 +2,8 @@ use std::collections::HashMap;
 
 use fontdue::Font;
 use image::{DynamicImage, Rgba, RgbaImage};
-use rust_embed::RustEmbed;
 
-use crate::setup::font_character::FontCharacter;
-
-#[derive(RustEmbed)]
-#[folder = "assets/"]
-struct Assets;
+use crate::setup::{assets::Assets, font_character::FontCharacter};
 
 pub fn load_font_atlas(path: &str) -> DynamicImage {
     let font_data = Assets::get(path).expect("Failed to load embedded texture");

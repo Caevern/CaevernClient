@@ -1,9 +1,6 @@
-use rust_embed::RustEmbed;
 use serde::{Deserialize, Serialize};
 
-#[derive(RustEmbed)]
-#[folder = "assets/"]
-struct Assets;
+use crate::setup::assets::Assets;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Scene {

@@ -14,6 +14,7 @@ use crate::{
         host::{EngineCommand, HostState},
         module,
     },
+    setup::assets::Assets,
 };
 
 pub fn load_module(
@@ -22,7 +23,8 @@ pub fn load_module(
     engine_tx: Sender<EngineCommand>,
 ) -> module::Module {
     let engine = Engine::default();
-    let module = Module::from_file(&engine, path).expect("Failed to load module");
+    let asset = Assets::get(path).unwrap_or_else(|| panic!("Embedded asset not found: {}", path));
+    let module = Module::new(&engine, asset.data.as_ref()).expect("Failed to load module");
 
     let mut linker = Linker::new(&engine);
     linker

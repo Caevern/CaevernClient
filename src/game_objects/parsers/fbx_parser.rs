@@ -1,7 +1,6 @@
 use cgmath::Vector3;
 use fbx::Property;
 use fbx::{File, Node};
-use rust_embed::RustEmbed;
 use std::collections::{HashMap, HashSet};
 use std::io::{BufReader, Cursor};
 
@@ -9,10 +8,7 @@ use crate::game_objects::parsers::parsed_mesh::ParsedMesh;
 use crate::game_objects::parsers::transforms::{rotate_x, rotate_y, rotate_z};
 use crate::renderer::skinned_vertex::SkinnedVertex;
 use crate::renderer::transform;
-
-#[derive(RustEmbed)]
-#[folder = "assets/"]
-struct Assets;
+use crate::setup::assets::Assets;
 
 #[derive(Debug)]
 struct Mesh {
