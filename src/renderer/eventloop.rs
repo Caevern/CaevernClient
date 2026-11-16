@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 
 use winit::event_loop::EventLoop;
-use winit::window::Icon;
+use winit::icon::{Icon, RgbaIcon};
 
 use crate::game_objects::world::World;
 use crate::interract::input_state::InputState;
@@ -10,12 +10,16 @@ use crate::renderer::game_window::GameWindow;
 use crate::setup::engine_arguments::EngineArguments;
 
 fn load_icon() -> Option<Icon> {
-    let image = image::open("assets/icons/icon-small.png")
-        .ok()?
+    let image = image::open("assets/icons/icon.png")
+        .expect("Failed to load window icon")
         .into_rgba8();
     let (width, height) = image.dimensions();
 
-    Icon::from_rgba(image.into_raw(), width, height).ok()
+    Some(
+        RgbaIcon::new(image.into_raw(), width, height)
+            .expect("Failed to create window icon")
+            .into(),
+    )
 }
 
 pub fn start_engine(world: World, engine_arguments: EngineArguments) {
@@ -24,7 +28,7 @@ pub fn start_engine(world: World, engine_arguments: EngineArguments) {
 
     println!("AMOUNT OF OBJECTS: {}", world.objects.len());
 
-    let mut game_window = GameWindow {
+    let game_window = GameWindow {
         window: None,
 
         windowed_renderer: None,
@@ -53,5 +57,5 @@ pub fn start_engine(world: World, engine_arguments: EngineArguments) {
         home_world: Some(world),
     };
 
-    event_loop.run_app(&mut game_window).unwrap();
+    event_loop.run_app(game_window).unwrap();
 }

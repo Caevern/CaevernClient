@@ -1,4 +1,3 @@
-use rust_embed::RustEmbed;
 use std::io::Cursor;
 use std::io::{self, Read};
 use std::{collections::HashMap, println};
@@ -9,10 +8,7 @@ use crate::game_objects::parsers::parsed_mesh::ParsedMesh;
 use crate::game_objects::parsers::transforms::{rotate_x, rotate_y, rotate_z};
 use crate::renderer::skinned_vertex::SkinnedVertex;
 use crate::renderer::vertex::create_vertices_skinned;
-
-#[derive(RustEmbed)]
-#[folder = "assets/"]
-struct Assets;
+use crate::setup::assets::Assets;
 
 fn read_u32<R: Read>(reader: &mut R) -> io::Result<u32> {
     let mut bytes = [0u8; 4];

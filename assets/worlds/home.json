@@ -2,15 +2,22 @@
     "name": "home",
     "creator": "theCaely",
 
+    "spawn": {
+        "position": [-3, 4, 3],
+        "rotation": [0, -45, 0]
+    },
+
     "cae_files": [
-        "cae_files/scene3.cae"
     ],
-    "module_files": [],
+    "module_files": [
+        "modules/caevern_portal_module.wasm"
+    ],
     "objects": [
         {
-            "is_static": false, "reference": "models/table.fbx",
-            "transform": {"position": [8, -0.2, 2], "scale": [0.01, 0.01, 0.02]},
-            "texture": "textures/table.png"
+            "is_static": false, "reference": "models/gate.fbx",
+            "transform": {"position": [6, -0.2, 2], "scale": [0.002, 0.00245, 0.002]},
+            "color": [0.1, 0.0, 0.0], "name": "portal",
+            "texture": "textures/white.png"
         }
     ]
 }

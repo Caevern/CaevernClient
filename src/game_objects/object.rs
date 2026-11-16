@@ -39,7 +39,8 @@ pub struct Object {
     bones: Vec<(Transform, Transform, i64, usize)>,
     skeleton: HashMap<String, usize>,
     movable: bool,
-    tag: String,
+    name: String,
+    needs_update: bool,
     pub canvas: Option<Canvas>,
     pub buffer_bindings: BufferBindings,
 }
@@ -63,10 +64,18 @@ impl Object {
             bones: Vec::new(),
             skeleton: HashMap::new(),
             movable: false,
-            tag: "unnamed".to_string(),
+            name: "unnamed".to_string(),
+            needs_update: false,
             canvas: None,
             buffer_bindings: BufferBindings::empty(),
         }
+    }
+
+    pub fn set_needs_update(&mut self, needs_update: bool) {
+        self.needs_update = needs_update;
+    }
+    pub fn needs_update(&self) -> bool {
+        self.needs_update
     }
 
     pub fn add_material(&mut self, material: Material, name: String) {
@@ -161,8 +170,8 @@ impl Object {
     pub fn set_movable(&mut self, value: bool) {
         self.movable = value;
     }
-    pub fn set_tag(&mut self, tag: &str) {
-        self.tag = tag.to_string();
+    pub fn set_name(&mut self, name: &str) {
+        self.name = name.to_string();
     }
 
     pub fn get_vertices(&self) -> &Vec<(Vec<Vertex>, String)> {
@@ -194,7 +203,7 @@ impl Object {
     pub fn get_scale(&self) -> Vector3<f32> {
         self.transform.scale
     }
-    pub fn get_tag(&self) -> &str {
-        &self.tag
+    pub fn get_name(&self) -> &str {
+        &self.name
     }
 }

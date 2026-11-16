@@ -15,10 +15,11 @@ use winit::event::ElementState;
 use winit::event::MouseButton;
 use winit::event::WindowEvent;
 use winit::event_loop::ActiveEventLoop;
+use winit::icon::Icon;
 use winit::keyboard::KeyCode;
 use winit::keyboard::PhysicalKey;
+use winit::window::Window;
 use winit::window::WindowAttributes;
-use winit::window::{Icon, Window};
 
 use crate::game::update_game::Engine;
 use crate::game_objects::world::World;
@@ -35,7 +36,7 @@ use crate::xr::xr_input::XrInput;
 use crate::xr::xr_manager::XRManager;
 
 pub struct GameWindow<'window> {
-    pub window: Option<Arc<Window>>,
+    pub window: Option<Arc<dyn Window>>,
 
     pub windowed_renderer: Option<RendererWindowed<'window>>,
 
@@ -64,7 +65,11 @@ pub struct GameWindow<'window> {
 }
 
 impl<'window> ApplicationHandler for GameWindow<'window> {
-    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+    fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
+        if self.window.is_some() {
+            return;
+        }
+
         let (data_thread_tx, data_thread_rx) = mpsc::channel::<UserUpdate>();
         let (avatar_thread_tx, avatar_thread_rx) = mpsc::channel::<AvatarUpdate>();
 
@@ -91,7 +96,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     println!("User ID: {}", user_id);
 
                     start_user_handler(socket, data_thread_rx, avatar_thread_tx, user_id).await;
-                    start_voice_handler(user_id, muted).await;
+                    start_voice_handler(user_id, muted, &server_url).await;
                 } else {
                     println!(
                         "Failed to connect to websocket /ws/user, not connected to any server"
@@ -112,7 +117,11 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 .attach_to_session(&renderer_openxr.init.session)
                 .expect("Failed to attach xr input to session");
 
-            let mut engine = Engine::new(data_thread_tx.clone(), avatar_thread_rx);
+            let mut engine = Engine::new(
+                data_thread_tx.clone(),
+                avatar_thread_rx,
+                self.server_url.clone(),
+            );
             engine.set_world(
                 self.home_world.take().unwrap(),
                 &mut renderer_openxr.buffer_collection,
@@ -125,12 +134,18 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
             renderer_openxr.run_frame_loop(engine, xr_input);
         } else {
-            self.engine = Some(Engine::new(data_thread_tx.clone(), avatar_thread_rx));
+            self.engine = Some(Engine::new(
+                data_thread_tx.clone(),
+                avatar_thread_rx,
+                self.server_url.clone(),
+            ));
 
             let attributes = WindowAttributes::default()
                 .with_title(self.title.clone())
                 .with_window_icon(self.icon.clone());
-            let window = Arc::new(event_loop.create_window(attributes).unwrap());
+
+            let window = event_loop.create_window(attributes).unwrap();
+            let window = Arc::from(window);
 
             let mut renderer = pollster::block_on(RendererWindowed::new(&window));
 
@@ -174,7 +189,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
     fn window_event(
         &mut self,
-        event_loop: &winit::event_loop::ActiveEventLoop,
+        event_loop: &dyn winit::event_loop::ActiveEventLoop,
         _window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
@@ -186,7 +201,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 event_loop.exit()
             }
 
-            WindowEvent::Resized(size) => {
+            WindowEvent::SurfaceResized(size) => {
                 let renderer = self.windowed_renderer.as_mut().unwrap();
                 renderer.resize(size);
                 self.depth_texture = Some(renderer.init.device.create_texture(
@@ -208,12 +223,18 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 self.window_size = (renderer.init.size.width, renderer.init.size.height);
             }
 
-            WindowEvent::MouseInput {
+            WindowEvent::PointerButton {
                 device_id: _,
                 state,
                 button,
+                position: _,
+                primary: _,
+                is_macos_activation_click: _,
             } => {
-                if state.is_pressed() && button == MouseButton::Left && !self.mouse_locked {
+                if state.is_pressed()
+                    && button.mouse_button() == Some(MouseButton::Left)
+                    && !self.mouse_locked
+                {
                     if let Err(err) = self
                         .window
                         .as_mut()
@@ -231,15 +252,15 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                         {
                             eprintln!("Failed to confine the cursor: {:?}", err);
                         }
-                        let window_size = self.window.as_ref().unwrap().inner_size();
+                        let window_size = self.window.as_ref().unwrap().surface_size();
                         let center_x = window_size.width as f64 / 2.0;
                         let center_y = window_size.height as f64 / 2.0;
                         self.window
                             .as_ref()
                             .unwrap()
-                            .set_cursor_position(winit::dpi::PhysicalPosition::new(
-                                center_x, center_y,
-                            ))
+                            .set_cursor_position(
+                                winit::dpi::PhysicalPosition::new(center_x, center_y).into(),
+                            )
                             .expect("Failed to set cursor position");
                     }
                     self.window.as_mut().unwrap().set_cursor_visible(false);
@@ -271,8 +292,8 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                     PhysicalKey::Code(KeyCode::Space) => {
                         self.input.jump = true;
                     }
-                    PhysicalKey::Code(KeyCode::SuperLeft)
-                    | PhysicalKey::Code(KeyCode::SuperRight) => {
+                    PhysicalKey::Code(KeyCode::MetaLeft)
+                    | PhysicalKey::Code(KeyCode::MetaRight) => {
                         if let Err(err) = self
                             .window
                             .as_ref()
@@ -319,15 +340,16 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                                     {
                                         eprintln!("Failed to confine the cursor: {:?}", err);
                                     }
-                                    let window_size = self.window.as_ref().unwrap().inner_size();
+                                    let window_size = self.window.as_ref().unwrap().surface_size();
                                     let center_x = window_size.width as f64 / 2.0;
                                     let center_y = window_size.height as f64 / 2.0;
                                     self.window
                                         .as_ref()
                                         .unwrap()
-                                        .set_cursor_position(winit::dpi::PhysicalPosition::new(
-                                            center_x, center_y,
-                                        ))
+                                        .set_cursor_position(
+                                            winit::dpi::PhysicalPosition::new(center_x, center_y)
+                                                .into(),
+                                        )
                                         .expect("Failed to set cursor position");
                                 }
                             } else {
@@ -339,15 +361,16 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                                 {
                                     eprintln!("Failed to confine the cursor: {:?}", err);
                                 }
-                                let window_size = self.window.as_ref().unwrap().inner_size();
+                                let window_size = self.window.as_ref().unwrap().surface_size();
                                 let center_x = window_size.width as f64 / 2.0;
                                 let center_y = window_size.height as f64 / 2.0;
                                 self.window
                                     .as_ref()
                                     .unwrap()
-                                    .set_cursor_position(winit::dpi::PhysicalPosition::new(
-                                        center_x, center_y,
-                                    ))
+                                    .set_cursor_position(
+                                        winit::dpi::PhysicalPosition::new(center_x, center_y)
+                                            .into(),
+                                    )
                                     .expect("Failed to set cursor position");
                             }
                             self.window.as_ref().unwrap().set_cursor_visible(false);
@@ -420,24 +443,23 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
     fn device_event(
         &mut self,
-        _event_loop: &ActiveEventLoop,
-        _device_id: DeviceId,
+        _event_loop: &dyn ActiveEventLoop,
+        _device_id: Option<DeviceId>,
         event: DeviceEvent,
     ) {
-        if let DeviceEvent::MouseMotion { delta } = event
+        if let DeviceEvent::PointerMotion { delta } = event
             && self.mouse_locked
         {
             self.input.mouse.x -= delta.0 as f32 * 0.3;
             self.input.mouse.y -= delta.1 as f32 * 0.3;
             if !self.use_confined
-                && let Err(err) =
-                    self.window
-                        .as_ref()
-                        .unwrap()
-                        .set_cursor_position(LogicalPosition {
-                            x: self.window_size.0 / 2,
-                            y: self.window_size.1 / 2,
-                        })
+                && let Err(err) = self.window.as_ref().unwrap().set_cursor_position(
+                    LogicalPosition {
+                        x: self.window_size.0 / 2,
+                        y: self.window_size.1 / 2,
+                    }
+                    .into(),
+                )
             {
                 eprint!("Failed to move back cursor {:?}", err);
             }

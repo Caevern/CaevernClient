@@ -10,30 +10,38 @@ use crate::{
         material::Material,
         object::{Object, ObjectType},
         parsers::{cae_parser::parse_cae, fbx_parser::parse},
-        scene::load_scene,
+        scene::{Scene, load_scene},
     },
     renderer::{transform::Transform, vertex::create_vertices_skinned},
+    ui::tablet_frame::create_tablet_frame,
 };
 
 pub struct World {
     pub objects: HashMap<usize, Object>,
     pub textures: HashSet<String>,
     pub images: HashMap<String, image::DynamicImage>,
+    pub player_position: Vector3<f32>,
+    pub modules: Vec<String>,
     cameras: Vec<Object>,
 }
 impl Default for World {
     fn default() -> Self {
-        Self::new()
-    }
-}
-impl World {
-    pub fn new() -> Self {
         Self {
             objects: HashMap::new(),
             textures: HashSet::new(),
             images: HashMap::new(),
+            player_position: Vector3::new(0.0, 0.0, 0.0),
+            modules: Vec::new(),
             cameras: Vec::new(),
         }
+    }
+}
+impl World {
+    pub fn new() -> Self {
+        let mut default = Self::default();
+        default.load_from_json("worlds/default.json");
+        create_tablet_frame(&mut default);
+        default
     }
 
     pub fn add_object(&mut self, object: Object) {
@@ -71,6 +79,10 @@ impl World {
     }
     pub fn get_cameras(&self) -> &Vec<Object> {
         &self.cameras
+    }
+
+    pub fn get_player_position(&self) -> Vector3<f32> {
+        self.player_position
     }
 
     pub fn get_textures(&self) -> &HashSet<String> {
@@ -114,163 +126,186 @@ impl World {
     }
 
     fn load_from_json(&mut self, path: &str) {
-        let scene = load_scene(path);
-        if let Ok(scene) = scene {
-            for cae_file in &scene.cae_files {
-                self.load_from_cae(cae_file);
-            }
-
-            let mut static_world_object = Object::create(ObjectType::Mesh, Vec::new());
-
-            for scene_object in scene.objects {
-                if scene_object.is_static {
-                    let model_parsed = parse(
-                        &scene_object.reference,
-                        Transform::new(
-                            Vector3::new(
-                                scene_object.transform.position[0],
-                                scene_object.transform.position[1],
-                                scene_object.transform.position[2],
-                            ),
-                            Vector3::new(
-                                scene_object.transform.rotation[0],
-                                scene_object.transform.rotation[1],
-                                scene_object.transform.rotation[2],
-                            ),
-                            Vector3::new(
-                                scene_object.transform.scale[0],
-                                scene_object.transform.scale[1],
-                                scene_object.transform.scale[2],
-                            ),
-                        ),
-                    );
-
-                    let mut vertices = create_vertices_skinned(&model_parsed.vertices);
-                    for mesh in &mut vertices {
-                        if mesh.1 == "default" {
-                            mesh.1 = format!(
-                                "caevern.material{}",
-                                static_world_object.get_materials().len()
-                            );
-                        }
-                    }
-                    let material_name = format!(
-                        "caevern.material{}",
-                        static_world_object.get_materials().len()
-                    );
-                    let mut object_material = Material::from_texture(&scene_object.texture);
-                    self.textures.insert(scene_object.texture);
-                    if !scene_object.displace.is_empty() {
-                        object_material.set_displacement(&scene_object.displace);
-                        self.textures.insert(scene_object.displace);
-                    }
-                    for material in scene_object.materials {
-                        static_world_object
-                            .add_material(Material::from_texture(&material.texture), material.name);
-                        self.textures.insert(material.texture);
-                    }
-                    static_world_object.add_material(object_material, material_name);
-                    static_world_object.add_meshes(vertices);
-                } else {
-                    let model_parsed = parse(&scene_object.reference, Transform::zero());
-
-                    let mut object = Object::create(
-                        ObjectType::Mesh,
-                        create_vertices_skinned(&model_parsed.vertices),
-                    );
-
-                    object.set_position(
-                        scene_object.transform.position[0],
-                        scene_object.transform.position[1],
-                        scene_object.transform.position[2],
-                    );
-                    object.set_rotation(
-                        scene_object.transform.rotation[0],
-                        scene_object.transform.rotation[1],
-                        scene_object.transform.rotation[2],
-                    );
-                    object.set_scale(
-                        scene_object.transform.scale[0],
-                        scene_object.transform.scale[1],
-                        scene_object.transform.scale[2],
-                    );
-
-                    if !scene_object.skeleton.is_empty() {
-                        let mut skeleton = HashMap::new();
-                        for bone_identifier in scene_object.skeleton {
-                            for bone in &model_parsed.bones {
-                                let filtered: String =
-                                    bone.1.2.chars().filter(|c| (*c as u32) >= 32).collect();
-                                if filtered == bone_identifier.bone_name {
-                                    skeleton.insert(bone_identifier.body_part, bone.1.0);
-                                    break;
-                                }
-                            }
-                        }
-                        object.set_skeleton(skeleton);
-                    }
-                    if !model_parsed.bones.is_empty() {
-                        let mut bone_values = model_parsed.bones;
-
-                        if scene_object.render_bones {
-                            for bone in bone_values.iter_mut() {
-                                let bone_model_parsed = parse(
-                                    "models/sphere.fbx",
-                                    Transform::new(
-                                        Vector3::new(0.0, 0.0, 0.0),
-                                        Vector3::new(0.0, 0.0, 0.0),
-                                        Vector3::new(0.001, 0.001, 0.001),
-                                    ),
-                                );
-                                let mut bone_object = Object::create(
-                                    ObjectType::Mesh,
-                                    create_vertices_skinned(&bone_model_parsed.vertices),
-                                );
-
-                                bone_object.set_position(
-                                    -2.5 + bone.1.1.position.x * 0.01,
-                                    3.0 + bone.1.1.position.z * 0.01,
-                                    bone.1.1.position.y * 0.01,
-                                );
-                                bone_object.set_default_texture("textures/missing.png");
-                                bone_object.set_movable(true);
-
-                                let bone_object_id = self.objects.len();
-                                bone.1.4 = bone_object_id;
-
-                                self.add_object(bone_object);
-                            }
-                        }
-                        object.set_bones(
-                            bone_values,
-                            Vector3::new(0.0, 0.0, 0.0),
-                            Vector3::new(0.0, 0.0, 0.0),
-                            Vector3::new(1.0, 1.0, 1.0),
-                        );
-                        object.set_object_type(ObjectType::SkinnedMesh);
-                    }
-
-                    for material in scene_object.materials {
-                        object
-                            .add_material(Material::from_texture(&material.texture), material.name);
-                        self.textures.insert(material.texture);
-                    }
-
-                    object.set_default_texture(&scene_object.texture);
-                    self.textures.insert(scene_object.texture);
-
-                    self.add_object(object);
-                }
-            }
-
-            self.add_object(static_world_object);
+        if let Ok(scene) = load_scene(path) {
+            self.load_from_scene(scene);
         } else {
             println!("Error while loading scene");
         }
     }
-}
 
-pub fn create_world() -> World {
-    let world: World = World::new();
-    world
+    pub fn load_from_scene(&mut self, scene: Scene) {
+        self.modules = scene.module_files.clone();
+
+        for cae_file in &scene.cae_files {
+            self.load_from_cae(cae_file);
+        }
+
+        let mut static_world_object = Object::create(ObjectType::Mesh, Vec::new());
+
+        for scene_object in scene.objects {
+            if scene_object.is_static {
+                let model_parsed = parse(
+                    &scene_object.reference,
+                    Transform::new(
+                        Vector3::new(
+                            scene_object.transform.position[0],
+                            scene_object.transform.position[1],
+                            scene_object.transform.position[2],
+                        ),
+                        Vector3::new(
+                            scene_object.transform.rotation[0],
+                            scene_object.transform.rotation[1],
+                            scene_object.transform.rotation[2],
+                        ),
+                        Vector3::new(
+                            scene_object.transform.scale[0],
+                            scene_object.transform.scale[1],
+                            scene_object.transform.scale[2],
+                        ),
+                    ),
+                    scene_object.color,
+                );
+
+                let mut vertices = create_vertices_skinned(&model_parsed.vertices);
+                for mesh in &mut vertices {
+                    if mesh.1 == "default" {
+                        mesh.1 = format!(
+                            "caevern.material{}",
+                            static_world_object.get_materials().len()
+                        );
+                    }
+                }
+                let material_name = format!(
+                    "caevern.material{}",
+                    static_world_object.get_materials().len()
+                );
+                let mut object_material = Material::from_texture(&scene_object.texture);
+                self.textures.insert(scene_object.texture);
+                if !scene_object.displace.is_empty() {
+                    object_material.set_displacement(&scene_object.displace);
+                    self.textures.insert(scene_object.displace);
+                }
+                for material in scene_object.materials {
+                    static_world_object
+                        .add_material(Material::from_texture(&material.texture), material.name);
+                    self.textures.insert(material.texture);
+                }
+                static_world_object.add_material(object_material, material_name);
+                static_world_object.add_meshes(vertices);
+            } else {
+                let model_parsed = parse(
+                    &scene_object.reference,
+                    Transform::zero(),
+                    scene_object.color,
+                );
+
+                let object_type = if scene_object.name == "skybox" {
+                    ObjectType::Skybox
+                } else {
+                    ObjectType::Mesh
+                };
+
+                let mut object =
+                    Object::create(object_type, create_vertices_skinned(&model_parsed.vertices));
+                object.set_name(&scene_object.name);
+
+                object.set_position(
+                    scene_object.transform.position[0],
+                    scene_object.transform.position[1],
+                    scene_object.transform.position[2],
+                );
+                object.set_rotation(
+                    scene_object.transform.rotation[0],
+                    scene_object.transform.rotation[1],
+                    scene_object.transform.rotation[2],
+                );
+                object.set_scale(
+                    scene_object.transform.scale[0],
+                    scene_object.transform.scale[1],
+                    scene_object.transform.scale[2],
+                );
+
+                if !scene_object.skeleton.is_empty() {
+                    let mut skeleton = HashMap::new();
+                    for bone_identifier in scene_object.skeleton {
+                        for bone in &model_parsed.bones {
+                            let filtered: String =
+                                bone.1.2.chars().filter(|c| (*c as u32) >= 32).collect();
+                            if filtered == bone_identifier.bone_name {
+                                skeleton.insert(bone_identifier.body_part, bone.1.0);
+                                break;
+                            }
+                        }
+                    }
+                    object.set_skeleton(skeleton);
+                }
+                if !model_parsed.bones.is_empty() {
+                    let mut bone_values = model_parsed.bones;
+
+                    if scene_object.render_bones {
+                        for bone in bone_values.iter_mut() {
+                            let bone_model_parsed = parse(
+                                "models/sphere.fbx",
+                                Transform::new(
+                                    Vector3::new(0.0, 0.0, 0.0),
+                                    Vector3::new(0.0, 0.0, 0.0),
+                                    Vector3::new(0.001, 0.001, 0.001),
+                                ),
+                                [1.0, 1.0, 1.0],
+                            );
+                            let mut bone_object = Object::create(
+                                ObjectType::Mesh,
+                                create_vertices_skinned(&bone_model_parsed.vertices),
+                            );
+
+                            bone_object.set_position(
+                                -2.5 + bone.1.1.position.x * 0.01,
+                                3.0 + bone.1.1.position.z * 0.01,
+                                bone.1.1.position.y * 0.01,
+                            );
+                            bone_object.set_default_texture("textures/missing.png");
+                            bone_object.set_movable(true);
+
+                            let bone_object_id = self.objects.len();
+                            bone.1.4 = bone_object_id;
+
+                            self.add_object(bone_object);
+                        }
+                    }
+                    object.set_bones(
+                        bone_values,
+                        Vector3::new(0.0, 0.0, 0.0),
+                        Vector3::new(0.0, 0.0, 0.0),
+                        Vector3::new(1.0, 1.0, 1.0),
+                    );
+                    object.set_object_type(ObjectType::SkinnedMesh);
+                }
+
+                for material in scene_object.materials {
+                    object.add_material(Material::from_texture(&material.texture), material.name);
+                    self.textures.insert(material.texture);
+                }
+
+                object.set_default_texture(&scene_object.texture);
+                self.textures.insert(scene_object.texture);
+
+                self.add_object(object);
+            }
+        }
+
+        self.add_object(static_world_object);
+
+        let mut spawn = Object::create(ObjectType::Camera, Vec::new());
+        spawn.set_position(
+            scene.spawn.position[0],
+            scene.spawn.position[1],
+            scene.spawn.position[2],
+        );
+        spawn.set_rotation(
+            scene.spawn.rotation[0],
+            scene.spawn.rotation[1],
+            scene.spawn.rotation[2],
+        );
+        self.add_object(spawn);
+    }
 }

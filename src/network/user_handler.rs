@@ -147,7 +147,6 @@ pub async fn start_user_handler(
 
                                     Entry::Occupied(entry) => {
                                         let object_id = *entry.get();
-
                                         if object_id == 0 {
                                             continue;
                                         }

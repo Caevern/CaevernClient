@@ -1,17 +1,13 @@
-use std::{cell::RefCell, rc::Rc};
-
 use wasmtime::Caller;
 
 use crate::{
-    game_objects::{
-        object::{Object, ObjectType},
-        world::World,
-    },
+    game_objects::object::{Object, ObjectType},
+    modules::host::HostState,
     renderer::vertex::Vertex,
 };
 
 pub fn game_create_mesh(
-    mut caller: Caller<'_, Rc<RefCell<World>>>,
+    mut caller: Caller<'_, HostState>,
     vertices_ptr: u32,
     vertices_len: u32,
     uvs_ptr: u32,
@@ -79,9 +75,9 @@ pub fn game_create_mesh(
     object.set_default_texture("textures/white.png");
     object.set_movable(true);
 
-    caller.data().borrow_mut().add_object(object);
+    caller.data().world.borrow_mut().add_object(object);
 
-    let object_id = caller.data().borrow_mut().get_objects().len() - 1;
+    let object_id = caller.data().world.borrow_mut().get_objects().len() - 1;
 
     object_id as u32
 }

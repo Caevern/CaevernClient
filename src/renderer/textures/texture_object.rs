@@ -1,8 +1,6 @@
 use image::{DynamicImage, GenericImageView};
 
-#[derive(rust_embed::RustEmbed)]
-#[folder = "assets/"]
-pub struct Assets;
+use crate::setup::assets::Assets;
 
 pub struct TextureObject {
     pub texture: wgpu::Texture,

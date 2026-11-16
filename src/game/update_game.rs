@@ -3,13 +3,16 @@ use std::{
     collections::HashMap,
     f32,
     rc::Rc,
-    sync::mpsc::{Receiver, Sender},
+    sync::mpsc::{self, Receiver, Sender},
 };
 
 use cgmath::{InnerSpace, Matrix, SquareMatrix, Vector3};
 
 use crate::{
-    game::{update_bone::update_bone, update_bones::update_bones},
+    game::{
+        engine_command::EngineCommand, update_bone::update_bone, update_bones::update_bones,
+        update_position::update_object,
+    },
     game_objects::{
         material::Material,
         object::{Object, ObjectType},
@@ -18,8 +21,10 @@ use crate::{
         world::World,
     },
     interract::input_state::InputState,
+    modules::{load_module::load_module, module::Module},
     network::{
         avatar_updates::AvatarUpdate,
+        get_world::get_world,
         user_updates::UserUpdate::{self, UpdateAvatarId},
     },
     physics::{
@@ -41,6 +46,9 @@ pub struct Engine {
 
     // world
     pub world_rc: Rc<RefCell<World>>,
+    pub engine_command_tx: Sender<EngineCommand>,
+    pub engine_command_rx: Receiver<EngineCommand>,
+    pub modules: Vec<Module>,
 
     // fallback model
     fallback_vertices: Vec<(Vec<Vertex>, String)>,
@@ -50,13 +58,15 @@ pub struct Engine {
     // networking
     data_thread_tx: Sender<UserUpdate>,
     avatar_thread_rx: Receiver<AvatarUpdate>,
+    server_url: String,
 }
 impl Engine {
     pub fn new(
         data_thread_tx: Sender<UserUpdate>,
         avatar_thread_rx: Receiver<AvatarUpdate>,
+        server_url: String,
     ) -> Self {
-        let model_parsed = parse("models/fallback.fbx", Transform::zero());
+        let model_parsed = parse("models/fallback.fbx", Transform::zero(), [1.0, 1.0, 1.0]);
         let fallback_vertices = create_vertices_skinned(&model_parsed.vertices);
         let fallback_bones = model_parsed.bones;
 
@@ -64,6 +74,7 @@ impl Engine {
         let fallback_skeleton = create_skeleton(bone_bindings, &fallback_bones);
 
         let world_rc = Rc::new(RefCell::new(World::new()));
+        let (engine_command_tx, engine_command_rx) = mpsc::channel();
 
         Self {
             player: Player::default(),
@@ -73,6 +84,10 @@ impl Engine {
             data_thread_tx,
             avatar_thread_rx,
             world_rc,
+            engine_command_tx,
+            engine_command_rx,
+            modules: Vec::new(),
+            server_url,
         }
     }
 
@@ -118,6 +133,22 @@ impl Engine {
 
         apply_gravity(&mut self.player, frame_time);
 
+        for module in self.modules.iter_mut() {
+            module.update(frame_time);
+        }
+
+        let mut world = self.world_rc.borrow_mut();
+        world.player_position = self.player.camera.position;
+        for object in world.objects.values_mut() {
+            if object.needs_update() {
+                update_object(object, queue, buffer_collection);
+                object.set_needs_update(false);
+            }
+        }
+        drop(world);
+
+        self.process_engine_commands(buffer_collection, device, queue);
+
         let _ = self
             .data_thread_tx
             .send(UserUpdate::SendUserPosition(Transform {
@@ -135,11 +166,63 @@ impl Engine {
         self.check_avatar_thread(buffer_collection, device, queue);
     }
 
-    pub fn load_modules(&mut self) {
-        /*let _ = load_module(
-            "assets/modules/caevern_polydural.wasm",
-            self.world_rc.clone(),
-        );*/
+    fn process_engine_commands(
+        &mut self,
+        buffer_collection: &mut BufferCollection,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) {
+        while let Ok(command) = self.engine_command_rx.try_recv() {
+            match command {
+                EngineCommand::ConnectWorld(address) => {
+                    println!("Module requested world connection: {address}");
+
+                    self.load_world_data();
+                }
+                EngineCommand::LoadWorldData(world) => {
+                    println!("Loading world data");
+
+                    self.load_new_world(buffer_collection, device, queue, *world);
+                }
+            }
+        }
+    }
+
+    pub fn load_modules(&mut self, modules: Vec<String>) {
+        for module_path in modules {
+            let module = load_module(
+                &module_path,
+                self.world_rc.clone(),
+                self.engine_command_tx.clone(),
+            );
+            self.modules.push(module);
+        }
+    }
+
+    pub fn load_world_data(&mut self) {
+        self.modules.clear();
+        get_world(self.engine_command_tx.clone(), self.server_url.clone(), 1);
+    }
+
+    pub fn load_new_world(
+        &mut self,
+        buffer_collection: &mut BufferCollection,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        world: World,
+    ) {
+        self.modules.clear();
+
+        buffer_collection.final_matrices.clear();
+        buffer_collection.bones.clear();
+        buffer_collection.bone_buffers.clear();
+        buffer_collection.shader_type.clear();
+        buffer_collection.vertex_buffers.clear();
+        buffer_collection.uniform_bind_groups.clear();
+        buffer_collection.num_vertices.clear();
+        buffer_collection.model_uniform_buffers.clear();
+
+        self.set_world(world, buffer_collection, device, queue);
     }
 
     pub fn set_world(
@@ -149,9 +232,8 @@ impl Engine {
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) {
+        let modules = new_world.modules.clone();
         *self.world_rc.borrow_mut() = new_world;
-
-        self.load_modules();
 
         let mut world = self.world_rc.borrow_mut();
         let textures = world.get_textures().clone();
@@ -160,8 +242,13 @@ impl Engine {
             let object = world.objects.get_mut(&object_index).unwrap();
             create_rendered_object(&textures, &images, object, buffer_collection, device, queue);
         }
-        world.clear_images();
-        world.clear_vertices();
+
+        //world.clear_images();
+        //world.clear_vertices();
+
+        drop(world);
+
+        self.load_modules(modules);
     }
 
     fn check_avatar_thread(
