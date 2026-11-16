@@ -11,7 +11,6 @@ use crate::setup::engine_arguments::EngineArguments;
 
 fn load_icon() -> Option<Icon> {
     let image = image::open("assets/icons/icon.png")
-        .ok()
         .expect("Failed to load window icon")
         .into_rgba8();
     let (width, height) = image.dimensions();
