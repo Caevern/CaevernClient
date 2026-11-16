@@ -174,7 +174,7 @@ impl Engine {
     pub fn load_modules(&mut self, modules: Vec<String>) {
         for module_path in modules {
             let module = load_module(
-                &format!("assets/{}", module_path),
+                &module_path,
                 self.world_rc.clone(),
                 self.engine_command_tx.clone(),
             );
@@ -184,7 +184,7 @@ impl Engine {
 
     pub fn unload_world(&mut self) {
         self.modules.clear();
-        //*self.world_rc.borrow_mut() = World::default();
+        *self.world_rc.borrow_mut() = World::new();
     }
 
     pub fn set_world(
