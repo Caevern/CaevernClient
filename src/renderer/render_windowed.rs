@@ -33,7 +33,7 @@ pub struct RendererWindowed<'window> {
     frame: usize,
 }
 impl<'window> RendererWindowed<'window> {
-    pub async fn new(window: &Arc<Window>) -> Self {
+    pub async fn new(window: &Arc<dyn Window>) -> Self {
         let init = init_wgpu::InitWgpu::init_wgpu(window).await;
 
         let uniform_bind_group_layout: wgpu::BindGroupLayout =
