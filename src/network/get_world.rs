@@ -20,7 +20,7 @@ pub fn get_world(engine_command_tx: Sender<EngineCommand>, server_url: String, w
                     let mut world = World::new();
                     world.load_from_scene(scene);
                     engine_command_tx
-                        .send(EngineCommand::LoadWorldData(world))
+                        .send(EngineCommand::LoadWorldData(Box::new(world)))
                         .ok();
                 }
                 Err(err) => eprintln!("Failed to load world: {err}"),

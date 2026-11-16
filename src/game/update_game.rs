@@ -182,7 +182,7 @@ impl Engine {
                 EngineCommand::LoadWorldData(world) => {
                     println!("Loading world data");
 
-                    self.load_new_world(buffer_collection, device, queue, world);
+                    self.load_new_world(buffer_collection, device, queue, *world);
                 }
             }
         }

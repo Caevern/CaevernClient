@@ -90,8 +90,7 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
             let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
             runtime.block_on(async {
-                if let Ok((socket, _)) =
-                    connect_async(format!("ws://{}/ws/user", &server_url)).await
+                if let Ok((socket, _)) = connect_async(format!("ws://{}/ws/user", server_url)).await
                 {
                     let (socket, user_id) = authenticate_user(socket).await;
                     println!("User ID: {}", user_id);
