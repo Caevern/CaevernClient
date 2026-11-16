@@ -2,6 +2,7 @@ use std::{cell::RefCell, rc::Rc, sync::mpsc::Sender};
 use wasmtime::{Engine, Linker, Module, Store};
 
 use crate::{
+    game::engine_command::EngineCommand,
     game_objects::world::World,
     modules::{
         api::{
@@ -11,7 +12,7 @@ use crate::{
             game_get_position::game_get_position, game_get_time::game_get_time, game_log::game_log,
             game_set_position::game_set_position, network_connect::network_connect,
         },
-        host::{EngineCommand, HostState},
+        host::HostState,
         module,
     },
     setup::assets::Assets,

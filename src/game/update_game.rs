@@ -9,7 +9,10 @@ use std::{
 use cgmath::{InnerSpace, Matrix, SquareMatrix, Vector3};
 
 use crate::{
-    game::{update_bone::update_bone, update_bones::update_bones, update_position::update_object},
+    game::{
+        engine_command::EngineCommand, update_bone::update_bone, update_bones::update_bones,
+        update_position::update_object,
+    },
     game_objects::{
         material::Material,
         object::{Object, ObjectType},
@@ -18,9 +21,10 @@ use crate::{
         world::World,
     },
     interract::input_state::InputState,
-    modules::{host::EngineCommand, load_module::load_module, module::Module},
+    modules::{load_module::load_module, module::Module},
     network::{
         avatar_updates::AvatarUpdate,
+        get_world::get_world,
         user_updates::UserUpdate::{self, UpdateAvatarId},
     },
     physics::{
@@ -54,11 +58,13 @@ pub struct Engine {
     // networking
     data_thread_tx: Sender<UserUpdate>,
     avatar_thread_rx: Receiver<AvatarUpdate>,
+    server_url: String,
 }
 impl Engine {
     pub fn new(
         data_thread_tx: Sender<UserUpdate>,
         avatar_thread_rx: Receiver<AvatarUpdate>,
+        server_url: String,
     ) -> Self {
         let model_parsed = parse("models/fallback.fbx", Transform::zero(), [1.0, 1.0, 1.0]);
         let fallback_vertices = create_vertices_skinned(&model_parsed.vertices);
@@ -81,6 +87,7 @@ impl Engine {
             engine_command_tx,
             engine_command_rx,
             modules: Vec::new(),
+            server_url,
         }
     }
 
@@ -170,7 +177,12 @@ impl Engine {
                 EngineCommand::ConnectWorld(address) => {
                     println!("Module requested world connection: {address}");
 
-                    self.unload_world(buffer_collection, device, queue);
+                    self.load_world_data();
+                }
+                EngineCommand::LoadWorldData(world) => {
+                    println!("Loading world data");
+
+                    self.load_new_world(buffer_collection, device, queue, world);
                 }
             }
         }
@@ -187,11 +199,17 @@ impl Engine {
         }
     }
 
-    pub fn unload_world(
+    pub fn load_world_data(&mut self) {
+        self.modules.clear();
+        get_world(self.engine_command_tx.clone(), self.server_url.clone(), 1);
+    }
+
+    pub fn load_new_world(
         &mut self,
         buffer_collection: &mut BufferCollection,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
+        world: World,
     ) {
         self.modules.clear();
 
@@ -204,8 +222,7 @@ impl Engine {
         buffer_collection.num_vertices.clear();
         buffer_collection.model_uniform_buffers.clear();
 
-        let new_world = World::new();
-        self.set_world(new_world, buffer_collection, device, queue);
+        self.set_world(world, buffer_collection, device, queue);
     }
 
     pub fn set_world(

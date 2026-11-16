@@ -90,7 +90,8 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
             let runtime = tokio::runtime::Runtime::new().expect("Failed to create Tokio runtime");
             runtime.block_on(async {
-                if let Ok((socket, _)) = connect_async(format!("ws://{}/ws/user", server_url)).await
+                if let Ok((socket, _)) =
+                    connect_async(format!("ws://{}/ws/user", &server_url)).await
                 {
                     let (socket, user_id) = authenticate_user(socket).await;
                     println!("User ID: {}", user_id);
@@ -117,7 +118,11 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
                 .attach_to_session(&renderer_openxr.init.session)
                 .expect("Failed to attach xr input to session");
 
-            let mut engine = Engine::new(data_thread_tx.clone(), avatar_thread_rx);
+            let mut engine = Engine::new(
+                data_thread_tx.clone(),
+                avatar_thread_rx,
+                self.server_url.clone(),
+            );
             engine.set_world(
                 self.home_world.take().unwrap(),
                 &mut renderer_openxr.buffer_collection,
@@ -130,7 +135,11 @@ impl<'window> ApplicationHandler for GameWindow<'window> {
 
             renderer_openxr.run_frame_loop(engine, xr_input);
         } else {
-            self.engine = Some(Engine::new(data_thread_tx.clone(), avatar_thread_rx));
+            self.engine = Some(Engine::new(
+                data_thread_tx.clone(),
+                avatar_thread_rx,
+                self.server_url.clone(),
+            ));
 
             let attributes = WindowAttributes::default()
                 .with_title(self.title.clone())
