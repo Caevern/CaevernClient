@@ -140,7 +140,7 @@ impl Engine {
         }
         drop(world);
 
-        self.process_engine_commands();
+        self.process_engine_commands(buffer_collection, device, queue);
 
         let _ = self
             .data_thread_tx
@@ -159,13 +159,18 @@ impl Engine {
         self.check_avatar_thread(buffer_collection, device, queue);
     }
 
-    fn process_engine_commands(&mut self) {
+    fn process_engine_commands(
+        &mut self,
+        buffer_collection: &mut BufferCollection,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) {
         while let Ok(command) = self.engine_command_rx.try_recv() {
             match command {
                 EngineCommand::ConnectWorld(address) => {
                     println!("Module requested world connection: {address}");
 
-                    self.unload_world();
+                    self.unload_world(buffer_collection, device, queue);
                 }
             }
         }
@@ -182,9 +187,25 @@ impl Engine {
         }
     }
 
-    pub fn unload_world(&mut self) {
+    pub fn unload_world(
+        &mut self,
+        buffer_collection: &mut BufferCollection,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) {
         self.modules.clear();
-        *self.world_rc.borrow_mut() = World::new();
+
+        buffer_collection.final_matrices.clear();
+        buffer_collection.bones.clear();
+        buffer_collection.bone_buffers.clear();
+        buffer_collection.shader_type.clear();
+        buffer_collection.vertex_buffers.clear();
+        buffer_collection.uniform_bind_groups.clear();
+        buffer_collection.num_vertices.clear();
+        buffer_collection.model_uniform_buffers.clear();
+
+        let new_world = World::new();
+        self.set_world(new_world, buffer_collection, device, queue);
     }
 
     pub fn set_world(
